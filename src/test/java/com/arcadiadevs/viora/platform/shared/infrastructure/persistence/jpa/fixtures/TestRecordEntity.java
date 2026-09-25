@@ -31,6 +31,7 @@ public class TestRecordEntity extends AuditableAbstractPersistenceEntity {
     private TestParentEntity parent;
 
     public TestRecordEntity(BigDecimal measurementValue, BigDecimal percentageScore, TestParentEntity parent) {
+        this.setId(java.util.UUID.randomUUID());
         this.measurementValue = measurementValue;
         this.percentageScore = percentageScore;
         this.parent = parent;
