@@ -4,8 +4,6 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
 
-import java.util.UUID;
-
 /**
  * Domain exception thrown when attempting to delimit a plot with a name that already exists for the producer.
  */
