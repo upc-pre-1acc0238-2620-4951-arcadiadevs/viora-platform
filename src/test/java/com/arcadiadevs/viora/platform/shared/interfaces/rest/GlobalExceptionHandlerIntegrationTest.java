@@ -105,7 +105,7 @@ class GlobalExceptionHandlerIntegrationTest {
                 .andExpect(header().string("Content-Type", containsString("application/problem+json")))
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.type").value("https://api.viora.com/errors/business-rule-violation"))
-                .andExpect(jsonPath("$.title").value("Unprocessable Entity"))
+                .andExpect(jsonPath("$.title").value("Unprocessable Content"))
                 .andExpect(jsonPath("$.detail").value("Business rule 'OperationNotPermitted' violated: The requested entity cannot be processed in its current status"))
                 .andExpect(jsonPath("$.instance").value("/api/v1/test-exceptions/business-rule"))
                 .andExpect(jsonPath("$.timestamp").exists());

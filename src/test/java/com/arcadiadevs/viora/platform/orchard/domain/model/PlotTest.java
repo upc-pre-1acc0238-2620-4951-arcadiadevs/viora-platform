@@ -1,7 +1,9 @@
 package com.arcadiadevs.viora.platform.orchard.domain.model;
 
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimited;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdated;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -144,5 +146,61 @@ class PlotTest {
         var reconstituted = Plot.reconstitute(snapshot);
 
         assertThat(reconstituted.snapshot()).isEqualTo(snapshot);
+    }
+
+    @Test
+    @DisplayName("Should successfully update plot, increment revision, recalculate density, and emit PlotUpdated event")
+    void shouldSuccessfullyUpdatePlot() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Original"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.clearDomainEvents();
+
+        var updatedName = new PlotName("Cuartel Rectificado");
+        var updatedPolygon = new PlotGeometry(validGeoJson, 1.50);
+        var updatedFrame = new PlantationFrame(6.0, 4.0);
+        var pruningDate = java.time.LocalDate.of(2026, 9, 15);
+
+        plot.update(updatedName, updatedPolygon, updatedFrame, pruningDate, 0L);
+
+        var snap = plot.snapshot();
+        assertThat(snap.name().value()).isEqualTo("Cuartel Rectificado");
+        assertThat(snap.geometry().areaHa()).isEqualTo(1.50);
+        assertThat(snap.frame().rowSpacingM()).isEqualTo(6.0);
+        assertThat(snap.frame().treeSpacingM()).isEqualTo(4.0);
+        assertThat(snap.density().treesPerHectare()).isEqualTo(417);
+        assertThat(snap.lastPruningDate()).isEqualTo(pruningDate);
+        assertThat(snap.revision()).isEqualTo(1L);
+
+        assertThat(plot.domainEvents()).hasSize(1);
+        var event = (PlotUpdated) plot.domainEvents().iterator().next();
+        assertThat(event.plotId()).isEqualTo(snap.id().plotId());
+        assertThat(event.producerId()).isEqualTo(producerId.producerId());
+        assertThat(event.name()).isEqualTo("Cuartel Rectificado");
+        assertThat(event.revision()).isEqualTo(1L);
+        assertThat(event.areaHa()).isEqualTo(1.50);
+    }
+
+    @Test
+    @DisplayName("Should throw PlotRevisionMismatchException when expected revision does not match aggregate revision")
+    void shouldThrowExceptionWhenRevisionMismatch() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Concurrente"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+
+        var updatedName = new PlotName("Cuartel Modificado");
+        var updatedPolygon = new PlotGeometry(validGeoJson, 1.25);
+        var updatedFrame = new PlantationFrame(7.0, 5.0);
+
+        assertThatThrownBy(() -> plot.update(updatedName, updatedPolygon, updatedFrame, null, 5L))
+                .isInstanceOf(PlotRevisionMismatchException.class);
     }
 }

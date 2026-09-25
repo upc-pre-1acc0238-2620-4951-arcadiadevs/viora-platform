@@ -82,7 +82,7 @@ class GlobalExceptionHandlerTest {
         var problemDetail = Objects.requireNonNull((ProblemDetail) response.getBody());
 
         assertEquals(422, response.getStatusCode().value());
-        assertEquals("Unprocessable Entity", problemDetail.getTitle());
+        assertEquals("Unprocessable Content", problemDetail.getTitle());
         assertEquals("Business rule 'OperationNotAllowed' violated: The requested operation violates business constraints", problemDetail.getDetail());
         assertEquals("https://api.viora.com/errors/business-rule-violation", problemDetail.getType().toString());
         assertNotNull(problemDetail.getProperties());
