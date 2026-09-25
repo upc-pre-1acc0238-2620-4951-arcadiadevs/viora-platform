@@ -49,5 +49,12 @@ class VioraPlatformApplicationTests {
                 .andDo(print())
                 .andExpect(status().isCreated());
     }
+
+    @Test
+    void testListPlotsEndpoint() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/plots"))
+                .andDo(print())
+                .andExpect(status().isOk());
+    }
 }
 

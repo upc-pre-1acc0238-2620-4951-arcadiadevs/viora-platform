@@ -5,6 +5,8 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -36,4 +38,21 @@ public interface PlotRepository {
      * @return true if a plot with the name exists for the producer, false otherwise
      */
     boolean existsByNameAndProducerId(PlotName name, ProducerId producerId);
+
+    /**
+     * Finds all active plots associated with a producer.
+     *
+     * @param producerId the producer identifier value object
+     * @return list of active plot aggregate roots
+     */
+    List<Plot> findActiveByProducerId(ProducerId producerId);
+
+    /**
+     * Finds plots associated with a producer updated since a given timestamp for delta synchronization.
+     *
+     * @param producerId   the producer identifier value object
+     * @param updatedSince the timestamp threshold
+     * @return list of plot aggregate roots updated at or after the timestamp
+     */
+    List<Plot> findByProducerIdAndUpdatedSince(ProducerId producerId, Instant updatedSince);
 }
