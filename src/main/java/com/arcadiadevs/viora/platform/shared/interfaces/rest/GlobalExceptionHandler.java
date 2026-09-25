@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.shared.interfaces.rest;
 
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
@@ -89,6 +90,21 @@ public class GlobalExceptionHandler {
                 ? resolveMessageOrDefault(ex.getMessage(), ex.getMessage())
                 : resolveMessageOrDefault("error.business-rule.message", "Business rule violation");
         var applicationError = ApplicationError.businessRuleViolation("business-rule", detail);
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles optimistic locking revision mismatch exceptions.
+     *
+     * @param ex the plot revision mismatch exception
+     * @return ProblemDetail response with PRECONDITION_FAILED (412) status
+     */
+    @ExceptionHandler(PlotRevisionMismatchException.class)
+    public ResponseEntity<ProblemDetail> handlePlotRevisionMismatchException(
+            PlotRevisionMismatchException ex
+    ) {
+        var detail = resolveMessageOrDefault(ex.getMessage(), "The plot revision has changed. Please reload.");
+        var applicationError = ApplicationError.preconditionFailed("plot", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 

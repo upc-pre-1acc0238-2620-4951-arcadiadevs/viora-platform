@@ -182,6 +182,7 @@ public final class ErrorResponseAssembler {
             case "VALIDATION_ERROR" -> HttpStatus.BAD_REQUEST;
             case String s when s.endsWith("_FORBIDDEN") -> HttpStatus.FORBIDDEN;
             case String s when s.endsWith("_NOT_FOUND") -> HttpStatus.NOT_FOUND;
+            case String s when s.endsWith("_PRECONDITION_FAILED") -> HttpStatus.PRECONDITION_FAILED;
             case "BUSINESS_RULE_VIOLATION" -> HttpStatus.UNPROCESSABLE_ENTITY;
             case String s when s.endsWith("_CONFLICT") -> HttpStatus.CONFLICT;
             case "UNEXPECTED_ERROR" -> HttpStatus.INTERNAL_SERVER_ERROR;

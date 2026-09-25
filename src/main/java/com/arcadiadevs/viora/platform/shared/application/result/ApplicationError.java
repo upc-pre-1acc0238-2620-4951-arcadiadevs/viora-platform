@@ -98,6 +98,20 @@ public record ApplicationError(
     }
 
     /**
+     * Creates a precondition failed error when optimistic locking or headers (e.g. If-Match) fail.
+     *
+     * @param resource the resource being mutated
+     * @param reason   the reason why the precondition failed
+     * @return an {@link ApplicationError} configured for precondition failures
+     */
+    public static ApplicationError preconditionFailed(String resource, String reason) {
+        return new ApplicationError(
+                "%s_PRECONDITION_FAILED".formatted(resource.toUpperCase().replace('-', '_')),
+                "Precondition failed for %s".formatted(resource),
+                reason);
+    }
+
+    /**
      * Creates an unexpected error when an unanticipated exception or state occurs.
      *
      * @param context the context or component where the error occurred
