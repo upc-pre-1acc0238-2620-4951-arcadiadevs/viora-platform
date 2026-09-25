@@ -3,12 +3,11 @@ package com.arcadiadevs.viora.platform.orchard.application.internal.commandservi
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.DuplicatePlotNameException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.InvalidPlotGeometryException;
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.OliveVariety;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlantationFrame;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
@@ -91,6 +90,59 @@ public class PlotCommandServiceImpl implements PlotCommandService {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
             return Result.failure(ApplicationError.unexpected("plot-creation", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<Plot, ApplicationError> handle(UpdatePlotCommand command) {
+        try {
+            var plotId = new PlotId(command.plotId());
+            var producerId = new ProducerId(command.producerId());
+
+            var existingPlotOpt = plotRepository.findById(plotId);
+            if (existingPlotOpt.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
+            var plot = existingPlotOpt.get();
+            if (plot.snapshot().status() != PlotStatus.ACTIVE
+                    || !plot.snapshot().producerId().equals(producerId)) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
+            var newPlotName = new PlotName(command.name());
+            if (!plot.snapshot().name().equals(newPlotName)
+                    && plotRepository.existsByNameAndProducerId(newPlotName, producerId)) {
+                return Result.failure(ApplicationError.conflict("plot", "plot.name.duplicate"));
+            }
+
+            var newFrame = new PlantationFrame(command.rowSpacingM(), command.treeSpacingM());
+            var newGeometry = cadastralGeometryService.computeGeometry(command.polygonGeoJson());
+
+            plot.update(
+                    newPlotName,
+                    newGeometry,
+                    newFrame,
+                    command.lastPruningDate(),
+                    command.expectedRevision()
+            );
+
+            var savedPlot = plotRepository.save(plot);
+
+            for (var event : plot.domainEvents()) {
+                eventPublisher.publishEvent(event);
+            }
+            plot.clearDomainEvents();
+
+            return Result.success(savedPlot);
+        } catch (PlotRevisionMismatchException ex) {
+            return Result.failure(ApplicationError.preconditionFailed("plot", "plot.revision.mismatch"));
+        } catch (InvalidPlotGeometryException ex) {
+            return Result.failure(ApplicationError.validationError("geometry", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        } catch (Exception ex) {
+            return Result.failure(ApplicationError.unexpected("plot-update", ex.getMessage()));
         }
     }
 }
