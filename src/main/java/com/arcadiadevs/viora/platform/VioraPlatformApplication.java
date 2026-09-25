@@ -2,10 +2,12 @@ package com.arcadiadevs.viora.platform;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 /**
  * Main application bootstrap class for the Viora Platform backend service.
  */
+@EnableJpaAuditing
 @SpringBootApplication
 public class VioraPlatformApplication {
 

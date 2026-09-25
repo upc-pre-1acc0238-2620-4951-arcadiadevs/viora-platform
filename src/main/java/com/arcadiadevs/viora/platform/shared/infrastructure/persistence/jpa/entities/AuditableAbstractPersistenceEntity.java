@@ -1,49 +1,45 @@
 package com.arcadiadevs.viora.platform.shared.infrastructure.persistence.jpa.entities;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
- * Base JPA mapped superclass providing auditing timestamps and identity.
+ * Base JPA mapped superclass providing auditing timestamps and domain-assigned UUID identity.
  */
 @Getter
+@Setter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class AuditableAbstractPersistenceEntity {
 
     /**
-     * The persistence identifier.
+     * The persistence identifier assigned by the domain layer.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
 
     /**
      * The timestamp when this entity was created in persistence.
      */
     @CreatedDate
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     /**
      * The timestamp when this entity was last updated in persistence.
      */
     @LastModifiedDate
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    /**
-     * Sets the id. Used by assemblers when reconstructing a persistence entity
-     * from an existing domain object that already carries an identity.
-     *
-     * @param id the persistence identity to assign
-     */
-    public void setId(Long id) {
-        this.id = id;
-    }
 }
