@@ -6,6 +6,8 @@ import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.ent
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.UUID;
+
 /**
  * Spring Data JPA persistence repository for {@link PlotPersistenceEntity}.
  */

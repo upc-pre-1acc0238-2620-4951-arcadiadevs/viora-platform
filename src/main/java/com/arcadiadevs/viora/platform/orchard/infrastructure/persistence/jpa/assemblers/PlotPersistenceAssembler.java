@@ -3,6 +3,8 @@ package com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.as
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.PlotSnapshot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.embeddables.PlantationFramePersistenceEmbeddable;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.embeddables.PlotGeometryPersistenceEmbeddable;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.entities.PlotPersistenceEntity;
 
 import java.util.UUID;
@@ -37,8 +39,14 @@ public final class PlotPersistenceAssembler {
         entity.setProducerId(snap.producerId());
         entity.setName(snap.name());
         entity.setVariety(snap.variety());
-        entity.setGeometry(snap.geometry());
-        entity.setFrame(snap.frame());
+        entity.setGeometry(new PlotGeometryPersistenceEmbeddable(
+                snap.geometry().geoJson(),
+                snap.geometry().areaHa()
+        ));
+        entity.setFrame(new PlantationFramePersistenceEmbeddable(
+                snap.frame().rowSpacingM(),
+                snap.frame().treeSpacingM()
+        ));
         entity.setDensity(snap.density());
         entity.setLastPruningDate(snap.lastPruningDate());
         entity.setStatus(snap.status());
@@ -68,13 +76,20 @@ public final class PlotPersistenceAssembler {
             throw new IllegalArgumentException("plot.entity.null");
         }
 
+        var geometryVo = entity.getGeometry() != null
+                ? new PlotGeometry(entity.getGeometry().getPolygonGeoJson(), entity.getGeometry().getAreaHa())
+                : null;
+        var frameVo = entity.getFrame() != null
+                ? new PlantationFrame(entity.getFrame().getRowSpacingM(), entity.getFrame().getTreeSpacingM())
+                : null;
+
         var snapshot = new PlotSnapshot(
                 new PlotId(entity.getId().toString()),
                 entity.getProducerId(),
                 entity.getName(),
                 entity.getVariety(),
-                entity.getGeometry(),
-                entity.getFrame(),
+                geometryVo,
+                frameVo,
                 entity.getDensity(),
                 entity.getLastPruningDate(),
                 entity.getStatus(),

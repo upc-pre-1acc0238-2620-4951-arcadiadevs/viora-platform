@@ -1,8 +1,15 @@
 package com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.entities;
 
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.OliveVariety;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.TreeDensity;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.converters.PlotNamePersistenceConverter;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.converters.ProducerIdPersistenceConverter;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.converters.TreeDensityPersistenceConverter;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.embeddables.PlantationFramePersistenceEmbeddable;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.embeddables.PlotGeometryPersistenceEmbeddable;
 import com.arcadiadevs.viora.platform.shared.infrastructure.persistence.jpa.entities.AuditableAbstractPersistenceEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -13,7 +20,6 @@ import java.time.LocalDate;
 
 /**
  * JPA entity mapping the {@code orchard.plots} relational database table.
- * Encapsulates domain Value Objects via {@link Embedded}, {@link Convert}, and {@link Enumerated}.
  */
 @Entity
 @Table(name = "plots", schema = "orchard")
@@ -35,23 +41,13 @@ public class PlotPersistenceEntity extends AuditableAbstractPersistenceEntity {
     private OliveVariety variety;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "geoJson", column = @Column(name = "polygon_geojson", nullable = false, columnDefinition = "text")),
-            @AttributeOverride(name = "areaHa", column = @Column(name = "area_ha", nullable = false))
-    })
-    private PlotGeometry geometry;
+    private PlotGeometryPersistenceEmbeddable geometry;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "rowSpacingM", column = @Column(name = "row_spacing_m", nullable = false)),
-            @AttributeOverride(name = "treeSpacingM", column = @Column(name = "tree_spacing_m", nullable = false))
-    })
-    private PlantationFrame frame;
+    private PlantationFramePersistenceEmbeddable frame;
 
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "treesPerHectare", column = @Column(name = "tree_density", nullable = false))
-    })
+    @Convert(converter = TreeDensityPersistenceConverter.class)
+    @Column(name = "tree_density", nullable = false)
     private TreeDensity density;
 
     @Column(name = "last_pruning_date")
