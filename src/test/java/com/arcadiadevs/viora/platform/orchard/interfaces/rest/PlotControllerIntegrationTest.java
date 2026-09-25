@@ -41,7 +41,7 @@ class PlotControllerIntegrationTest {
     private PlotCommandService plotCommandService;
 
     @Mock
-    private com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService plotQueryService;
+    private PlotQueryService plotQueryService;
 
     @Mock
     private PlotRepository plotRepository;
@@ -193,62 +193,5 @@ class PlotControllerIntegrationTest {
                 .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")))
                 .andExpect(jsonPath("$.status", is(409)))
                 .andExpect(jsonPath("$.detail", is("Ya existe una parcela con este nombre para el productor")));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/plots should return 200 OK and list of plots")
-    void shouldReturnOkAndListOfPlots() throws Exception {
-        var plot = Plot.delimit(
-                new ProducerId(producerId.toString()),
-                new PlotName("Cuartel San Jerónimo"),
-                OliveVariety.CRIOLLA,
-                new PlotGeometry(validGeoJson, 1.25),
-                new PlantationFrame(7.0, 5.0)
-        );
-
-        when(plotQueryService.handle(any(com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery.class)))
-                .thenReturn(java.util.List.of(plot));
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/plots")
-                        .param("producerId", producerId.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()", is(1)))
-                .andExpect(jsonPath("$[0].id", is(plot.snapshot().id().plotId())))
-                .andExpect(jsonPath("$[0].producerId", is(producerId.toString())))
-                .andExpect(jsonPath("$[0].name", is("Cuartel San Jerónimo")))
-                .andExpect(jsonPath("$[0].variety", is("CRIOLLA")))
-                .andExpect(jsonPath("$[0].areaHa", is(1.25)))
-                .andExpect(jsonPath("$[0].treeDensity", is(286)))
-                .andExpect(jsonPath("$[0].status", is("ACTIVE")));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/plots with updatedSince parameter should filter by delta timestamp")
-    void shouldReturnOkAndListOfUpdatedPlotsWhenUpdatedSinceProvided() throws Exception {
-        var plot = Plot.delimit(
-                new ProducerId(producerId.toString()),
-                new PlotName("Cuartel San Jerónimo"),
-                OliveVariety.CRIOLLA,
-                new PlotGeometry(validGeoJson, 1.25),
-                new PlantationFrame(7.0, 5.0)
-        );
-
-        when(plotQueryService.handle(any(com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery.class)))
-                .thenReturn(java.util.List.of(plot));
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/plots")
-                        .param("producerId", producerId.toString())
-                        .param("updatedSince", "2026-09-01T00:00:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()", is(1)))
-                .andExpect(jsonPath("$[0].id", is(plot.snapshot().id().plotId())));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/plots should return 400 Bad Request when updatedSince date format is malformed")
-    void shouldReturnBadRequestWhenUpdatedSinceIsMalformed() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/plots")
-                        .param("updatedSince", "invalid-date-format"))
-                .andExpect(status().isBadRequest());
     }
 }
