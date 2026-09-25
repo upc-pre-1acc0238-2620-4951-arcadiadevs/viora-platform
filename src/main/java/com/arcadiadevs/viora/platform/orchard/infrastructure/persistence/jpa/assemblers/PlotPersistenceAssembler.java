@@ -50,7 +50,9 @@ public final class PlotPersistenceAssembler {
         entity.setDensity(snap.density());
         entity.setLastPruningDate(snap.lastPruningDate());
         entity.setStatus(snap.status());
-        entity.setRevision(snap.revision());
+        if (snap.revision() != null && snap.revision() > 0L) {
+            entity.setRevision(snap.revision());
+        }
 
         return entity;
     }
