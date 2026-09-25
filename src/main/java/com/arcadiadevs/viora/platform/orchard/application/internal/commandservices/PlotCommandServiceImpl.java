@@ -40,6 +40,15 @@ public class PlotCommandServiceImpl implements PlotCommandService {
             CadastralGeometryService cadastralGeometryService,
             ApplicationEventPublisher eventPublisher
     ) {
+        if (plotRepository == null) {
+            throw new IllegalArgumentException("plot.repository.null");
+        }
+        if (cadastralGeometryService == null) {
+            throw new IllegalArgumentException("plot.cadastral_geometry_service.null");
+        }
+        if (eventPublisher == null) {
+            throw new IllegalArgumentException("plot.event_publisher.null");
+        }
         this.plotRepository = plotRepository;
         this.cadastralGeometryService = cadastralGeometryService;
         this.eventPublisher = eventPublisher;
