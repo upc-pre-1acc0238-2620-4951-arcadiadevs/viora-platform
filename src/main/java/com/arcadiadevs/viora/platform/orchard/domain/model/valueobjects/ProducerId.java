@@ -35,7 +35,7 @@ public record ProducerId(String producerId) {
             throw new IllegalArgumentException("producer.id.null_or_empty");
         }
         try {
-            UUID.fromString(producerId);
+            producerId = UUID.fromString(producerId.trim()).toString().toLowerCase();
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("producer.id.invalid_uuid", exception);
         }
