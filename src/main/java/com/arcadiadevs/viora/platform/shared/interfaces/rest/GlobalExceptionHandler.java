@@ -82,7 +82,7 @@ public class GlobalExceptionHandler {
      * Handles domain business rule violation exceptions.
      *
      * @param ex the business rule exception
-     * @return ProblemDetail response with UNPROCESSABLE_ENTITY status
+     * @return ProblemDetail response with UNPROCESSABLE_CONTENT status
      */
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ProblemDetail> handleBusinessRuleException(BusinessRuleException ex) {
