@@ -19,6 +19,7 @@ public class TestParentEntity extends AuditableAbstractPersistenceEntity {
     private String name;
 
     public TestParentEntity(String name) {
+        this.setId(java.util.UUID.randomUUID());
         this.name = name;
     }
 }

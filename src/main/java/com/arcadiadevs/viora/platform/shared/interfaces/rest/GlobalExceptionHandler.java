@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.shared.interfaces.rest;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
+import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceNotFoundException;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import jakarta.validation.ConstraintViolationException;
@@ -84,10 +85,25 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ProblemDetail> handleBusinessRuleException(BusinessRuleException ex) {
-        var applicationError = ApplicationError.businessRuleViolation(
-                "business-rule",
-                ex.getMessage() != null ? ex.getMessage() : resolveMessageOrDefault("error.business-rule.message", "Business rule violation")
-        );
+        var detail = ex.getMessage() != null
+                ? resolveMessageOrDefault(ex.getMessage(), ex.getMessage())
+                : resolveMessageOrDefault("error.business-rule.message", "Business rule violation");
+        var applicationError = ApplicationError.businessRuleViolation("business-rule", detail);
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles domain resource conflict exceptions.
+     *
+     * @param ex the resource conflict exception
+     * @return ProblemDetail response with CONFLICT status
+     */
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<ProblemDetail> handleResourceConflictException(ResourceConflictException ex) {
+        var detail = ex.getMessage() != null
+                ? resolveMessageOrDefault(ex.getMessage(), ex.getMessage())
+                : resolveMessageOrDefault("error.conflict.message", "Resource conflict");
+        var applicationError = ApplicationError.conflict("resource", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 
@@ -139,9 +155,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex) {
+        var detail = ex.getMessage() != null
+                ? resolveMessageOrDefault(ex.getMessage(), ex.getMessage())
+                : resolveMessageOrDefault("validation.request.failed", "Request validation failed");
         var applicationError = ApplicationError.validationError(
                 resolveMessageOrDefault("validation.request.argument", "request-argument"),
-                ex.getMessage() != null ? ex.getMessage() : resolveMessageOrDefault("validation.request.failed", "Request validation failed")
+                detail
         );
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
