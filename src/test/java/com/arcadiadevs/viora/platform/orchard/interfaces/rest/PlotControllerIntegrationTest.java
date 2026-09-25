@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.orchard.interfaces.rest;
 
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
+import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
@@ -40,6 +41,9 @@ class PlotControllerIntegrationTest {
     private PlotCommandService plotCommandService;
 
     @Mock
+    private PlotQueryService plotQueryService;
+
+    @Mock
     private PlotRepository plotRepository;
 
     private final UUID producerId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
@@ -47,7 +51,7 @@ class PlotControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        var plotController = new PlotController(plotCommandService, plotRepository);
+        var plotController = new PlotController(plotCommandService, plotQueryService, plotRepository);
         mockMvc = MockMvcBuilders.standaloneSetup(plotController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

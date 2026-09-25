@@ -3,12 +3,15 @@ package com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.ad
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.assemblers.PlotPersistenceAssembler;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.repositories.PlotPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,5 +47,21 @@ public class PlotRepositoryImpl implements PlotRepository {
     @Override
     public boolean existsByNameAndProducerId(PlotName name, ProducerId producerId) {
         return plotPersistenceRepository.existsByNameAndProducerId(name, producerId);
+    }
+
+    @Override
+    public List<Plot> findActiveByProducerId(ProducerId producerId) {
+        return plotPersistenceRepository.findAllByProducerIdAndStatus(producerId, PlotStatus.ACTIVE)
+                .stream()
+                .map(PlotPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
+    public List<Plot> findByProducerIdAndUpdatedSince(ProducerId producerId, Instant updatedSince) {
+        return plotPersistenceRepository.findAllByProducerIdAndUpdatedAtGreaterThanEqual(producerId, updatedSince)
+                .stream()
+                .map(PlotPersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 }

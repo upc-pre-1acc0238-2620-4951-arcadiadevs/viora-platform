@@ -3,8 +3,10 @@ package com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.PlotResource;
 
+import java.util.List;
+
 /**
- * Assembler to convert a Plot entity to a PlotResource.
+ * Assembler to convert a Plot entity or list of entities to PlotResource representations.
  */
 public class PlotResourceFromEntityAssembler {
 
@@ -30,5 +32,17 @@ public class PlotResourceFromEntityAssembler {
                 snap.status().name(),
                 snap.revision()
         );
+    }
+
+    /**
+     * Converts a list of Plot entities to a list of PlotResources.
+     *
+     * @param entities The list of {@link Plot} entities to convert.
+     * @return The list of {@link PlotResource} resources.
+     */
+    public static List<PlotResource> toResourceList(List<Plot> entities) {
+        return entities.stream()
+                .map(PlotResourceFromEntityAssembler::toResourceFromEntity)
+                .toList();
     }
 }

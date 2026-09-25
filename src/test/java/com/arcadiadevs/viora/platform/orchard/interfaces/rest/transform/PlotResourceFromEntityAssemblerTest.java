@@ -40,4 +40,22 @@ class PlotResourceFromEntityAssemblerTest {
         assertThat(resource.status()).isEqualTo("ACTIVE");
         assertThat(resource.revision()).isZero();
     }
+
+    @Test
+    @DisplayName("Should transform List of Plot entities into List of PlotResources")
+    void shouldTransformPlotListToResourceList() {
+        Plot plot = Plot.delimit(
+                new ProducerId(producerId),
+                new PlotName("Cuartel San Jerónimo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+
+        var resourceList = PlotResourceFromEntityAssembler.toResourceList(java.util.List.of(plot));
+
+        assertThat(resourceList).hasSize(1);
+        assertThat(resourceList.getFirst().id()).isEqualTo(plot.snapshot().id().plotId());
+        assertThat(PlotResourceFromEntityAssembler.toResourceList(java.util.List.of())).isEmpty();
+    }
 }
