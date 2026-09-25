@@ -2,8 +2,10 @@ package com.arcadiadevs.viora.platform.orchard.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
 import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotNotFoundException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
@@ -135,6 +137,43 @@ public class PlotController {
                 : plotQueryService.handle(new GetAllActivePlotsByProducerIdQuery(effectiveProducerId));
 
         return ResponseEntity.ok(PlotResourceFromEntityAssembler.toResourceList(plots));
+    }
+
+    /**
+     * Retrieves the agronomic details and boundaries of an orchard plot by its unique identifier.
+     *
+     * @param plotId     the unique identifier of the plot
+     * @param producerId optional producer UUID parameter (falls back to default tenant producer if omitted)
+     * @return the PlotResource with 200 OK, or ProblemDetail with 404 Not Found if missing or inactive
+     */
+    @GetMapping("/{plotId}")
+    @Operation(
+            summary = "Get plot agronomic details by id",
+            description = "Retrieves active orchard plot details, dendrometric spacing, calculated density, and cadastral geometry."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Plot details successfully retrieved",
+                    content = @Content(schema = @Schema(implementation = PlotResource.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "Plot not found or not active for the producer")
+    })
+    public ResponseEntity<PlotResource> getPlotById(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String plotId,
+            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
+            @RequestParam(required = false) @Nullable String producerId
+    ) {
+        var effectiveProducerId = (producerId != null && !producerId.isBlank())
+                ? new ProducerId(producerId)
+                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+
+        var query = new GetPlotByIdQuery(new PlotId(plotId), effectiveProducerId);
+        var plot = plotQueryService.handle(query)
+                .orElseThrow(() -> new PlotNotFoundException(query.plotId()));
+
+        return ResponseEntity.ok(PlotResourceFromEntityAssembler.toResourceFromEntity(plot));
     }
 }
 
