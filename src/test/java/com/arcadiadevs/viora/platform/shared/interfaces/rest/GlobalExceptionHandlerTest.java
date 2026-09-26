@@ -91,6 +91,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleDataIntegrityViolationReturnsConflict() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
         var handler = new GlobalExceptionHandler();
         var response = handler.handleDataIntegrityViolation(
                 new DataIntegrityViolationException("Unique constraint violation")
