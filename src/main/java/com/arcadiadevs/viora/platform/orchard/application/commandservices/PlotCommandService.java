@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.orchard.application.commandservices;
 
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -28,4 +29,13 @@ public interface PlotCommandService {
      * @see UpdatePlotCommand
      */
     Result<Plot, ApplicationError> handle(UpdatePlotCommand command);
+
+    /**
+     * Handles plot soft deletion and removal from active inventory.
+     *
+     * @param command plot removal command
+     * @return removed plot identifier string or an application error
+     * @see RemovePlotCommand
+     */
+    Result<String, ApplicationError> handle(RemovePlotCommand command);
 }

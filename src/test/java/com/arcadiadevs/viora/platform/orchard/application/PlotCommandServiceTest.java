@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.orchard.application;
 import com.arcadiadevs.viora.platform.orchard.application.internal.commandservices.PlotCommandServiceImpl;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -262,5 +263,80 @@ class PlotCommandServiceTest {
 
         assertThat(result.isFailure()).isTrue();
         assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("Should successfully soft delete plot and publish PlotRemovedEvent event")
+    void shouldRemovePlotSuccessfully() {
+        var plot = Plot.delimit(
+                new ProducerId(producerId.toString()),
+                new PlotName("Cuartel A Eliminar"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+        when(plotRepository.save(any(Plot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var command = new RemovePlotCommand(
+                plotId.plotId(),
+                producerId.toString(),
+                "Cierre de cuartel"
+        );
+
+        var result = plotCommandService.handle(command);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success().orElseThrow()).isEqualTo(plotId.plotId());
+        verify(plotRepository).save(plot);
+        verify(eventPublisher, atLeastOnce()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("Should return Not Found when removing a plot that does not exist")
+    void shouldReturnNotFoundWhenRemovingNonExistentPlot() {
+        var nonExistentPlotId = new PlotId();
+        when(plotRepository.findById(nonExistentPlotId)).thenReturn(java.util.Optional.empty());
+
+        var command = new RemovePlotCommand(
+                nonExistentPlotId.plotId(),
+                producerId.toString(),
+                "Remocion"
+        );
+
+        var result = plotCommandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    @Test
+    @DisplayName("Should return Conflict when removing a plot that is already removed")
+    void shouldReturnConflictWhenPlotIsAlreadyRemoved() {
+        var plot = Plot.delimit(
+                new ProducerId(producerId.toString()),
+                new PlotName("Cuartel Ya Desactivado"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.remove("Primera remocion");
+
+        var plotId = plot.snapshot().id();
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+
+        var command = new RemovePlotCommand(
+                plotId.plotId(),
+                producerId.toString(),
+                "Segunda remocion"
+        );
+
+        var result = plotCommandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_CONFLICT");
     }
 }
