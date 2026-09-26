@@ -3,8 +3,8 @@ package com.arcadiadevs.viora.platform.orchard.application;
 import com.arcadiadevs.viora.platform.orchard.application.internal.commandservices.PlotCommandServiceImpl;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
-import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -112,8 +112,10 @@ class PlotCommandServiceTest {
 
     @Test
     @DisplayName("Should return Failure result when command is null")
+    @SuppressWarnings({"all", "ConstantConditions"})
     void shouldReturnFailureWhenCommandIsNull() {
-        var result = plotCommandService.handle(null);
+        DelimitPlotCommand nullCommand = null;
+        var result = plotCommandService.handle(nullCommand);
 
         assertThat(result.isFailure()).isTrue();
         assertThat(result.failure().orElseThrow().code()).isEqualTo("UNEXPECTED_ERROR");
@@ -121,6 +123,7 @@ class PlotCommandServiceTest {
 
     @Test
     @DisplayName("Should enforce constructor dependency null guards")
+    @SuppressWarnings({"DataFlowIssue", "ConstantConditions"})
     void shouldEnforceConstructorNullGuards() {
         var geometryService = new CadastralGeometryService();
 
@@ -165,5 +168,99 @@ class PlotCommandServiceTest {
         assertThatThrownBy(() -> new DelimitPlotCommand(prodIdStr, "Name", "CRIOLLA", validGeoJson, 7.0, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("plot.spacing.positive");
+    }
+
+    @Test
+    @DisplayName("Should successfully handle UpdatePlotCommand and update boundaries")
+    void shouldSuccessfullyUpdatePlot() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Antiguo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+        when(plotRepository.existsByNameAndProducerId(any(PlotName.class), eq(prodId))).thenReturn(false);
+        when(plotRepository.save(any(Plot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var updateCommand = new UpdatePlotCommand(
+                plotId.plotId(),
+                prodId.producerId(),
+                "Cuartel Rectificado",
+                6.5,
+                4.5,
+                java.time.LocalDate.of(2026, 9, 10),
+                validGeoJson,
+                0L
+        );
+
+        var result = plotCommandService.handle(updateCommand);
+
+        assertThat(result.isSuccess()).isTrue();
+        var updated = result.success().orElseThrow();
+        assertThat(updated.snapshot().name().value()).isEqualTo("Cuartel Rectificado");
+        assertThat(updated.snapshot().revision()).isEqualTo(1L);
+        verify(plotRepository, times(1)).save(plot);
+        verify(eventPublisher, atLeastOnce()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("Should return Precondition Failed when revision does not match expected revision")
+    void shouldReturnPreconditionFailedWhenRevisionMismatch() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Antiguo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+
+        var updateCommand = new UpdatePlotCommand(
+                plotId.plotId(),
+                prodId.producerId(),
+                "Cuartel Rectificado",
+                6.5,
+                4.5,
+                null,
+                validGeoJson,
+                5L // current is 0L
+        );
+
+        var result = plotCommandService.handle(updateCommand);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_PRECONDITION_FAILED");
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    @Test
+    @DisplayName("Should return Not Found when updating a plot that does not exist")
+    void shouldReturnNotFoundWhenUpdatingNonExistentPlot() {
+        var nonExistentPlotId = new PlotId();
+        when(plotRepository.findById(nonExistentPlotId)).thenReturn(java.util.Optional.empty());
+
+        var updateCommand = new UpdatePlotCommand(
+                nonExistentPlotId.plotId(),
+                producerId.toString(),
+                "Cuartel Nuevo",
+                6.5,
+                4.5,
+                null,
+                validGeoJson,
+                0L
+        );
+
+        var result = plotCommandService.handle(updateCommand);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
     }
 }

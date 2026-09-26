@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStat
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.assemblers.PlotPersistenceAssembler;
+import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.entities.PlotPersistenceEntity;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.persistence.jpa.repositories.PlotPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
@@ -40,7 +41,17 @@ public class PlotRepositoryImpl implements PlotRepository {
 
     @Override
     public Plot save(Plot plot) {
-        var savedEntity = plotPersistenceRepository.save(PlotPersistenceAssembler.toPersistenceFromDomain(plot));
+        var uuid = UUID.fromString(plot.snapshot().id().plotId());
+        var existingEntityOpt = plotPersistenceRepository.findById(uuid);
+
+        PlotPersistenceEntity entityToSave;
+        if (existingEntityOpt.isPresent()) {
+            entityToSave = PlotPersistenceAssembler.updateEntityFromDomain(existingEntityOpt.get(), plot);
+        } else {
+            entityToSave = PlotPersistenceAssembler.toPersistenceFromDomain(plot);
+        }
+
+        var savedEntity = plotPersistenceRepository.save(entityToSave);
         return PlotPersistenceAssembler.toDomainFromPersistence(savedEntity);
     }
 
