@@ -33,6 +33,9 @@ public class OpenApiConfiguration {
     @Value("${documentation.application.version}")
     String applicationVersion;
 
+    @Value("${server.port:8080}")
+    String serverPort;
+
     // Methods
 
     /**
@@ -59,7 +62,7 @@ public class OpenApiConfiguration {
                                 .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8080")
+                                .url("http://localhost:" + this.serverPort)
                                 .description("Local Development Server"),
                         new Server()
                                 .url("https://api.viora.com")

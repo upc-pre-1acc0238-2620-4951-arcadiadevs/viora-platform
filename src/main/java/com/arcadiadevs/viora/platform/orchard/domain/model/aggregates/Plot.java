@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.orchard.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimited;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdated;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 
@@ -123,6 +125,46 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 snapshot.status(),
                 snapshot.revision()
         );
+    }
+
+    /**
+     * Integrally updates the plot agronomic and cadastral boundaries while enforcing optimistic locking.
+     * Recalculates planting tree density and dispatches {@link PlotUpdated}.
+     *
+     * @param newName          the new plot name
+     * @param newGeometry      the updated cadastral geometry
+     * @param newFrame         the updated plantation frame
+     * @param newPruningDate   the updated date of last pruning
+     * @param expectedRevision the revision expected by the caller from If-Match header
+     * @throws PlotRevisionMismatchException if expectedRevision does not match current aggregate revision
+     */
+    public void update(
+            PlotName newName,
+            PlotGeometry newGeometry,
+            PlantationFrame newFrame,
+            LocalDate newPruningDate,
+            long expectedRevision
+    ) {
+        if (this.revision == null || this.revision != expectedRevision) {
+            long currentRev = this.revision == null ? 0L : this.revision;
+            throw new PlotRevisionMismatchException(this.id, currentRev, expectedRevision);
+        }
+        this.name = newName;
+        this.geometry = newGeometry;
+        this.frame = newFrame;
+        this.density = TreeDensity.from(newFrame);
+        this.lastPruningDate = newPruningDate;
+        this.revision = this.revision + 1L;
+
+        registerDomainEvent(new PlotUpdated(
+                this.id.plotId(),
+                this.producerId.producerId(),
+                this.name.value(),
+                this.geometry.geoJson(),
+                this.geometry.areaHa(),
+                this.revision,
+                Instant.now()
+        ));
     }
 
     /**

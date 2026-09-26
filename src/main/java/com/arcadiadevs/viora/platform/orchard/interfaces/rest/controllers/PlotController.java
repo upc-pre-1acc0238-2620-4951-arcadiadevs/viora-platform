@@ -10,10 +10,13 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.Producer
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.CreatePlotResource;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.PlotResource;
+import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.UpdatePlotResource;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.CreatePlotCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.PlotResourceFromEntityAssembler;
+import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.UpdatePlotCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -135,6 +138,65 @@ public class PlotController {
                 : plotQueryService.handle(new GetAllActivePlotsByProducerIdQuery(effectiveProducerId));
 
         return ResponseEntity.ok(PlotResourceFromEntityAssembler.toResourceList(plots));
+    }
+
+    /**
+     * Updates an orchard plot's boundaries and dendrometric frame with optimistic concurrency control.
+     *
+     * @param plotId     the identifier of the plot to update
+     * @param ifMatch    the expected revision header (e.g., "1" or 1)
+     * @param producerId optional managing producer UUID parameter (falls back to default tenant)
+     * @param resource   the payload containing updated boundaries and frame
+     * @return updated PlotResource with ETag header and 200 OK, or ProblemDetail on error
+     */
+    @PutMapping(value = "/{plotId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Update plot boundaries and density with optimistic lock",
+            description = "Updates plot boundaries, recalculates tree density, and enforces optimistic locking via the If-Match header."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Plot boundaries successfully updated",
+                    content = @Content(schema = @Schema(implementation = PlotResource.class))
+            ),
+            @ApiResponse(responseCode = "400", description = "Invalid payload or geometric boundary validation error"),
+            @ApiResponse(responseCode = "404", description = "Plot not found or not active for the producer"),
+            @ApiResponse(responseCode = "409", description = "A plot with the same name already exists for the producer"),
+            @ApiResponse(responseCode = "412", description = "Precondition Failed: If-Match revision mismatch")
+    })
+    public ResponseEntity<?> updatePlot(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String plotId,
+            @Parameter(description = "Optimistic locking revision", example = "\"1\"", required = true)
+            @RequestHeader("If-Match") String ifMatch,
+            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
+            @RequestParam(required = false) @Nullable String producerId,
+            @Valid @RequestBody UpdatePlotResource resource
+    ) {
+        long expectedRevision;
+        try {
+            var rawRevision = ifMatch.replace("\"", "").trim();
+            expectedRevision = Long.parseLong(rawRevision);
+        } catch (NumberFormatException ex) {
+            var error = ApplicationError.validationError("If-Match", "plot.revision.invalid");
+            return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+        }
+
+        var effectiveProducerId = (producerId != null && !producerId.isBlank())
+                ? new ProducerId(producerId)
+                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+
+        var command = UpdatePlotCommandFromResourceAssembler
+                .toCommandFromResource(plotId, effectiveProducerId.producerId(), expectedRevision, resource);
+
+        var result = plotCommandService.handle(command);
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(
+                result,
+                PlotResourceFromEntityAssembler::toResourceFromEntity,
+                HttpStatus.OK
+        );
     }
 }
 
