@@ -3,9 +3,11 @@ package com.arcadiadevs.viora.platform.orchard.application.internal.commandservi
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.DuplicatePlotNameException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.InvalidPlotGeometryException;
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotAlreadyRemovedException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -39,15 +41,6 @@ public class PlotCommandServiceImpl implements PlotCommandService {
             CadastralGeometryService cadastralGeometryService,
             ApplicationEventPublisher eventPublisher
     ) {
-        if (plotRepository == null) {
-            throw new IllegalArgumentException("plot.repository.null");
-        }
-        if (cadastralGeometryService == null) {
-            throw new IllegalArgumentException("plot.cadastral_geometry_service.null");
-        }
-        if (eventPublisher == null) {
-            throw new IllegalArgumentException("plot.event_publisher.null");
-        }
         this.plotRepository = plotRepository;
         this.cadastralGeometryService = cadastralGeometryService;
         this.eventPublisher = eventPublisher;
@@ -143,6 +136,41 @@ public class PlotCommandServiceImpl implements PlotCommandService {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
             return Result.failure(ApplicationError.unexpected("plot-update", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<String, ApplicationError> handle(RemovePlotCommand command) {
+        try {
+            var plotId = new PlotId(command.plotId());
+            var producerId = new ProducerId(command.producerId());
+
+            var existingPlotOpt = plotRepository.findById(plotId);
+            if (existingPlotOpt.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
+            var plot = existingPlotOpt.get();
+            if (!plot.snapshot().producerId().equals(producerId)) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
+            plot.remove(command.reason());
+
+            var savedPlot = plotRepository.save(plot);
+
+            for (var event : plot.domainEvents()) {
+                eventPublisher.publishEvent(event);
+            }
+            plot.clearDomainEvents();
+
+            return Result.success(savedPlot.snapshot().id().plotId());
+        } catch (PlotAlreadyRemovedException ex) {
+            return Result.failure(ApplicationError.conflict("plot", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        } catch (Exception ex) {
+            return Result.failure(ApplicationError.unexpected("plot-removal", ex.getMessage()));
         }
     }
 }

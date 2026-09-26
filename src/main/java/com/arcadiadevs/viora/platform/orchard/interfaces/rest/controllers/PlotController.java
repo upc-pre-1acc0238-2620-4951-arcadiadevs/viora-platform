@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCo
 import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotNotFoundException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
@@ -18,6 +19,7 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.PlotReso
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.UpdatePlotCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -236,6 +238,47 @@ public class PlotController {
                 PlotResourceFromEntityAssembler::toResourceFromEntity,
                 HttpStatus.OK
         );
+    }
+
+    /**
+     * Soft deletes and deactivates an orchard plot from active inventory.
+     *
+     * @param plotId     the identifier of the plot to delete
+     * @param reason     optional justification or cause for removing the plot
+     * @param producerId optional managing producer UUID parameter (falls back to default tenant)
+     * @return MessageResource with confirmation message and 200 OK, or ProblemDetail on error
+     */
+    @DeleteMapping("/{plotId}")
+    @Operation(
+            summary = "Soft delete plot from active inventory",
+            description = "Removes an active orchard plot from inventory preserving historical traceability."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Plot deleted successfully",
+                    content = @Content(schema = @Schema(implementation = MessageResource.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "Plot not found or not active for the producer"),
+            @ApiResponse(responseCode = "409", description = "Plot has already been deactivated or removed")
+    })
+    public ResponseEntity<?> deletePlot(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+            @PathVariable String plotId,
+            @Parameter(description = "Justification for removing the plot", example = "Manual plot removal")
+            @RequestParam(required = false, defaultValue = "Manual plot removal") String reason,
+            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
+            @RequestParam(required = false) @Nullable String producerId
+    ) {
+        var effectiveProducerId = (producerId != null && !producerId.isBlank())
+                ? new ProducerId(producerId)
+                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+
+        var command = new RemovePlotCommand(plotId, effectiveProducerId.producerId(), reason);
+        var result = plotCommandService.handle(command)
+                .map(removedId -> new MessageResource("Plot deleted successfully"));
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(result, message -> message, HttpStatus.OK);
     }
 }
 

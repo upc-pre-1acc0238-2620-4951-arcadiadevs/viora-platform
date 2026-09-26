@@ -1,9 +1,11 @@
 package com.arcadiadevs.viora.platform.orchard.domain.model;
 
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotAlreadyRemovedException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
-import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimited;
-import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdated;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimitedEvent;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotRemovedEvent;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdatedEvent;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +44,7 @@ class PlotTest {
         assertThat(snapshot.revision()).isEqualTo(0L);
 
         assertThat(plot.domainEvents()).hasSize(1);
-        var event = (PlotDelimited) plot.domainEvents().iterator().next();
+        var event = (PlotDelimitedEvent) plot.domainEvents().iterator().next();
         assertThat(event.plotId()).isEqualTo(snapshot.id().plotId());
         assertThat(event.producerId()).isEqualTo(producerId.producerId());
         assertThat(event.variety()).isEqualTo("CRIOLLA");
@@ -177,7 +179,7 @@ class PlotTest {
         assertThat(snap.revision()).isEqualTo(1L);
 
         assertThat(plot.domainEvents()).hasSize(1);
-        var event = (PlotUpdated) plot.domainEvents().iterator().next();
+        var event = (PlotUpdatedEvent) plot.domainEvents().iterator().next();
         assertThat(event.plotId()).isEqualTo(snap.id().plotId());
         assertThat(event.producerId()).isEqualTo(producerId.producerId());
         assertThat(event.name()).isEqualTo("Cuartel Rectificado");
@@ -202,5 +204,47 @@ class PlotTest {
 
         assertThatThrownBy(() -> plot.update(updatedName, updatedPolygon, updatedFrame, null, 5L))
                 .isInstanceOf(PlotRevisionMismatchException.class);
+    }
+
+    @Test
+    @DisplayName("Should successfully soft delete plot and register PlotRemovedEvent domain event")
+    void shouldSuccessfullyRemovePlot() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel A Eliminar"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.clearDomainEvents();
+
+        plot.remove("Desafectado por salinizacion");
+
+        var snap = plot.snapshot();
+        assertThat(snap.status()).isEqualTo(PlotStatus.REMOVED_SOFT_DELETE);
+        assertThat(snap.revision()).isEqualTo(1L);
+
+        assertThat(plot.domainEvents()).hasSize(1);
+        var event = (PlotRemovedEvent) plot.domainEvents().iterator().next();
+        assertThat(event.plotId()).isEqualTo(snap.id().plotId());
+        assertThat(event.producerId()).isEqualTo(producerId.producerId());
+        assertThat(event.reason()).isEqualTo("Desafectado por salinizacion");
+        assertThat(event.occurredOn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should throw PlotAlreadyRemovedException when removing an already soft-deleted plot")
+    void shouldThrowExceptionWhenAlreadyRemoved() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Ya Eliminado"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.remove("Primera remocion");
+
+        assertThatThrownBy(() -> plot.remove("Segunda remocion"))
+                .isInstanceOf(PlotAlreadyRemovedException.class);
     }
 }

@@ -11,7 +11,7 @@ import java.time.Instant;
  * @param variety        the botanical variety name
  * @param occurredOn     the exact UTC timestamp when the event occurred
  */
-public record PlotDelimited(
+public record PlotDelimitedEvent(
         String plotId,
         String producerId,
         String polygonGeoJson,
@@ -22,7 +22,7 @@ public record PlotDelimited(
     /**
      * Compact constructor enforcing non-null event fields.
      */
-    public PlotDelimited {
+    public PlotDelimitedEvent {
         if (plotId == null || plotId.isBlank()) {
             throw new IllegalArgumentException("plot.event.plot_id.null");
         }

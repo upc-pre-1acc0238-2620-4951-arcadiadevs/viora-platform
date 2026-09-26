@@ -14,7 +14,7 @@ import java.time.Instant;
  * @param revision       new plot revision number following optimistic lock increment
  * @param occurredOn     timestamp when the domain event occurred
  */
-public record PlotUpdated(
+public record PlotUpdatedEvent(
         String plotId,
         String producerId,
         String name,
@@ -27,7 +27,7 @@ public record PlotUpdated(
     /**
      * Compact constructor validating event invariants and non-null values.
      */
-    public PlotUpdated {
+    public PlotUpdatedEvent {
         if (plotId == null || plotId.isBlank()) {
             throw new IllegalArgumentException("plot.event.plot_id.null");
         }
