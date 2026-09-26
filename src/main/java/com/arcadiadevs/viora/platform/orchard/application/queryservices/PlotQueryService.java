@@ -2,9 +2,11 @@ package com.arcadiadevs.viora.platform.orchard.application.queryservices;
 
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application query service port for querying orchard plots.
@@ -27,4 +29,12 @@ public interface PlotQueryService {
      * @return list of plot aggregate roots modified since the timestamp
      */
     List<Plot> handle(GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery query);
+
+    /**
+     * Retrieves an active orchard plot by its identifier and owning producer.
+     *
+     * @param query the query containing the plot and producer identifiers
+     * @return optional containing the plot aggregate root if found and active, empty otherwise
+     */
+    Optional<Plot> handle(GetPlotByIdQuery query);
 }
