@@ -34,7 +34,7 @@ public record PlotId(String plotId) {
             throw new IllegalArgumentException("plot.id.null_or_empty");
         }
         try {
-            UUID.fromString(plotId);
+            plotId = UUID.fromString(plotId.trim()).toString().toLowerCase();
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("plot.id.invalid_uuid", exception);
         }
