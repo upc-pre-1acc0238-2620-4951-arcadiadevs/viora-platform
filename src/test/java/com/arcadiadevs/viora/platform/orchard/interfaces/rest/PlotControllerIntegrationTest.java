@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCo
 import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.controllers.PlotController;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -193,5 +195,103 @@ class PlotControllerIntegrationTest {
                 .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")))
                 .andExpect(jsonPath("$.status", is(409)))
                 .andExpect(jsonPath("$.detail", is("Ya existe una parcela con este nombre para el productor")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId} should return 200 OK with ETag when revision matches")
+    void shouldReturnOkAndETagWhenUpdatingPlotWithValidRevision() throws Exception {
+        var plot = Plot.delimit(
+                new ProducerId(producerId.toString()),
+                new PlotName("Cuartel Rectificado"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(6.5, 4.5)
+        );
+        // simulate updated revision
+        plot.update(
+                new PlotName("Cuartel Rectificado"),
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(6.5, 4.5),
+                null,
+                0L
+        );
+        var plotId = UUID.fromString(plot.snapshot().id().plotId());
+
+        when(plotCommandService.handle(any(UpdatePlotCommand.class)))
+                .thenReturn(Result.success(plot));
+
+        String updatePayload = """
+                {
+                    "name": "Cuartel Rectificado",
+                    "rowSpacingM": 6.5,
+                    "treeSpacingM": 4.5,
+                    "lastPruningDate": "2026-09-10",
+                    "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}", plotId)
+                        .header("If-Match", "\"0\"")
+                        .param("producerId", producerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(plot.snapshot().id().plotId())))
+                .andExpect(jsonPath("$.name", is("Cuartel Rectificado")))
+                .andExpect(jsonPath("$.rowSpacingM", is(6.5)))
+                .andExpect(jsonPath("$.treeSpacingM", is(4.5)))
+                .andExpect(jsonPath("$.revision", is(1)));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId} should return 412 Precondition Failed when revision does not match")
+    void shouldReturnPreconditionFailedWhenRevisionMismatch() throws Exception {
+        var plotId = UUID.randomUUID();
+
+        when(plotCommandService.handle(any(UpdatePlotCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.preconditionFailed("plot", "The plot revision has changed. Please reload.")));
+
+        String updatePayload = """
+                {
+                    "name": "Cuartel Rectificado",
+                    "rowSpacingM": 6.5,
+                    "treeSpacingM": 4.5,
+                    "lastPruningDate": null,
+                    "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}", plotId)
+                        .header("If-Match", "\"5\"")
+                        .param("producerId", producerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isPreconditionFailed())
+                .andExpect(jsonPath("$.status", is(412)))
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-precondition-failed")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId} should return 400 Bad Request when If-Match header is malformed")
+    void shouldReturnBadRequestWhenIfMatchIsMalformed() throws Exception {
+        var plotId = UUID.randomUUID();
+
+        String updatePayload = """
+                {
+                    "name": "Cuartel Rectificado",
+                    "rowSpacingM": 6.5,
+                    "treeSpacingM": 4.5,
+                    "lastPruningDate": null,
+                    "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}", plotId)
+                        .header("If-Match", "invalid-revision")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/validation-error")));
     }
 }

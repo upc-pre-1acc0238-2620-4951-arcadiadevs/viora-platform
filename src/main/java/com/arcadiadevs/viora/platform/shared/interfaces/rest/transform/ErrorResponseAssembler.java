@@ -38,9 +38,13 @@ public final class ErrorResponseAssembler {
      */
     public static ProblemDetail toProblemDetail(ApplicationError error) {
         HttpStatusCode status = toStatusFromErrorCode(error.code());
-        String detailMessage = (error.details() != null && !error.details().isBlank())
-                ? error.details()
-                : toLocalizedMessageFromApplicationError(error);
+        String detailMessage;
+        if (error.details() != null && !error.details().isBlank()) {
+            String localizedDetail = toLocalizedMessageOrNull(error.details());
+            detailMessage = (localizedDetail != null) ? localizedDetail : error.details();
+        } else {
+            detailMessage = toLocalizedMessageFromApplicationError(error);
+        }
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detailMessage);
         problemDetail.setType(toTypeUriFromErrorCode(error.code()));
         problemDetail.setTitle(toTitleFromStatus(status));
@@ -182,7 +186,8 @@ public final class ErrorResponseAssembler {
             case "VALIDATION_ERROR" -> HttpStatus.BAD_REQUEST;
             case String s when s.endsWith("_FORBIDDEN") -> HttpStatus.FORBIDDEN;
             case String s when s.endsWith("_NOT_FOUND") -> HttpStatus.NOT_FOUND;
-            case "BUSINESS_RULE_VIOLATION" -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case String s when s.endsWith("_PRECONDITION_FAILED") -> HttpStatus.PRECONDITION_FAILED;
+            case "BUSINESS_RULE_VIOLATION" -> HttpStatus.UNPROCESSABLE_CONTENT;
             case String s when s.endsWith("_CONFLICT") -> HttpStatus.CONFLICT;
             case "UNEXPECTED_ERROR" -> HttpStatus.INTERNAL_SERVER_ERROR;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;

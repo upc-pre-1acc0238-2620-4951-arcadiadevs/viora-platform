@@ -58,6 +58,35 @@ public final class PlotPersistenceAssembler {
     }
 
     /**
+     * Updates an existing managed JPA entity state from the domain aggregate snapshot,
+     * allowing JPA / Hibernate to handle @Version revision incrementing naturally.
+     *
+     * @param target the managed JPA entity to update
+     * @param domain the domain aggregate containing updated state
+     * @return the updated JPA entity
+     */
+    public static PlotPersistenceEntity updateEntityFromDomain(PlotPersistenceEntity target, Plot domain) {
+        if (target == null || domain == null) {
+            throw new IllegalArgumentException("plot.entity_or_domain.null");
+        }
+        var snap = domain.snapshot();
+        target.setName(snap.name());
+        target.setVariety(snap.variety());
+        target.setGeometry(new PlotGeometryPersistenceEmbeddable(
+                snap.geometry().geoJson(),
+                snap.geometry().areaHa()
+        ));
+        target.setFrame(new PlantationFramePersistenceEmbeddable(
+                snap.frame().rowSpacingM(),
+                snap.frame().treeSpacingM()
+        ));
+        target.setDensity(snap.density());
+        target.setLastPruningDate(snap.lastPruningDate());
+        target.setStatus(snap.status());
+        return target;
+    }
+
+    /**
      * Maps a JPA {@link PlotPersistenceEntity} into a domain {@link Plot} aggregate.
      *
      * @param entity the JPA entity to map
