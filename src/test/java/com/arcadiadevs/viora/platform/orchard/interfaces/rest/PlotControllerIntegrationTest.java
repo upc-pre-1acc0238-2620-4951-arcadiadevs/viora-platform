@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCo
 import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -29,6 +30,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -293,5 +295,44 @@ class PlotControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/validation-error")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId} should return 200 OK with MessageResource on successful soft deletion")
+    void shouldReturnOkWhenDeletingPlotSuccessfully() throws Exception {
+        var plotId = UUID.randomUUID().toString();
+        when(plotCommandService.handle(any(RemovePlotCommand.class)))
+                .thenReturn(Result.success(plotId));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}", plotId)
+                        .param("reason", "Manual deactivation"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("Plot deleted successfully")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId} should return 404 Not Found when plot does not exist")
+    void shouldReturnNotFoundWhenDeletingNonExistentPlot() throws Exception {
+        var plotId = UUID.randomUUID().toString();
+        when(plotCommandService.handle(any(RemovePlotCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("Plot", plotId)));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}", plotId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status", is(404)))
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-not-found")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId} should return 409 Conflict when plot is already soft-deleted")
+    void shouldReturnConflictWhenPlotIsAlreadyDeleted() throws Exception {
+        var plotId = UUID.randomUUID().toString();
+        when(plotCommandService.handle(any(RemovePlotCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.conflict("plot", "plot.already_removed")));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}", plotId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status", is(409)))
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")));
     }
 }
