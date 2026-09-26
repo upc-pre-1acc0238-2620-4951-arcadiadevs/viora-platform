@@ -1,8 +1,10 @@
 package com.arcadiadevs.viora.platform.orchard.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotAlreadyRemovedException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
-import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimited;
-import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdated;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimitedEvent;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotRemovedEvent;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdatedEvent;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 
@@ -92,7 +94,7 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 initialRevision
         );
 
-        plot.registerDomainEvent(new PlotDelimited(
+        plot.registerDomainEvent(new PlotDelimitedEvent(
                 id.plotId(),
                 producerId.producerId(),
                 geometry.geoJson(),
@@ -129,7 +131,7 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
 
     /**
      * Integrally updates the plot agronomic and cadastral boundaries while enforcing optimistic locking.
-     * Recalculates planting tree density and dispatches {@link PlotUpdated}.
+     * Recalculates planting tree density and dispatches {@link PlotUpdatedEvent}.
      *
      * @param newName          the new plot name
      * @param newGeometry      the updated cadastral geometry
@@ -156,13 +158,37 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
         this.lastPruningDate = newPruningDate;
         this.revision = this.revision + 1L;
 
-        registerDomainEvent(new PlotUpdated(
+        registerDomainEvent(new PlotUpdatedEvent(
                 this.id.plotId(),
                 this.producerId.producerId(),
                 this.name.value(),
                 this.geometry.geoJson(),
                 this.geometry.areaHa(),
                 this.revision,
+                Instant.now()
+        ));
+    }
+
+    /**
+     * Executes sovereign soft deletion of the plot, changing status to REMOVED_SOFT_DELETE
+     * and dispatching a {@link PlotRemovedEvent} domain event.
+     *
+     * @param reason optional justification or cause for removing the plot
+     * @throws PlotAlreadyRemovedException if the plot is already in soft-deleted state
+     */
+    public void remove(String reason) {
+        if (this.status == PlotStatus.REMOVED_SOFT_DELETE) {
+            throw new PlotAlreadyRemovedException(this.id);
+        }
+        this.status = PlotStatus.REMOVED_SOFT_DELETE;
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        var effectiveReason = (reason != null && !reason.isBlank()) ? reason : "Manual plot removal";
+
+        registerDomainEvent(new PlotRemovedEvent(
+                this.id.plotId(),
+                this.producerId.producerId(),
+                effectiveReason,
                 Instant.now()
         ));
     }
