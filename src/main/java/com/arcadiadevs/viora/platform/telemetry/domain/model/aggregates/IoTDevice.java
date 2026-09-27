@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
+import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceCalibratedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceRegisteredEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 
@@ -160,7 +162,58 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
     }
 
     /**
-     * Calibrates sensor calculation coefficients and physical depth.
+     * Calibrates sensor calculation coefficients, physical depth, and soil texture.
+     * Enforces active operational status and optimistic locking revision if provided.
+     * Dispatches an {@link IoTDeviceCalibratedEvent}.
+     *
+     * @param newDepth         the updated installation depth (for soil probes, or null to keep current)
+     * @param newTexture       the updated soil textural type (for soil probes, or null to keep current)
+     * @param newMultiplier    the updated calibration multiplier
+     * @param expectedRevision the expected optimistic concurrency revision (optional, null to bypass check)
+     * @throws IllegalStateException if device is not in ACTIVE status
+     * @throws DeviceRevisionMismatchException if expectedRevision does not match aggregate revision
+     */
+    public void calibrate(
+            SensorDepth newDepth,
+            SoilTextureType newTexture,
+            CalibrationMultiplier newMultiplier,
+            Long expectedRevision
+    ) {
+        if (this.status != DeviceStatus.ACTIVE) {
+            throw new IllegalStateException("device.status.not_active");
+        }
+        if (expectedRevision != null && (this.revision == null || !this.revision.equals(expectedRevision))) {
+            long currentRev = this.revision == null ? 0L : this.revision;
+            throw new DeviceRevisionMismatchException(this.id, currentRev, expectedRevision);
+        }
+        if (newMultiplier == null) {
+            throw new IllegalArgumentException("device.calibration.null");
+        }
+
+        if (this.type == DeviceType.SOIL_PROBE) {
+            if (newDepth != null && newDepth.isPresent()) {
+                this.depth = newDepth;
+            }
+            if (newTexture != null && newTexture != SoilTextureType.NOT_APPLICABLE) {
+                this.soilTextureType = newTexture;
+            }
+        }
+        this.calibrationMultiplier = newMultiplier;
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        registerDomainEvent(new IoTDeviceCalibratedEvent(
+                this.id.deviceId(),
+                this.plotId.plotId(),
+                this.calibrationMultiplier.value(),
+                this.soilTextureType.name(),
+                this.depth.depthCm(),
+                this.revision,
+                Instant.now()
+        ));
+    }
+
+    /**
+     * Backward-compatible overload for calibrating without revision check.
      *
      * @param newDepth      the updated installation depth
      * @param newTexture    the updated soil textural type
@@ -171,19 +224,24 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
             SoilTextureType newTexture,
             CalibrationMultiplier newMultiplier
     ) {
-        if (this.type == DeviceType.SOIL_PROBE) {
-            if (newDepth == null || !newDepth.isPresent()) {
-                throw new IllegalArgumentException("device.soil_probe.depth_required");
-            }
-            this.depth = newDepth;
-            this.soilTextureType = (newTexture != null && newTexture != SoilTextureType.NOT_APPLICABLE)
-                    ? newTexture
-                    : this.soilTextureType;
-        }
-        if (newMultiplier != null) {
-            this.calibrationMultiplier = newMultiplier;
-        }
-        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+        calibrate(newDepth, newTexture, newMultiplier, null);
+    }
+
+    /**
+     * Calibrates empirical offset multiplier and soil parameters (semantic alias for calibrate).
+     *
+     * @param newMultiplier    the updated calibration multiplier
+     * @param newTexture       the updated soil texture type
+     * @param newDepth         the updated installation depth
+     * @param expectedRevision the expected optimistic concurrency revision
+     */
+    public void calibrateOffset(
+            CalibrationMultiplier newMultiplier,
+            SoilTextureType newTexture,
+            SensorDepth newDepth,
+            Long expectedRevision
+    ) {
+        calibrate(newDepth, newTexture, newMultiplier, expectedRevision);
     }
 
     /**

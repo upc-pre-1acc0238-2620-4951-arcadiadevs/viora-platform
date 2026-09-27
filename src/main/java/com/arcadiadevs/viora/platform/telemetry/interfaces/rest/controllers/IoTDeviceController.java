@@ -2,13 +2,18 @@ package com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.IoTDeviceCommandService;
+import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDeviceQueryService;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceId;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
+import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.CalibrateIoTDeviceResource;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.IoTDeviceResource;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.RegisterIoTDeviceResource;
+import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.transform.CalibrateIoTDeviceCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.transform.IoTDeviceResourceFromEntityAssembler;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.transform.RegisterIoTDeviceCommandFromResourceAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,13 +25,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDeviceQueryService;
-import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
 import java.util.List;
 
 /**
@@ -125,5 +129,67 @@ public class IoTDeviceController {
         var devices = ioTDeviceQueryService.handle(query);
         var resources = IoTDeviceResourceFromEntityAssembler.toResourceList(devices);
         return ResponseEntity.ok(resources);
+    }
+
+    /**
+     * Calibrates an existing IoT sensor device offset multiplier, depth, and soil texture.
+     * Enforces optimistic locking revision if provided via the If-Match header.
+     *
+     * @param plotId   the unique plot UUID
+     * @param deviceId the unique device UUID
+     * @param ifMatch  optional If-Match header containing the expected revision
+     * @param resource the calibration payload
+     * @return 200 OK with the updated IoTDeviceResource, or ProblemDetail on error
+     */
+    @PutMapping(value = "/{deviceId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Calibrate sensor offset and soil factor",
+            description = "Updates the empirical calibration multiplier, soil texture, and depth for an active IoT device."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "IoT device successfully calibrated",
+                    content = @Content(schema = @Schema(implementation = IoTDeviceResource.class))
+            ),
+            @ApiResponse(responseCode = "400", description = "Invalid payload or calibration parameters"),
+            @ApiResponse(responseCode = "404", description = "IoT device not found"),
+            @ApiResponse(responseCode = "409", description = "Device is not associated with the specified plot"),
+            @ApiResponse(responseCode = "412", description = "Precondition Failed: If-Match revision mismatch"),
+            @ApiResponse(responseCode = "422", description = "Device is not in ACTIVE status")
+    })
+    public ResponseEntity<?> calibrateIoTDevice(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String plotId,
+            @Parameter(description = "Unique device UUID", example = "7b2d5a39-c1f4-4b53-bca9-59eb88d440aa")
+            @PathVariable String deviceId,
+            @Parameter(description = "Optimistic locking revision", example = "\"0\"")
+            @RequestHeader(value = "If-Match", required = false) @Nullable String ifMatch,
+            @Valid @RequestBody CalibrateIoTDeviceResource resource
+    ) {
+        Long expectedRevision = null;
+        if (ifMatch != null && !ifMatch.isBlank()) {
+            try {
+                expectedRevision = Long.parseLong(ifMatch.replace("\"", "").trim());
+            } catch (NumberFormatException ex) {
+                var error = ApplicationError.validationError("If-Match", "device.revision.invalid");
+                return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+            }
+        }
+
+        var command = CalibrateIoTDeviceCommandFromResourceAssembler.toCommandFromResource(
+                plotId, deviceId, expectedRevision, resource
+        );
+
+        var result = ioTDeviceCommandService.handle(command)
+                .flatMap(id -> ioTDeviceRepository.findById(new DeviceId(id))
+                        .<Result<IoTDevice, ApplicationError>>map(Result::success)
+                        .orElseGet(() -> Result.failure(ApplicationError.notFound("IoTDevice", id))));
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(
+                result,
+                IoTDeviceResourceFromEntityAssembler::toResourceFromEntity,
+                HttpStatus.OK
+        );
     }
 }

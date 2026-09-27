@@ -3,8 +3,10 @@ package com.arcadiadevs.viora.platform.telemetry.application.internal.commandser
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.IoTDeviceCommandService;
+import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DuplicateDeviceNameException;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
@@ -32,12 +34,21 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
             IoTDeviceRepository ioTDeviceRepository,
             ApplicationEventPublisher eventPublisher
     ) {
+        if (ioTDeviceRepository == null) {
+            throw new IllegalArgumentException("device.repository.null");
+        }
+        if (eventPublisher == null) {
+            throw new IllegalArgumentException("device.event_publisher.null");
+        }
         this.ioTDeviceRepository = ioTDeviceRepository;
         this.eventPublisher = eventPublisher;
     }
 
     @Override
     public Result<String, ApplicationError> handle(RegisterIoTDeviceCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("command.null");
+        }
         try {
             var plotId = new PlotId(command.plotId());
             var deviceName = new DeviceName(command.name());
@@ -80,6 +91,54 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
             return Result.failure(ApplicationError.unexpected("device-registration", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<String, ApplicationError> handle(CalibrateIoTDeviceCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("command.null");
+        }
+        try {
+            var plotId = new PlotId(command.plotId());
+            var deviceId = new DeviceId(command.deviceId());
+
+            var deviceOpt = ioTDeviceRepository.findById(deviceId);
+            if (deviceOpt.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("IoTDevice", command.deviceId()));
+            }
+
+            var device = deviceOpt.get();
+            if (!device.snapshot().plotId().equals(plotId)) {
+                return Result.failure(ApplicationError.conflict("device", "device.plot_id.mismatch"));
+            }
+
+            var multiplier = new CalibrationMultiplier(command.calibrationMultiplier());
+            var texture = (command.soilTextureType() != null && !command.soilTextureType().isBlank())
+                    ? SoilTextureType.from(command.soilTextureType())
+                    : null;
+            var depth = (command.depthCm() != null)
+                    ? SensorDepth.of(command.depthCm())
+                    : null;
+
+            device.calibrateOffset(multiplier, texture, depth, command.expectedRevision());
+
+            var savedDevice = ioTDeviceRepository.save(device);
+
+            for (var event : device.domainEvents()) {
+                eventPublisher.publishEvent(event);
+            }
+            device.clearDomainEvents();
+
+            return Result.success(savedDevice.snapshot().id().deviceId());
+        } catch (DeviceRevisionMismatchException ex) {
+            return Result.failure(ApplicationError.preconditionFailed("device", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            return Result.failure(ApplicationError.businessRuleViolation("DeviceNotActive", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        } catch (Exception ex) {
+            return Result.failure(ApplicationError.unexpected("device-calibration", ex.getMessage()));
         }
     }
 }

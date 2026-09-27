@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.shared.interfaces.rest;
 
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceNotFoundException;
@@ -105,6 +106,21 @@ public class GlobalExceptionHandler {
     ) {
         var detail = resolveMessageOrDefault(ex.getMessage(), "The plot revision has changed. Please reload.");
         var applicationError = ApplicationError.preconditionFailed("plot", detail);
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles optimistic locking revision mismatch exceptions for IoT devices.
+     *
+     * @param ex the device revision mismatch exception
+     * @return ProblemDetail response with PRECONDITION_FAILED (412) status
+     */
+    @ExceptionHandler(DeviceRevisionMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleDeviceRevisionMismatchException(
+            DeviceRevisionMismatchException ex
+    ) {
+        var detail = resolveMessageOrDefault(ex.getMessage(), "The device revision has changed. Please reload.");
+        var applicationError = ApplicationError.preconditionFailed("device", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 

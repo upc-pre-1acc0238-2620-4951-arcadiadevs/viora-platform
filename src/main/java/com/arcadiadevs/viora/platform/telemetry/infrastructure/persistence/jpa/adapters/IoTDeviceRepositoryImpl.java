@@ -29,6 +29,9 @@ public class IoTDeviceRepositoryImpl implements IoTDeviceRepository {
      * @param ioTDevicePersistenceRepository the underlying Spring Data JPA repository
      */
     public IoTDeviceRepositoryImpl(IoTDevicePersistenceRepository ioTDevicePersistenceRepository) {
+        if (ioTDevicePersistenceRepository == null) {
+            throw new IllegalArgumentException("device.repository.null");
+        }
         this.ioTDevicePersistenceRepository = ioTDevicePersistenceRepository;
     }
 

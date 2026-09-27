@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.telemetry.application.commandservices;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 
 /**
@@ -17,4 +18,13 @@ public interface IoTDeviceCommandService {
      * @see RegisterIoTDeviceCommand
      */
     Result<String, ApplicationError> handle(RegisterIoTDeviceCommand command);
+
+    /**
+     * Handles calibrating an existing virtual IoT sensor device.
+     *
+     * @param command command containing calibration multiplier and edaphic factors
+     * @return the calibrated device identifier UUID string or an application error
+     * @see CalibrateIoTDeviceCommand
+     */
+    Result<String, ApplicationError> handle(CalibrateIoTDeviceCommand command);
 }
