@@ -26,14 +26,29 @@ public class DeviceRevisionMismatchException extends BusinessRuleException {
         this.expectedRevision = expectedRevision;
     }
 
+    /**
+     * Returns the identifier of the device whose revision mismatched.
+     *
+     * @return the device identifier value object
+     */
     public DeviceId getDeviceId() {
         return deviceId;
     }
 
+    /**
+     * Returns the actual current revision of the device aggregate in domain.
+     *
+     * @return the current revision number
+     */
     public long getCurrentRevision() {
         return currentRevision;
     }
 
+    /**
+     * Returns the revision expected by the client caller.
+     *
+     * @return the expected revision number
+     */
     public long getExpectedRevision() {
         return expectedRevision;
     }

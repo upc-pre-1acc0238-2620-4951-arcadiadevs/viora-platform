@@ -34,12 +34,21 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
             IoTDeviceRepository ioTDeviceRepository,
             ApplicationEventPublisher eventPublisher
     ) {
+        if (ioTDeviceRepository == null) {
+            throw new IllegalArgumentException("device.repository.null");
+        }
+        if (eventPublisher == null) {
+            throw new IllegalArgumentException("device.event_publisher.null");
+        }
         this.ioTDeviceRepository = ioTDeviceRepository;
         this.eventPublisher = eventPublisher;
     }
 
     @Override
     public Result<String, ApplicationError> handle(RegisterIoTDeviceCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("command.null");
+        }
         try {
             var plotId = new PlotId(command.plotId());
             var deviceName = new DeviceName(command.name());

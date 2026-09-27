@@ -26,10 +26,10 @@ public record CalibrateIoTDeviceCommand(
      * @throws IllegalArgumentException if plotId, deviceId, or calibrationMultiplier is null or invalid
      */
     public CalibrateIoTDeviceCommand {
-        if (plotId == null || plotId.isBlank()) {
+        if (plotId == null) {
             throw new IllegalArgumentException("plot.id.null_or_empty");
         }
-        if (deviceId == null || deviceId.isBlank()) {
+        if (deviceId == null) {
             throw new IllegalArgumentException("device.id.null_or_empty");
         }
         if (calibrationMultiplier == null) {

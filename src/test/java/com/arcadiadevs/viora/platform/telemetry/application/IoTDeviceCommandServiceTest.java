@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -274,5 +275,31 @@ class IoTDeviceCommandServiceTest {
         assertThat(result.isFailure()).isTrue();
         assertThat(result.failure().get().code()).isEqualTo("BUSINESS_RULE_VIOLATION");
         assertThat(result.failure().get().details()).isEqualTo("device.status.not_active");
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when constructor dependencies are null")
+    @SuppressWarnings("DataFlowIssue")
+    void shouldThrowWhenConstructorDependenciesNull() {
+        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(null, eventPublisher))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("device.repository.null");
+
+        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(ioTDeviceRepository, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("device.event_publisher.null");
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when handling null commands")
+    @SuppressWarnings("DataFlowIssue")
+    void shouldThrowWhenCommandIsNull() {
+        assertThatThrownBy(() -> commandService.handle((RegisterIoTDeviceCommand) null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("command.null");
+
+        assertThatThrownBy(() -> commandService.handle((CalibrateIoTDeviceCommand) null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("command.null");
     }
 }

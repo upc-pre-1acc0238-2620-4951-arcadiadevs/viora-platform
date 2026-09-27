@@ -21,17 +21,17 @@ import org.jspecify.annotations.Nullable;
 )
 @NullMarked
 public record RegisterIoTDeviceResource(
-        @NotBlank(message = "Device name cannot be blank")
-        @Size(min = 2, max = 100, message = "Device name must be between 2 and 100 characters")
+        @NotBlank(message = "device.name.blank")
+        @Size(min = 2, max = 100, message = "device.name.invalid_length")
         @Schema(description = "Descriptive name of the sensor device", example = "Sonda Edafica Sector Norte", minLength = 2, maxLength = 100)
         String name,
 
-        @NotBlank(message = "Device type cannot be blank")
+        @NotBlank(message = "device.type.blank")
         @Schema(description = "Functional device classification", example = "SOIL_PROBE", allowableValues = {"MICROCLIMATE", "SOIL_PROBE"})
         String type,
 
-        @Min(value = 1, message = "Sensor depth must be at least 1 cm")
-        @Max(value = 200, message = "Sensor depth must not exceed 200 cm")
+        @Min(value = 1, message = "device.depth.invalid")
+        @Max(value = 200, message = "device.depth.invalid")
         @Schema(description = "Installation depth in centimeters for soil probes", example = "30")
         @Nullable Integer depthCm,
 
@@ -41,8 +41,8 @@ public record RegisterIoTDeviceResource(
         })
         @Nullable String soilTextureType,
 
-        @DecimalMin(value = "0.50", message = "Calibration multiplier must be at least 0.50")
-        @DecimalMax(value = "2.00", message = "Calibration multiplier must not exceed 2.00")
+        @DecimalMin(value = "0.50", message = "device.calibration.out_of_range")
+        @DecimalMax(value = "2.00", message = "device.calibration.out_of_range")
         @Schema(description = "Empirical calibration multiplier in range [0.50, 2.00]", example = "1.0")
         @Nullable Double calibrationMultiplier
 ) {
