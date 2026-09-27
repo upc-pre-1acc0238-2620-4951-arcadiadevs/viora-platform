@@ -33,6 +33,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -55,9 +57,31 @@ public class PlotController {
     private final PlotCommandService plotCommandService;
     private final PlotQueryService plotQueryService;
     private final PlotRepository plotRepository;
+    private final String defaultProducerId;
 
     /**
-     * Constructor
+     * Primary constructor for Spring injection.
+     *
+     * @param plotCommandService the plot command service
+     * @param plotQueryService   the plot query service
+     * @param plotRepository     the domain plot repository port
+     * @param defaultProducerId  the default mock producer identifier from application properties
+     */
+    @Autowired
+    public PlotController(
+            PlotCommandService plotCommandService,
+            PlotQueryService plotQueryService,
+            PlotRepository plotRepository,
+            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultProducerId
+    ) {
+        this.plotCommandService = plotCommandService;
+        this.plotQueryService = plotQueryService;
+        this.plotRepository = plotRepository;
+        this.defaultProducerId = defaultProducerId;
+    }
+
+    /**
+     * Test-convenience constructor using default mock producer UUID.
      *
      * @param plotCommandService the plot command service
      * @param plotQueryService   the plot query service
@@ -68,9 +92,13 @@ public class PlotController {
             PlotQueryService plotQueryService,
             PlotRepository plotRepository
     ) {
-        this.plotCommandService = plotCommandService;
-        this.plotQueryService = plotQueryService;
-        this.plotRepository = plotRepository;
+        this(plotCommandService, plotQueryService, plotRepository, "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    private ProducerId resolveEffectiveProducerId(@Nullable String producerId) {
+        return (producerId != null && !producerId.isBlank())
+                ? new ProducerId(producerId)
+                : new ProducerId(defaultProducerId);
     }
 
     /**
@@ -133,9 +161,7 @@ public class PlotController {
             @Parameter(description = "Timestamp threshold for incremental delta sync (ISO-8601)", example = "2026-09-01T00:00:00Z")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant updatedSince
     ) {
-        var effectiveProducerId = (producerId != null && !producerId.isBlank())
-                ? new ProducerId(producerId)
-                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+        var effectiveProducerId = resolveEffectiveProducerId(producerId);
 
         var plots = (updatedSince != null)
                 ? plotQueryService.handle(new GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery(effectiveProducerId, updatedSince))
@@ -170,9 +196,7 @@ public class PlotController {
             @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestParam(required = false) @Nullable String producerId
     ) {
-        var effectiveProducerId = (producerId != null && !producerId.isBlank())
-                ? new ProducerId(producerId)
-                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+        var effectiveProducerId = resolveEffectiveProducerId(producerId);
 
         var query = new GetPlotByIdQuery(new PlotId(plotId), effectiveProducerId);
         var plot = plotQueryService.handle(query)
@@ -224,9 +248,7 @@ public class PlotController {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
         }
 
-        var effectiveProducerId = (producerId != null && !producerId.isBlank())
-                ? new ProducerId(producerId)
-                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+        var effectiveProducerId = resolveEffectiveProducerId(producerId);
 
         var command = UpdatePlotCommandFromResourceAssembler
                 .toCommandFromResource(plotId, effectiveProducerId.producerId(), expectedRevision, resource);
@@ -270,9 +292,7 @@ public class PlotController {
             @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestParam(required = false) @Nullable String producerId
     ) {
-        var effectiveProducerId = (producerId != null && !producerId.isBlank())
-                ? new ProducerId(producerId)
-                : new ProducerId("550e8400-e29b-41d4-a716-446655440000");
+        var effectiveProducerId = resolveEffectiveProducerId(producerId);
 
         var command = new RemovePlotCommand(plotId, effectiveProducerId.producerId(), reason);
         var result = plotCommandService.handle(command)
