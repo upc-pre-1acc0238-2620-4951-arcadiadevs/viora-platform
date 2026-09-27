@@ -95,10 +95,8 @@ public class PlotController {
         this(plotCommandService, plotQueryService, plotRepository, "550e8400-e29b-41d4-a716-446655440000");
     }
 
-    private ProducerId resolveEffectiveProducerId(@Nullable String producerId) {
-        return (producerId != null && !producerId.isBlank())
-                ? new ProducerId(producerId)
-                : new ProducerId(defaultProducerId);
+    private ProducerId resolveEffectiveProducerId() {
+        return new ProducerId(defaultProducerId);
     }
 
     /**
@@ -122,7 +120,11 @@ public class PlotController {
             @ApiResponse(responseCode = "409", description = "A plot with the same name already exists for the producer")
     })
     public ResponseEntity<?> createPlot(@Valid @RequestBody CreatePlotResource resource) {
-        var createPlotCommand = CreatePlotCommandFromResourceAssembler.toCommandFromResource(resource);
+        var effectiveProducerId = resolveEffectiveProducerId();
+        var createPlotCommand = CreatePlotCommandFromResourceAssembler.toCommandFromResource(
+                effectiveProducerId.producerId(),
+                resource
+        );
         var result = plotCommandService.handle(createPlotCommand)
                 .flatMap(plotId -> plotRepository.findById(new PlotId(plotId))
                         .<Result<Plot, ApplicationError>>map(Result::success)
@@ -136,9 +138,8 @@ public class PlotController {
     }
 
     /**
-     * Lists plots belonging to a producer with optional incremental delta synchronization.
+     * Lists plots belonging to the authenticated producer with optional incremental delta synchronization.
      *
-     * @param producerId   optional producer UUID parameter (falls back to default tenant producer if omitted)
      * @param updatedSince optional timestamp for delta synchronization
      * @return list of PlotResource objects with 200 OK
      */
@@ -156,12 +157,10 @@ public class PlotController {
             @ApiResponse(responseCode = "400", description = "Malformed updatedSince date parameter format")
     })
     public ResponseEntity<List<PlotResource>> listPlots(
-            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
-            @RequestParam(required = false) @Nullable String producerId,
             @Parameter(description = "Timestamp threshold for incremental delta sync (ISO-8601)", example = "2026-09-01T00:00:00Z")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant updatedSince
     ) {
-        var effectiveProducerId = resolveEffectiveProducerId(producerId);
+        var effectiveProducerId = resolveEffectiveProducerId();
 
         var plots = (updatedSince != null)
                 ? plotQueryService.handle(new GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery(effectiveProducerId, updatedSince))
@@ -173,8 +172,7 @@ public class PlotController {
     /**
      * Retrieves the agronomic details and boundaries of an orchard plot by its unique identifier.
      *
-     * @param plotId     the unique identifier of the plot
-     * @param producerId optional producer UUID parameter (falls back to default tenant producer if omitted)
+     * @param plotId the unique identifier of the plot
      * @return the PlotResource with 200 OK, or ProblemDetail with 404 Not Found if missing or inactive
      */
     @GetMapping("/{plotId}")
@@ -192,11 +190,9 @@ public class PlotController {
     })
     public ResponseEntity<PlotResource> getPlotById(
             @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-            @PathVariable String plotId,
-            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
-            @RequestParam(required = false) @Nullable String producerId
+            @PathVariable String plotId
     ) {
-        var effectiveProducerId = resolveEffectiveProducerId(producerId);
+        var effectiveProducerId = resolveEffectiveProducerId();
 
         var query = new GetPlotByIdQuery(new PlotId(plotId), effectiveProducerId);
         var plot = plotQueryService.handle(query)
@@ -208,10 +204,9 @@ public class PlotController {
     /**
      * Updates an orchard plot's boundaries and dendrometric frame with optimistic concurrency control.
      *
-     * @param plotId     the identifier of the plot to update
-     * @param ifMatch    the expected revision header (e.g., "1" or 1)
-     * @param producerId optional managing producer UUID parameter (falls back to default tenant)
-     * @param resource   the payload containing updated boundaries and frame
+     * @param plotId   the identifier of the plot to update
+     * @param ifMatch  the expected revision header (e.g., "1" or 1)
+     * @param resource the payload containing updated boundaries and frame
      * @return updated PlotResource with ETag header and 200 OK, or ProblemDetail on error
      */
     @PutMapping(value = "/{plotId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -235,8 +230,6 @@ public class PlotController {
             @PathVariable String plotId,
             @Parameter(description = "Optimistic locking revision", example = "\"1\"", required = true)
             @RequestHeader("If-Match") String ifMatch,
-            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
-            @RequestParam(required = false) @Nullable String producerId,
             @Valid @RequestBody UpdatePlotResource resource
     ) {
         long expectedRevision;
@@ -248,7 +241,7 @@ public class PlotController {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
         }
 
-        var effectiveProducerId = resolveEffectiveProducerId(producerId);
+        var effectiveProducerId = resolveEffectiveProducerId();
 
         var command = UpdatePlotCommandFromResourceAssembler
                 .toCommandFromResource(plotId, effectiveProducerId.producerId(), expectedRevision, resource);
@@ -265,9 +258,8 @@ public class PlotController {
     /**
      * Soft deletes and deactivates an orchard plot from active inventory.
      *
-     * @param plotId     the identifier of the plot to delete
-     * @param reason     optional justification or cause for removing the plot
-     * @param producerId optional managing producer UUID parameter (falls back to default tenant)
+     * @param plotId the identifier of the plot to delete
+     * @param reason optional justification or cause for removing the plot
      * @return MessageResource with confirmation message and 200 OK, or ProblemDetail on error
      */
     @DeleteMapping("/{plotId}")
@@ -288,11 +280,9 @@ public class PlotController {
             @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
             @PathVariable String plotId,
             @Parameter(description = "Justification for removing the plot", example = "Manual plot removal")
-            @RequestParam(required = false, defaultValue = "Manual plot removal") String reason,
-            @Parameter(description = "Managing producer UUID", example = "550e8400-e29b-41d4-a716-446655440000")
-            @RequestParam(required = false) @Nullable String producerId
+            @RequestParam(required = false, defaultValue = "Manual plot removal") String reason
     ) {
-        var effectiveProducerId = resolveEffectiveProducerId(producerId);
+        var effectiveProducerId = resolveEffectiveProducerId();
 
         var command = new RemovePlotCommand(plotId, effectiveProducerId.producerId(), reason);
         var result = plotCommandService.handle(command)

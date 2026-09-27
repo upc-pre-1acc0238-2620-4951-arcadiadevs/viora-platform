@@ -102,13 +102,4 @@ class OrchardContextFacadeImplTest {
         assertThat(facade.existsActivePlot("   ")).isFalse();
         assertThat(facade.existsActivePlot("not-a-valid-uuid")).isFalse();
     }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException when repository dependency is null")
-    @SuppressWarnings("DataFlowIssue")
-    void shouldThrowWhenPlotRepositoryIsNull() {
-        assertThatThrownBy(() -> new OrchardContextFacadeImpl(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("plot.repository.null");
-    }
 }

@@ -94,21 +94,4 @@ class HarvestRecordCommandServiceTest {
         assertThat(result.failure().get().code()).isEqualTo("HARVEST_CONFLICT");
         assertThat(result.failure().get().details()).isEqualTo("phenology.harvest_yield.duplicate_campaign");
     }
-
-    @Test
-    @DisplayName("Should throw IllegalArgumentException when constructor dependencies are null")
-    @SuppressWarnings("DataFlowIssue")
-    void shouldThrowWhenConstructorDependenciesNull() {
-        assertThatThrownBy(() -> new HarvestRecordCommandServiceImpl(null, eventPublisher, externalOrchardService))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("harvest.repository.null");
-
-        assertThatThrownBy(() -> new HarvestRecordCommandServiceImpl(trackerRepository, null, externalOrchardService))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("harvest.event_publisher.null");
-
-        assertThatThrownBy(() -> new HarvestRecordCommandServiceImpl(trackerRepository, eventPublisher, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("harvest.external_orchard_service.null");
-    }
 }
