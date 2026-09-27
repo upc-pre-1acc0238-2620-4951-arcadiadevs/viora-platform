@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHandler;
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.IoTDeviceCommandService;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -176,5 +178,153 @@ class IoTDeviceControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()", is(0)));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 200 OK on valid calibration")
+    void shouldReturnOkOnValidCalibration() throws Exception {
+        var device = IoTDevice.register(
+                new PlotId(plotId.toString()),
+                new DeviceName("Sonda a Calibrar"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        var deviceId = device.snapshot().id().deviceId();
+
+        when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
+                .thenReturn(Result.success(deviceId));
+        when(ioTDeviceRepository.findById(eq(new DeviceId(deviceId))))
+                .thenReturn(Optional.of(device));
+
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.15,
+                    "soilTextureType": "CLAY_LOAM",
+                    "depthCm": 40
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("If-Match", "\"0\"")
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(deviceId)))
+                .andExpect(jsonPath("$.plotId", is(plotId.toString())))
+                .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 400 Bad Request when multiplier out of range")
+    void shouldReturnBadRequestWhenMultiplierOutOfRange() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        String payload = """
+                {
+                    "calibrationMultiplier": 0.20,
+                    "soilTextureType": "LOAM",
+                    "depthCm": 30
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 400 Bad Request when If-Match header is non-numeric")
+    void shouldReturnBadRequestWhenIfMatchHeaderIsInvalid() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.10
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("If-Match", "not-a-number")
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 404 Not Found when device does not exist")
+    void shouldReturnNotFoundWhenCalibratingMissingDevice() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("IoTDevice", deviceId)));
+
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.10
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 409 Conflict when device plot mismatch")
+    void shouldReturnConflictWhenPlotMismatchOnCalibration() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.conflict("device", "device.plot_id.mismatch")));
+
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.10
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 412 Precondition Failed on revision mismatch")
+    void shouldReturnPreconditionFailedOnRevisionMismatch() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.preconditionFailed("device", "device.revision.mismatch")));
+
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.10
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("If-Match", "\"5\"")
+                        .content(payload))
+                .andExpect(status().isPreconditionFailed());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 422 Unprocessable Content when device not active")
+    void shouldReturnUnprocessableEntityWhenDeviceNotActive() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.businessRuleViolation("DeviceNotActive", "device.status.not_active")));
+
+        String payload = """
+                {
+                    "calibrationMultiplier": 1.10
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isUnprocessableEntity());
     }
 }

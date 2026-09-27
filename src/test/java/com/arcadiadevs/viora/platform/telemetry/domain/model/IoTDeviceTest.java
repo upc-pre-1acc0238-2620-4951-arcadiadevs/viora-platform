@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.telemetry.domain.model;
 
+import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceCalibratedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceRegisteredEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import org.junit.jupiter.api.DisplayName;
@@ -210,5 +212,131 @@ class IoTDeviceTest {
         var reconstituted = IoTDevice.reconstitute(snapshot);
 
         assertThat(reconstituted.snapshot()).isEqualTo(snapshot);
+    }
+
+    @Test
+    @DisplayName("Should successfully calibrate soil probe offset with event and revision increment")
+    void shouldSuccessfullyCalibrateSoilProbeOffsetWithEventAndRevisionIncrement() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Calibrable"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        device.clearDomainEvents();
+
+        device.calibrateOffset(
+                new CalibrationMultiplier(1.25),
+                SoilTextureType.CLAY_LOAM,
+                SensorDepth.of(50),
+                0L
+        );
+
+        var snapshot = device.snapshot();
+        assertThat(snapshot.calibrationMultiplier().value()).isEqualTo(1.25);
+        assertThat(snapshot.soilTextureType()).isEqualTo(SoilTextureType.CLAY_LOAM);
+        assertThat(snapshot.depth().depthCm()).isEqualTo(50);
+        assertThat(snapshot.revision()).isEqualTo(1L);
+
+        assertThat(device.domainEvents()).hasSize(1);
+        var event = (IoTDeviceCalibratedEvent) device.domainEvents().iterator().next();
+        assertThat(event.deviceId()).isEqualTo(snapshot.id().deviceId());
+        assertThat(event.plotId()).isEqualTo(plotId.plotId());
+        assertThat(event.calibrationMultiplier()).isEqualTo(1.25);
+        assertThat(event.soilTextureType()).isEqualTo("CLAY_LOAM");
+        assertThat(event.depthCm()).isEqualTo(50);
+        assertThat(event.revision()).isEqualTo(1L);
+        assertThat(event.occurredOn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should calibrate microclimate multiplier without altering depth or soil texture")
+    void shouldCalibrateMicroclimateWithoutAlteringDepthOrSoilTexture() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Estacion Metereologica"),
+                DeviceType.MICROCLIMATE,
+                SensorDepth.none(),
+                SoilTextureType.NOT_APPLICABLE,
+                null
+        );
+
+        device.calibrateOffset(
+                new CalibrationMultiplier(1.35),
+                SoilTextureType.SANDY,
+                SensorDepth.of(40),
+                0L
+        );
+
+        var snapshot = device.snapshot();
+        assertThat(snapshot.calibrationMultiplier().value()).isEqualTo(1.35);
+        assertThat(snapshot.soilTextureType()).isEqualTo(SoilTextureType.NOT_APPLICABLE);
+        assertThat(snapshot.depth().isPresent()).isFalse();
+        assertThat(snapshot.revision()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Should throw DeviceRevisionMismatchException when expected revision does not match")
+    void shouldThrowDeviceRevisionMismatchExceptionWhenRevisionDiffers() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Revision"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        assertThatThrownBy(() -> device.calibrateOffset(
+                new CalibrationMultiplier(1.2),
+                SoilTextureType.SANDY,
+                SensorDepth.of(30),
+                5L
+        )).isInstanceOf(DeviceRevisionMismatchException.class);
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalStateException when calibrating inactive device")
+    void shouldThrowIllegalStateExceptionWhenCalibratingInactiveDevice() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Inactiva"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        device.unlink();
+
+        assertThatThrownBy(() -> device.calibrateOffset(
+                new CalibrationMultiplier(1.2),
+                SoilTextureType.SANDY,
+                SensorDepth.of(30),
+                null
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("device.status.not_active");
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when calibration multiplier is null")
+    void shouldThrowIllegalArgumentExceptionWhenCalibrationMultiplierIsNull() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Multiplier Null"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        assertThatThrownBy(() -> device.calibrateOffset(
+                null,
+                SoilTextureType.SANDY,
+                SensorDepth.of(30),
+                0L
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("device.calibration.null");
     }
 }
