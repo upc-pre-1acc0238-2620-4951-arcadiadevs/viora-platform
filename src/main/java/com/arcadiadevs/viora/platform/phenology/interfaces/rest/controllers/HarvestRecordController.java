@@ -81,12 +81,16 @@ public class HarvestRecordController {
                 .flatMap(entryId -> trackerRepository.findByPlotId(new PlotId(plotId))
                         .<Result<HarvestRecordResource, ApplicationError>>map(tracker -> {
                             var snap = tracker.snapshot();
-                            var entrySnap = snap.harvestHistory().stream()
+                            var entrySnapOpt = snap.harvestHistory().stream()
                                     .filter(e -> e.id().harvestEntryId().equals(entryId))
-                                    .findFirst()
-                                    .orElseThrow();
+                                    .findFirst();
+
+                            if (entrySnapOpt.isEmpty()) {
+                                return Result.failure(ApplicationError.notFound("HarvestRecord", entryId));
+                            }
+
                             var resourceOut = HarvestRecordResourceFromEntityAssembler.toResource(
-                                    entrySnap,
+                                    entrySnapOpt.get(),
                                     plotId,
                                     snap.calculatedBbi().value()
                             );
