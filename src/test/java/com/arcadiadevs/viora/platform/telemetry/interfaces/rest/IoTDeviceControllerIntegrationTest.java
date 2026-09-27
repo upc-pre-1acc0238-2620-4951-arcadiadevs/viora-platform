@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHand
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.IoTDeviceCommandService;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.DeactivateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
@@ -30,6 +31,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -326,5 +328,74 @@ class IoTDeviceControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 200 OK on valid deactivation")
+    void shouldReturnOkOnValidDeactivation() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+
+        when(ioTDeviceCommandService.handle(any(DeactivateIoTDeviceCommand.class)))
+                .thenReturn(Result.success(deviceId));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .header("If-Match", "\"0\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("IoT device unlinked successfully")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 400 Bad Request when If-Match header is non-numeric")
+    void shouldReturnBadRequestWhenIfMatchHeaderIsInvalidOnDeactivate() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .header("If-Match", "non-numeric"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 404 Not Found when device does not exist")
+    void shouldReturnNotFoundWhenDeactivatingMissingDevice() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(DeactivateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("IoTDevice", deviceId)));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 409 Conflict when device plot mismatch")
+    void shouldReturnConflictWhenPlotMismatchOnDeactivate() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(DeactivateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.conflict("device", "device.plot_id.mismatch")));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 409 Conflict when device is already unlinked")
+    void shouldReturnConflictWhenDeviceAlreadyUnlinked() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(DeactivateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.conflict("device", "device.already_unlinked")));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId} should return 412 Precondition Failed on revision mismatch")
+    void shouldReturnPreconditionFailedOnRevisionMismatchOnDeactivate() throws Exception {
+        var deviceId = UUID.randomUUID().toString();
+        when(ioTDeviceCommandService.handle(any(DeactivateIoTDeviceCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.preconditionFailed("device", "device.revision.mismatch")));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .header("If-Match", "\"5\""))
+                .andExpect(status().isPreconditionFailed());
     }
 }

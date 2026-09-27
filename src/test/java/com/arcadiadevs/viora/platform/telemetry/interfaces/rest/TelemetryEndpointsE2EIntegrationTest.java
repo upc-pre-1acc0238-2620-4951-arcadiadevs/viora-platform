@@ -16,6 +16,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -155,5 +156,24 @@ class TelemetryEndpointsE2EIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
                 .andExpect(status().isBadRequest());
+
+        // 7. DELETE: Unlink device with If-Match: "1"
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .header("If-Match", "\"1\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("IoT device unlinked successfully")));
+
+        // 8. GET: Check device list reflects UNLINKED status and incremented revision
+        mockMvc.perform(get("/api/v1/plots/{plotId}/iot-devices", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(deviceId)))
+                .andExpect(jsonPath("$[0].status", is("UNLINKED")))
+                .andExpect(jsonPath("$[0].revision", is(2)));
+
+        // 9. DELETE: Unlink already unlinked device should fail with 409 Conflict
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
+                .andExpect(status().isConflict());
     }
 }
