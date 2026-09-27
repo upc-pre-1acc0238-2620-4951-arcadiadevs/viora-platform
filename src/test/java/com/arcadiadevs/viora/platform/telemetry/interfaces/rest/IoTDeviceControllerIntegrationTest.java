@@ -9,6 +9,8 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIo
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers.IoTDeviceController;
+import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDeviceQueryService;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +29,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,13 +44,20 @@ class IoTDeviceControllerIntegrationTest {
     private IoTDeviceCommandService ioTDeviceCommandService;
 
     @Mock
+    private IoTDeviceQueryService ioTDeviceQueryService;
+
+    @Mock
     private IoTDeviceRepository ioTDeviceRepository;
 
     private final UUID plotId = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
-        var controller = new IoTDeviceController(ioTDeviceCommandService, ioTDeviceRepository);
+        var controller = new IoTDeviceController(
+                ioTDeviceCommandService,
+                ioTDeviceQueryService,
+                ioTDeviceRepository
+        );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -127,5 +138,43 @@ class IoTDeviceControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/iot-devices should return 200 OK with device list")
+    void shouldReturnOkWithDeviceList() throws Exception {
+        var device = IoTDevice.register(
+                new PlotId(plotId.toString()),
+                new DeviceName("Sonda Edafica Sector Norte"),
+                DeviceType.SOIL_PROBE,
+                new SensorDepth(30),
+                SoilTextureType.SANDY_LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        when(ioTDeviceQueryService.handle(any(GetIoTDevicesByPlotIdQuery.class)))
+                .thenReturn(List.of(device));
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/iot-devices", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name", is("Sonda Edafica Sector Norte")))
+                .andExpect(jsonPath("$[0].type", is("SOIL_PROBE")))
+                .andExpect(jsonPath("$[0].depthCm", is(30)))
+                .andExpect(jsonPath("$[0].soilTextureType", is("SANDY_LOAM")))
+                .andExpect(jsonPath("$[0].status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/iot-devices should return 200 OK with empty list when no devices exist")
+    void shouldReturnOkWithEmptyListWhenNoDevices() throws Exception {
+        when(ioTDeviceQueryService.handle(any(GetIoTDevicesByPlotIdQuery.class)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/iot-devices", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()", is(0)));
     }
 }
