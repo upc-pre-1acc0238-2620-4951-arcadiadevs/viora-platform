@@ -40,7 +40,9 @@ public class ChillAccumulationTrackerRepositoryImpl implements ChillAccumulation
     @Override
     public ChillAccumulationTracker save(ChillAccumulationTracker tracker) {
         var uuid = UUID.fromString(tracker.snapshot().id().trackerId());
-        var existingOpt = trackerPersistenceRepository.findById(uuid);
+        var plotUuid = UUID.fromString(tracker.snapshot().plotId().plotId());
+        var existingOpt = trackerPersistenceRepository.findById(uuid)
+                .or(() -> trackerPersistenceRepository.findByPlotId(plotUuid));
 
         ChillAccumulationTrackerPersistenceEntity entityToSave;
         if (existingOpt.isPresent()) {

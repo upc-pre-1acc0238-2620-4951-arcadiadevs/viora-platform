@@ -52,9 +52,8 @@ public final class ChillAccumulationTrackerPersistenceAssembler {
             childEntities.add(child);
         }
         entity.setHarvestRecords(childEntities);
-        if (snap.revision() != null && snap.revision() > 0L) {
-            entity.setRevision(snap.revision());
-        }
+        // Revision is intentionally left null for transient entities so Hibernate executes an INSERT
+        // and initializes the @Version counter properly without marking transactions rollback-only.
 
         return entity;
     }
