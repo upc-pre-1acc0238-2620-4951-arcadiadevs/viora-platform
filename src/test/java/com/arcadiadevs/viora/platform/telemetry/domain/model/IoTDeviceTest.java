@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevision
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceCalibratedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceRegisteredEvent;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceUnlinkedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -338,5 +339,65 @@ class IoTDeviceTest {
                 0L
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("device.calibration.null");
+    }
+
+    @Test
+    @DisplayName("Should successfully unlink device with event emission and revision increment")
+    void shouldSuccessfullyUnlinkDeviceWithEventAndRevisionIncrement() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda a Desvincular"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        device.clearDomainEvents();
+
+        device.unlink(0L);
+
+        assertThat(device.snapshot().status()).isEqualTo(DeviceStatus.UNLINKED);
+        assertThat(device.snapshot().revision()).isEqualTo(1L);
+
+        assertThat(device.domainEvents()).hasSize(1);
+        var event = (IoTDeviceUnlinkedEvent) device.domainEvents().iterator().next();
+        assertThat(event.deviceId()).isEqualTo(device.snapshot().id().deviceId());
+        assertThat(event.plotId()).isEqualTo(plotId.plotId());
+        assertThat(event.revision()).isEqualTo(1L);
+        assertThat(event.occurredOn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalStateException when unlinking already unlinked device")
+    void shouldThrowIllegalStateExceptionWhenAlreadyUnlinked() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Doble Desvinculacion"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        device.unlink();
+
+        assertThatThrownBy(() -> device.unlink())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("device.already_unlinked");
+    }
+
+    @Test
+    @DisplayName("Should throw DeviceRevisionMismatchException when unlinking with mismatched revision")
+    void shouldThrowDeviceRevisionMismatchExceptionWhenUnlinkingRevisionDiffers() {
+        var device = IoTDevice.register(
+                plotId,
+                new DeviceName("Sonda Revision Unlink"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        assertThatThrownBy(() -> device.unlink(99L))
+                .isInstanceOf(DeviceRevisionMismatchException.class);
     }
 }

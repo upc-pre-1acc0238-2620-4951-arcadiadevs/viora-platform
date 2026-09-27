@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevision
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DuplicateDeviceNameException;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.DeactivateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
@@ -139,6 +140,46 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
             return Result.failure(ApplicationError.unexpected("device-calibration", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<String, ApplicationError> handle(DeactivateIoTDeviceCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("command.null");
+        }
+        try {
+            var plotId = new PlotId(command.plotId());
+            var deviceId = new DeviceId(command.deviceId());
+
+            var deviceOpt = ioTDeviceRepository.findById(deviceId);
+            if (deviceOpt.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("IoTDevice", command.deviceId()));
+            }
+
+            var device = deviceOpt.get();
+            if (!device.snapshot().plotId().equals(plotId)) {
+                return Result.failure(ApplicationError.conflict("device", "device.plot_id.mismatch"));
+            }
+
+            device.unlink(command.expectedRevision());
+
+            var savedDevice = ioTDeviceRepository.save(device);
+
+            for (var event : device.domainEvents()) {
+                eventPublisher.publishEvent(event);
+            }
+            device.clearDomainEvents();
+
+            return Result.success(savedDevice.snapshot().id().deviceId());
+        } catch (DeviceRevisionMismatchException ex) {
+            return Result.failure(ApplicationError.preconditionFailed("device", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            return Result.failure(ApplicationError.conflict("device", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        } catch (Exception ex) {
+            return Result.failure(ApplicationError.unexpected("device-deactivation", ex.getMessage()));
         }
     }
 }

@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDom
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceCalibratedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceRegisteredEvent;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceUnlinkedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 
 import java.time.Instant;
@@ -259,10 +260,37 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
 
     /**
      * Unlinks and logically deactivates this sensor device from the active plot inventory.
+     * Enforces active operational status and optimistic locking revision if provided.
+     * Dispatches an {@link IoTDeviceUnlinkedEvent}.
+     *
+     * @param expectedRevision the expected optimistic concurrency revision (optional, null to bypass check)
+     * @throws IllegalStateException if device is already UNLINKED
+     * @throws DeviceRevisionMismatchException if expectedRevision does not match aggregate revision
      */
-    public void unlink() {
+    public void unlink(Long expectedRevision) {
+        if (this.status == DeviceStatus.UNLINKED) {
+            throw new IllegalStateException("device.already_unlinked");
+        }
+        if (expectedRevision != null && (this.revision == null || !this.revision.equals(expectedRevision))) {
+            long currentRev = this.revision == null ? 0L : this.revision;
+            throw new DeviceRevisionMismatchException(this.id, currentRev, expectedRevision);
+        }
         this.status = DeviceStatus.UNLINKED;
         this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        registerDomainEvent(new IoTDeviceUnlinkedEvent(
+                this.id.deviceId(),
+                this.plotId.plotId(),
+                this.revision,
+                Instant.now()
+        ));
+    }
+
+    /**
+     * Backward-compatible overload for unlinking without revision check.
+     */
+    public void unlink() {
+        unlink(null);
     }
 
     /**

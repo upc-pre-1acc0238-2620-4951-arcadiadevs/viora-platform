@@ -3,9 +3,11 @@ package com.arcadiadevs.viora.platform.telemetry.application;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.commandservices.IoTDeviceCommandServiceImpl;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateIoTDeviceCommand;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.DeactivateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceCalibratedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceRegisteredEvent;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.events.IoTDeviceUnlinkedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -301,5 +303,150 @@ class IoTDeviceCommandServiceTest {
         assertThatThrownBy(() -> commandService.handle((CalibrateIoTDeviceCommand) null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("command.null");
+
+        assertThatThrownBy(() -> commandService.handle((DeactivateIoTDeviceCommand) null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("command.null");
+    }
+
+    @Test
+    @DisplayName("Should successfully deactivate device when plot matches and device is active")
+    void shouldSuccessfullyDeactivateDevice() {
+        var device = IoTDevice.register(
+                new PlotId(plotId.toString()),
+                new DeviceName("Sonda a Desvincular"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        when(ioTDeviceRepository.findById(eq(device.snapshot().id())))
+                .thenReturn(Optional.of(device));
+        when(ioTDeviceRepository.save(any(IoTDevice.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var command = new DeactivateIoTDeviceCommand(
+                plotId.toString(),
+                device.snapshot().id().deviceId(),
+                0L
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success()).contains(device.snapshot().id().deviceId());
+
+        verify(ioTDeviceRepository).save(any(IoTDevice.class));
+        verify(eventPublisher).publishEvent(any(IoTDeviceUnlinkedEvent.class));
+    }
+
+    @Test
+    @DisplayName("Should return not found error when deactivating non-existent device")
+    void shouldReturnNotFoundWhenDeactivatingNonExistentDevice() {
+        var nonExistentId = UUID.randomUUID().toString();
+        when(ioTDeviceRepository.findById(eq(new DeviceId(nonExistentId))))
+                .thenReturn(Optional.empty());
+
+        var command = new DeactivateIoTDeviceCommand(
+                plotId.toString(),
+                nonExistentId,
+                null
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("IOTDEVICE_NOT_FOUND");
+        verify(ioTDeviceRepository, never()).save(any(IoTDevice.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Should return conflict error when deactivating device with plot mismatch")
+    void shouldReturnConflictWhenPlotMismatchOnDeactivate() {
+        var otherPlotId = UUID.randomUUID();
+        var device = IoTDevice.register(
+                new PlotId(otherPlotId.toString()),
+                new DeviceName("Sonda de Otro Lote"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        when(ioTDeviceRepository.findById(eq(device.snapshot().id())))
+                .thenReturn(Optional.of(device));
+
+        var command = new DeactivateIoTDeviceCommand(
+                plotId.toString(),
+                device.snapshot().id().deviceId(),
+                null
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("DEVICE_CONFLICT");
+        assertThat(result.failure().get().details()).isEqualTo("device.plot_id.mismatch");
+        verify(ioTDeviceRepository, never()).save(any(IoTDevice.class));
+    }
+
+    @Test
+    @DisplayName("Should return conflict error when deactivating already unlinked device")
+    void shouldReturnConflictWhenDeviceAlreadyUnlinked() {
+        var device = IoTDevice.register(
+                new PlotId(plotId.toString()),
+                new DeviceName("Sonda Ya Desvinculada"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+        device.unlink();
+
+        when(ioTDeviceRepository.findById(eq(device.snapshot().id())))
+                .thenReturn(Optional.of(device));
+
+        var command = new DeactivateIoTDeviceCommand(
+                plotId.toString(),
+                device.snapshot().id().deviceId(),
+                null
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("DEVICE_CONFLICT");
+        assertThat(result.failure().get().details()).isEqualTo("device.already_unlinked");
+        verify(ioTDeviceRepository, never()).save(any(IoTDevice.class));
+    }
+
+    @Test
+    @DisplayName("Should return precondition failed when revision mismatch on deactivation")
+    void shouldReturnPreconditionFailedWhenRevisionMismatchOnDeactivate() {
+        var device = IoTDevice.register(
+                new PlotId(plotId.toString()),
+                new DeviceName("Sonda Revision Deactivate"),
+                DeviceType.SOIL_PROBE,
+                SensorDepth.of(30),
+                SoilTextureType.LOAM,
+                new CalibrationMultiplier(1.0)
+        );
+
+        when(ioTDeviceRepository.findById(eq(device.snapshot().id())))
+                .thenReturn(Optional.of(device));
+
+        var command = new DeactivateIoTDeviceCommand(
+                plotId.toString(),
+                device.snapshot().id().deviceId(),
+                99L
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("DEVICE_PRECONDITION_FAILED");
+        assertThat(result.failure().get().details()).isEqualTo("device.revision.mismatch");
     }
 }
