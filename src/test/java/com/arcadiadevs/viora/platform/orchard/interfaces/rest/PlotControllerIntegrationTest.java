@@ -79,7 +79,6 @@ class PlotControllerIntegrationTest {
 
         String payload = """
                 {
-                    "producerId": "550e8400-e29b-41d4-a716-446655440000",
                     "name": "Cuartel San Jerónimo",
                     "variety": "CRIOLLA",
                     "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
@@ -105,7 +104,6 @@ class PlotControllerIntegrationTest {
     void shouldReturnBadRequestWhenValidationFails() throws Exception {
         String invalidPayload = """
                 {
-                    "producerId": "550e8400-e29b-41d4-a716-446655440000",
                     "name": "ab",
                     "variety": "CRIOLLA",
                     "polygonGeoJson": "{\\"type\\":\\"Polygon\\"}",
@@ -124,29 +122,6 @@ class PlotControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/plots should return 400 Bad Request when producerId is blank")
-    void shouldReturnBadRequestWhenProducerIdIsBlank() throws Exception {
-        String payloadWithoutProducer = """
-                {
-                    "producerId": "",
-                    "name": "Cuartel San Jerónimo",
-                    "variety": "CRIOLLA",
-                    "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
-                    "rowSpacingM": 7.0,
-                    "treeSpacingM": 5.0
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/plots")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(payloadWithoutProducer))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/validation-error")))
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.detail", containsString("Producer id cannot be blank")));
-    }
-
-    @Test
     @DisplayName("POST /api/v1/plots should return 409 Conflict with RFC 7807 ProblemDetail on duplicate plot name in English")
     void shouldReturnConflictWhenPlotNameIsDuplicate() throws Exception {
         when(plotCommandService.handle(any(DelimitPlotCommand.class)))
@@ -154,7 +129,6 @@ class PlotControllerIntegrationTest {
 
         String payload = """
                 {
-                    "producerId": "550e8400-e29b-41d4-a716-446655440000",
                     "name": "Cuartel Duplicado",
                     "variety": "CRIOLLA",
                     "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
@@ -180,7 +154,6 @@ class PlotControllerIntegrationTest {
 
         String payload = """
                 {
-                    "producerId": "550e8400-e29b-41d4-a716-446655440000",
                     "name": "Cuartel Duplicado",
                     "variety": "CRIOLLA",
                     "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
@@ -234,7 +207,6 @@ class PlotControllerIntegrationTest {
 
         mockMvc.perform(put("/api/v1/plots/{plotId}", plotId)
                         .header("If-Match", "\"0\"")
-                        .param("producerId", producerId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload))
                 .andExpect(status().isOk())
@@ -265,7 +237,6 @@ class PlotControllerIntegrationTest {
 
         mockMvc.perform(put("/api/v1/plots/{plotId}", plotId)
                         .header("If-Match", "\"5\"")
-                        .param("producerId", producerId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload))
                 .andExpect(status().isPreconditionFailed())

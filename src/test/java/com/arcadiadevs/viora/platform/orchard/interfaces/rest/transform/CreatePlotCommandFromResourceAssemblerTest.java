@@ -14,7 +14,6 @@ class CreatePlotCommandFromResourceAssemblerTest {
     @DisplayName("Should transform CreatePlotResource to DelimitPlotCommand with all attributes mapped")
     void shouldTransformResourceToCommand() {
         var resource = new CreatePlotResource(
-                "550e8400-e29b-41d4-a716-446655440000",
                 "Cuartel San Jerónimo",
                 "CRIOLLA",
                 "{\"type\":\"Polygon\",\"coordinates\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
@@ -22,7 +21,10 @@ class CreatePlotCommandFromResourceAssemblerTest {
                 5.0
         );
 
-        DelimitPlotCommand command = CreatePlotCommandFromResourceAssembler.toCommandFromResource(resource);
+        DelimitPlotCommand command = CreatePlotCommandFromResourceAssembler.toCommandFromResource(
+                "550e8400-e29b-41d4-a716-446655440000",
+                resource
+        );
 
         assertThat(command).isNotNull();
         assertThat(command.producerId()).isEqualTo("550e8400-e29b-41d4-a716-446655440000");
