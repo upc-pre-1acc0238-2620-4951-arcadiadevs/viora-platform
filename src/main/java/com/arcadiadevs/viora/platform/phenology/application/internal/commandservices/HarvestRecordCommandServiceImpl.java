@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.phenology.application.internal.commandser
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.phenology.application.commandservices.HarvestRecordCommandService;
+import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
@@ -22,25 +23,34 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
 
     private final ChillAccumulationTrackerRepository trackerRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExternalOrchardService externalOrchardService;
 
     /**
      * Constructs the command service injecting dependencies.
      *
-     * @param trackerRepository the domain repository port
-     * @param eventPublisher    the application event publisher
+     * @param trackerRepository      the domain repository port
+     * @param eventPublisher         the application event publisher
+     * @param externalOrchardService the outbound ACL service for orchard verifications
      */
     public HarvestRecordCommandServiceImpl(
             ChillAccumulationTrackerRepository trackerRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            ExternalOrchardService externalOrchardService
     ) {
         this.trackerRepository = trackerRepository;
         this.eventPublisher = eventPublisher;
+        this.externalOrchardService = externalOrchardService;
     }
 
     @Override
     public Result<String, ApplicationError> handle(RecordHarvestYieldCommand command) {
         try {
             var plotId = new PlotId(command.plotId());
+
+            if (!externalOrchardService.existsActivePlot(plotId)) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
             var campaignYear = new CampaignYear(command.campaignYear());
             var harvestYield = new HarvestYield(command.totalYieldKg(), command.greenKg(), command.blackKg());
 

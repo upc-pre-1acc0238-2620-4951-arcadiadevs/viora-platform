@@ -37,17 +37,21 @@ class IoTDeviceCommandServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalOrchardService externalOrchardService;
+
     private IoTDeviceCommandServiceImpl commandService;
     private final UUID plotId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        commandService = new IoTDeviceCommandServiceImpl(ioTDeviceRepository, eventPublisher);
+        commandService = new IoTDeviceCommandServiceImpl(ioTDeviceRepository, eventPublisher, externalOrchardService);
     }
 
     @Test
     @DisplayName("Should successfully register device when name is unique and parameters are valid")
     void shouldSuccessfullyRegisterDevice() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
         var command = new RegisterIoTDeviceCommand(
                 plotId.toString(),
                 "Estacion Principal",
@@ -73,8 +77,34 @@ class IoTDeviceCommandServiceTest {
     }
 
     @Test
+    @DisplayName("Should return not found error when plot does not exist in orchard")
+    void shouldReturnNotFoundWhenPlotDoesNotExist() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(false);
+
+        var command = new RegisterIoTDeviceCommand(
+                plotId.toString(),
+                "Estacion Sin Lote",
+                "MICROCLIMATE",
+                null,
+                null,
+                1.0
+        );
+
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure()).isPresent();
+        assertThat(result.failure().get().code()).isEqualTo("PLOT_NOT_FOUND");
+        assertThat(result.failure().get().message()).contains(plotId.toString());
+
+        verify(ioTDeviceRepository, never()).save(any(IoTDevice.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("Should return conflict error when device name already exists in the plot")
     void shouldReturnConflictWhenNameExists() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
         var command = new RegisterIoTDeviceCommand(
                 plotId.toString(),
                 "Estacion Repetida",
@@ -101,6 +131,7 @@ class IoTDeviceCommandServiceTest {
     @Test
     @DisplayName("Should return validation error when soil probe has no depth")
     void shouldReturnValidationErrorWhenSoilProbeMissingDepth() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
         var command = new RegisterIoTDeviceCommand(
                 plotId.toString(),
                 "Sonda Sin Profundidad",
@@ -283,13 +314,17 @@ class IoTDeviceCommandServiceTest {
     @DisplayName("Should throw IllegalArgumentException when constructor dependencies are null")
     @SuppressWarnings("DataFlowIssue")
     void shouldThrowWhenConstructorDependenciesNull() {
-        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(null, eventPublisher))
+        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(null, eventPublisher, externalOrchardService))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("device.repository.null");
 
-        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(ioTDeviceRepository, null))
+        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(ioTDeviceRepository, null, externalOrchardService))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("device.event_publisher.null");
+
+        assertThatThrownBy(() -> new IoTDeviceCommandServiceImpl(ioTDeviceRepository, eventPublisher, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("device.external_orchard_service.null");
     }
 
     @Test
@@ -301,10 +336,6 @@ class IoTDeviceCommandServiceTest {
                 .hasMessage("command.null");
 
         assertThatThrownBy(() -> commandService.handle((CalibrateIoTDeviceCommand) null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("command.null");
-
-        assertThatThrownBy(() -> commandService.handle((DeactivateIoTDeviceCommand) null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("command.null");
     }

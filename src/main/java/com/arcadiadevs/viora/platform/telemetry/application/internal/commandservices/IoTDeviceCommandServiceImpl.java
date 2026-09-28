@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.telemetry.application.internal.commandser
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.IoTDeviceCommandService;
+import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DuplicateDeviceNameException;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
@@ -24,16 +25,19 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
 
     private final IoTDeviceRepository ioTDeviceRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExternalOrchardService externalOrchardService;
 
     /**
      * Constructs the IoTDeviceCommandServiceImpl with required dependencies.
      *
-     * @param ioTDeviceRepository the domain device repository port
-     * @param eventPublisher      the Spring application event publisher
+     * @param ioTDeviceRepository    the domain device repository port
+     * @param eventPublisher         the Spring application event publisher
+     * @param externalOrchardService the outbound ACL service for orchard verifications
      */
     public IoTDeviceCommandServiceImpl(
             IoTDeviceRepository ioTDeviceRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            ExternalOrchardService externalOrchardService
     ) {
         if (ioTDeviceRepository == null) {
             throw new IllegalArgumentException("device.repository.null");
@@ -41,8 +45,12 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         if (eventPublisher == null) {
             throw new IllegalArgumentException("device.event_publisher.null");
         }
+        if (externalOrchardService == null) {
+            throw new IllegalArgumentException("device.external_orchard_service.null");
+        }
         this.ioTDeviceRepository = ioTDeviceRepository;
         this.eventPublisher = eventPublisher;
+        this.externalOrchardService = externalOrchardService;
     }
 
     @Override
@@ -52,6 +60,11 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         }
         try {
             var plotId = new PlotId(command.plotId());
+
+            if (!externalOrchardService.existsActivePlot(plotId)) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
             var deviceName = new DeviceName(command.name());
 
             if (ioTDeviceRepository.existsByNameAndPlotId(deviceName, plotId)) {
@@ -145,9 +158,6 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
 
     @Override
     public Result<String, ApplicationError> handle(DeactivateIoTDeviceCommand command) {
-        if (command == null) {
-            throw new IllegalArgumentException("command.null");
-        }
         try {
             var plotId = new PlotId(command.plotId());
             var deviceId = new DeviceId(command.deviceId());

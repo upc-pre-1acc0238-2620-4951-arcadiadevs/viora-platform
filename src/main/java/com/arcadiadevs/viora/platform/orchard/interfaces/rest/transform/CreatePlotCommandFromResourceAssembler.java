@@ -9,14 +9,15 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.CreatePl
 public class CreatePlotCommandFromResourceAssembler {
 
     /**
-     * Converts a CreatePlotResource to a DelimitPlotCommand.
+     * Converts a CreatePlotResource and effective producerId to a DelimitPlotCommand.
      *
-     * @param resource The {@link CreatePlotResource} resource to convert.
+     * @param producerId The effective producer UUID string.
+     * @param resource   The {@link CreatePlotResource} resource to convert.
      * @return The {@link DelimitPlotCommand} command that results from the conversion.
      */
-    public static DelimitPlotCommand toCommandFromResource(CreatePlotResource resource) {
+    public static DelimitPlotCommand toCommandFromResource(String producerId, CreatePlotResource resource) {
         return new DelimitPlotCommand(
-                resource.producerId(),
+                producerId,
                 resource.name(),
                 resource.variety(),
                 resource.polygonGeoJson(),
