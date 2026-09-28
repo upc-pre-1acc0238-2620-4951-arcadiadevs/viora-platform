@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
 
+import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand;
+
 /**
  * Application service port orchestrating harvest record mutations in phenology.
  */
@@ -16,4 +18,12 @@ public interface HarvestRecordCommandService {
      * @return {@link Result} containing the created harvest record ID on success, or an {@link ApplicationError}
      */
     Result<String, ApplicationError> handle(RecordHarvestYieldCommand command);
+
+    /**
+     * Handles the rectification of an existing annual campaign harvest record.
+     *
+     * @param command the command specifying plot, entry ID, updated yields, and revision
+     * @return {@link Result} containing the rectified harvest record ID on success, or an {@link ApplicationError}
+     */
+    Result<String, ApplicationError> handle(RectifyHarvestYieldCommand command);
 }
