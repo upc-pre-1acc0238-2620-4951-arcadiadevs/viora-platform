@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.phenology.domain.services;
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.HistoricalHarvestEntry;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.BbiAlternationCategory;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.BiennialBearingIndex;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.SampleSufficiency;
 
 import java.util.Comparator;
 import java.util.List;
@@ -20,6 +21,16 @@ import java.util.List;
 public final class HoblynBbiCalculatorService {
 
     private HoblynBbiCalculatorService() {
+    }
+
+    /**
+     * Evaluates sample sufficiency according to domain requirements (minimum 3 campaigns).
+     *
+     * @param sampleSize the number of evaluated harvest campaigns
+     * @return the {@link SampleSufficiency} assessment
+     */
+    public static SampleSufficiency evaluateSufficiency(int sampleSize) {
+        return SampleSufficiency.of(sampleSize);
     }
 
     /**

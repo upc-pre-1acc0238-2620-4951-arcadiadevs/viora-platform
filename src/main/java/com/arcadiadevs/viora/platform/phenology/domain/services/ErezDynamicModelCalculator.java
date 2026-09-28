@@ -30,7 +30,37 @@ public final class ErezDynamicModelCalculator {
     private static final double TETMLT = 277.0; // ~ 4.0 °C in Kelvin
     private static final double KELVIN_OFFSET = 273.15;
 
+    /**
+     * Standard varietal chilling portions target required for olive floral bud release.
+     */
+    public static final double DEFAULT_VARIETAL_CHILL_THRESHOLD = 27.0;
+
     private ErezDynamicModelCalculator() {
+    }
+
+    /**
+     * Evaluates whether the accumulated chilling portions fulfill the varietal physiological requirement.
+     *
+     * @param portions the accumulated chilling portions
+     * @param targetThreshold the target threshold
+     * @return "SATISFIED" if portions >= targetThreshold; otherwise "DEFICIENT"
+     */
+    public static String evaluateSatisfactionStatus(double portions, double targetThreshold) {
+        return portions >= targetThreshold ? "SATISFIED" : "DEFICIENT";
+    }
+
+    /**
+     * Computes the percentage of the chilling requirement completed, rounded to 2 decimal places.
+     *
+     * @param portions the accumulated chilling portions
+     * @param targetThreshold the target threshold
+     * @return the percentage completion
+     */
+    public static double computeCompletionPercentage(double portions, double targetThreshold) {
+        if (targetThreshold <= 0.0) {
+            return 0.0;
+        }
+        return Math.round((portions / targetThreshold) * 10000.0) / 100.0;
     }
 
     /**
