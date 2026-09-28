@@ -2,14 +2,17 @@ package com.arcadiadevs.viora.platform.phenology.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.phenology.application.commandservices.HarvestRecordCommandService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.HarvestRecordResource;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.RecordHarvestYieldResource;
+import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.RectifyHarvestYieldResource;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.HarvestRecordResourceFromEntityAssembler;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.RecordHarvestYieldCommandFromResourceAssembler;
+import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.RectifyHarvestYieldCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
 import io.swagger.v3.oas.annotations.Operation;
@@ -151,6 +154,80 @@ public class HarvestRecordController {
                             .orElse(0.0);
                     return HarvestRecordResourceFromEntityAssembler.toResourceList(entries, plotId, bbi);
                 });
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(
+                result,
+                res -> res,
+                HttpStatus.OK
+        );
+    }
+
+    /**
+     * Rectifies an existing annual campaign olive harvest record with optimistic concurrency control.
+     *
+     * @param plotId   the unique plot UUID
+     * @param recordId the unique harvest record UUID to rectify
+     * @param ifMatch  optional If-Match header containing the expected revision
+     * @param resource the rectified harvest payload
+     * @return 200 OK with the updated HarvestRecordResource, or ProblemDetail on error
+     */
+    @PutMapping(value = "/{recordId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Rectify annual campaign harvest yield",
+            description = "Adjusts the volume and green/black olive composition of an existing harvest record, enforcing optimistic locking and recalculating Hoblyn's BBI."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Harvest yield successfully rectified",
+                    content = @Content(schema = @Schema(implementation = HarvestRecordResource.class))
+            ),
+            @ApiResponse(responseCode = "400", description = "Invalid payload, incoherent yield sum, or malformed UUID"),
+            @ApiResponse(responseCode = "404", description = "Harvest record or plot not found"),
+            @ApiResponse(responseCode = "412", description = "Precondition Failed: If-Match revision mismatch")
+    })
+    public ResponseEntity<?> rectifyHarvestRecord(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String plotId,
+            @Parameter(description = "Unique harvest record UUID", example = "550e8400-e29b-41d4-a716-446655440001")
+            @PathVariable String recordId,
+            @Parameter(description = "Optimistic locking revision", example = "\"0\"")
+            @RequestHeader(value = "If-Match", required = false) @Nullable String ifMatch,
+            @Valid @RequestBody RectifyHarvestYieldResource resource
+    ) {
+        Long expectedRevision = null;
+        if (ifMatch != null && !ifMatch.isBlank()) {
+            try {
+                expectedRevision = Long.parseLong(ifMatch.replace("\"", "").trim());
+            } catch (NumberFormatException ex) {
+                var error = ApplicationError.validationError("If-Match", "phenology.tracker.revision.invalid");
+                return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+            }
+        }
+
+        var command = RectifyHarvestYieldCommandFromResourceAssembler
+                .toCommandFromResource(plotId, recordId, expectedRevision, resource);
+
+        var result = harvestRecordCommandService.handle(command)
+                .flatMap(id -> trackerRepository.findByPlotId(new PlotId(plotId))
+                        .<Result<HarvestRecordResource, ApplicationError>>map(tracker -> {
+                            var snap = tracker.snapshot();
+                            var entrySnapOpt = snap.harvestHistory().stream()
+                                    .filter(e -> e.id().harvestEntryId().equals(id))
+                                    .findFirst();
+
+                            if (entrySnapOpt.isEmpty()) {
+                                return Result.failure(ApplicationError.notFound("HarvestRecord", id));
+                            }
+
+                            var resourceOut = HarvestRecordResourceFromEntityAssembler.toResource(
+                                    entrySnapOpt.get(),
+                                    plotId,
+                                    snap.calculatedBbi().value()
+                            );
+                            return Result.success(resourceOut);
+                        })
+                        .orElseGet(() -> Result.failure(ApplicationError.notFound("Plot", plotId))));
 
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 result,

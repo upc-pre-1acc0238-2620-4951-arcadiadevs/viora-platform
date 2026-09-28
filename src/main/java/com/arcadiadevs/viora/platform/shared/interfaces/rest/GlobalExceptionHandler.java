@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.shared.interfaces.rest;
 
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
+import com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
@@ -121,6 +122,21 @@ public class GlobalExceptionHandler {
     ) {
         var detail = resolveMessageOrDefault(ex.getMessage(), "The device revision has changed. Please reload.");
         var applicationError = ApplicationError.preconditionFailed("device", detail);
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles optimistic locking revision mismatch exceptions for phenology trackers.
+     *
+     * @param ex the tracker revision mismatch exception
+     * @return ProblemDetail response with PRECONDITION_FAILED (412) status
+     */
+    @ExceptionHandler(TrackerRevisionMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleTrackerRevisionMismatchException(
+            TrackerRevisionMismatchException ex
+    ) {
+        var detail = resolveMessageOrDefault(ex.getMessage(), "The tracker revision has changed. Please reload.");
+        var applicationError = ApplicationError.preconditionFailed("tracker", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 
