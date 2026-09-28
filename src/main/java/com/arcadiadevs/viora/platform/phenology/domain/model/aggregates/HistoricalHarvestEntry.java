@@ -72,10 +72,10 @@ public class HistoricalHarvestEntry {
     /**
      * Updates the harvest yield of this campaign entry.
      *
-     * @param newYield the updated harvest yield
+     * @param updatedHarvestYield the updated harvest yield
      */
-    public void updateYield(HarvestYield newYield) {
-        this.harvestYield = newYield;
+    public void updateYield(HarvestYield updatedHarvestYield) {
+        this.harvestYield = updatedHarvestYield;
     }
 
     /**

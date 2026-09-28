@@ -1,8 +1,11 @@
 package com.arcadiadevs.viora.platform.phenology.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
+import com.arcadiadevs.viora.platform.phenology.domain.exceptions.HarvestRecordNotFoundException;
+import com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.BiennialBearingIndexAssessedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.HarvestYieldRecordedEvent;
+import com.arcadiadevs.viora.platform.phenology.domain.model.events.HistoricalHarvestRectifiedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.phenology.domain.services.HoblynBbiCalculatorService;
 
@@ -101,15 +104,15 @@ public class ChillAccumulationTracker extends AbstractDomainAggregateRoot<ChillA
      * and recalculating the Hoblyn BBI across the complete pluriannual series.
      *
      * @param campaignYear the campaign year
-     * @param yield        the harvest yield component
+     * @param harvestYield the harvest yield component
      * @return the newly created {@link HistoricalHarvestEntry}
      * @throws IllegalArgumentException if an entry for the campaign year already exists
      */
-    public HistoricalHarvestEntry recordHarvest(CampaignYear campaignYear, HarvestYield yield) {
+    public HistoricalHarvestEntry recordHarvest(CampaignYear campaignYear, HarvestYield harvestYield) {
         if (campaignYear == null) {
             throw new IllegalArgumentException("phenology.campaign_year.null");
         }
-        if (yield == null) {
+        if (harvestYield == null) {
             throw new IllegalArgumentException("phenology.harvest_yield.null");
         }
 
@@ -120,7 +123,7 @@ public class ChillAccumulationTracker extends AbstractDomainAggregateRoot<ChillA
             throw new IllegalArgumentException("phenology.harvest_yield.duplicate_campaign");
         }
 
-        var entry = HistoricalHarvestEntry.create(campaignYear, yield);
+        var entry = HistoricalHarvestEntry.create(campaignYear, harvestYield);
         harvestHistory.add(entry);
 
         recalculateBearingMetrics();
@@ -131,7 +134,7 @@ public class ChillAccumulationTracker extends AbstractDomainAggregateRoot<ChillA
                 entry.snapshot().id().harvestEntryId(),
                 plotId.plotId(),
                 campaignYear.value(),
-                yield.totalKg(),
+                harvestYield.totalKg(),
                 Instant.now()
         ));
 
@@ -143,6 +146,64 @@ public class ChillAccumulationTracker extends AbstractDomainAggregateRoot<ChillA
         ));
 
         return entry;
+    }
+
+    /**
+     * Rectifies an existing annual harvest record, validating optimistic revision concurrency,
+     * updating child entity yield, and recalculating Hoblyn's BBI across the series.
+     *
+     * @param entryId          the identifier of the entry to rectify
+     * @param rectifiedYield   the corrected harvest yield VO
+     * @param expectedRevision optional optimistic revision
+     * @return the updated {@link HistoricalHarvestEntry}
+     * @throws com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException if revision mismatches
+     * @throws com.arcadiadevs.viora.platform.phenology.domain.exceptions.HarvestRecordNotFoundException   if entryId is not found
+     */
+    public HistoricalHarvestEntry rectifyHarvestRecord(
+            HarvestEntryId entryId,
+            HarvestYield rectifiedYield,
+            Long expectedRevision
+    ) {
+        if (entryId == null) {
+            throw new IllegalArgumentException("phenology.harvest_entry.id.null_or_empty");
+        }
+        if (rectifiedYield == null) {
+            throw new IllegalArgumentException("phenology.harvest_yield.null");
+        }
+        if (expectedRevision != null && (this.revision == null || !expectedRevision.equals(this.revision))) {
+            long current = this.revision == null ? 0L : this.revision;
+            throw new TrackerRevisionMismatchException(this.id, current, expectedRevision);
+        }
+
+        var targetEntry = harvestHistory.stream()
+                .filter(e -> e.snapshot().id().equals(entryId))
+                .findFirst()
+                .orElseThrow(() -> new HarvestRecordNotFoundException(entryId));
+
+        targetEntry.updateYield(rectifiedYield);
+
+        recalculateBearingMetrics();
+
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        registerDomainEvent(new HistoricalHarvestRectifiedEvent(
+                targetEntry.snapshot().id().harvestEntryId(),
+                plotId.plotId(),
+                targetEntry.snapshot().campaignYear().value(),
+                rectifiedYield.totalKg(),
+                calculatedBbi.value(),
+                this.revision,
+                Instant.now()
+        ));
+
+        registerDomainEvent(new BiennialBearingIndexAssessedEvent(
+                plotId.plotId(),
+                calculatedBbi.value(),
+                targetEntry.snapshot().classification().name(),
+                Instant.now()
+        ));
+
+        return targetEntry;
     }
 
     private void recalculateBearingMetrics() {
