@@ -38,4 +38,26 @@ public final class HarvestRecordResourceFromEntityAssembler {
                 entrySnap.recordedAt()
         );
     }
+
+    /**
+     * Converts a list of domain harvest snapshots and contextual aggregate attributes to a presentation resource list.
+     *
+     * @param entrySnaps the list of harvest entry snapshots
+     * @param plotId     the plot UUID string
+     * @param bbiValue   the assessed BBI value
+     * @return the mapped list of {@link HarvestRecordResource} instances
+     */
+    public static List<HarvestRecordResource> toResourceList(
+            List<HistoricalHarvestEntrySnapshot> entrySnaps,
+            String plotId,
+            Double bbiValue
+    ) {
+        if (entrySnaps == null) {
+            return List.of();
+        }
+        return entrySnaps.stream()
+                .map(snap -> toResource(snap, plotId, bbiValue))
+                .toList();
+    }
 }
+
