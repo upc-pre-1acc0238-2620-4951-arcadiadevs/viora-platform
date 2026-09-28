@@ -11,6 +11,8 @@ import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.Harves
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.controllers.HarvestRecordController;
+import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
+import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,12 +23,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,13 +47,16 @@ class HarvestRecordControllerIntegrationTest {
     private HarvestRecordCommandService harvestRecordCommandService;
 
     @Mock
+    private HarvestRecordQueryService harvestRecordQueryService;
+
+    @Mock
     private ChillAccumulationTrackerRepository trackerRepository;
 
     private final UUID plotId = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
-        var controller = new HarvestRecordController(harvestRecordCommandService, trackerRepository);
+        var controller = new HarvestRecordController(harvestRecordCommandService, harvestRecordQueryService, trackerRepository);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -125,5 +134,79 @@ class HarvestRecordControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/harvest-records should return 200 OK with harvest record list")
+    void shouldReturnOkWithHarvestRecordsList() throws Exception {
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId.toString()), new CampaignYear(2024));
+        var entry1 = tracker.recordHarvest(new CampaignYear(2024), new HarvestYield(12000.0, 7000.0, 5000.0));
+        var entry2 = tracker.recordHarvest(new CampaignYear(2025), new HarvestYield(15000.0, 9000.0, 6000.0));
+
+        when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
+                .thenReturn(Result.success(List.of(entry1.snapshot(), entry2.snapshot())));
+        when(trackerRepository.findByPlotId(any(PlotId.class)))
+                .thenReturn(Optional.of(tracker));
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].campaignYear", is(2024)))
+                .andExpect(jsonPath("$[0].totalYieldKg", is(12000.0)))
+                .andExpect(jsonPath("$[1].campaignYear", is(2025)))
+                .andExpect(jsonPath("$[1].totalYieldKg", is(15000.0)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/harvest-records with campaignYear should return filtered 200 OK")
+    void shouldReturnOkWithFilteredHarvestRecord() throws Exception {
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId.toString()), new CampaignYear(2025));
+        var entry = tracker.recordHarvest(new CampaignYear(2025), new HarvestYield(14250.0, 8200.0, 6050.0));
+
+        when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
+                .thenReturn(Result.success(List.of(entry.snapshot())));
+        when(trackerRepository.findByPlotId(any(PlotId.class)))
+                .thenReturn(Optional.of(tracker));
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records?campaignYear=2025", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].campaignYear", is(2025)))
+                .andExpect(jsonPath("$[0].totalYieldKg", is(14250.0)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/harvest-records should return 200 OK with empty array when no records")
+    void shouldReturnEmptyListWhenNoRecords() throws Exception {
+        when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
+                .thenReturn(Result.success(Collections.emptyList()));
+        when(trackerRepository.findByPlotId(any(PlotId.class)))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/harvest-records should return 404 Not Found when plot does not exist in ACL")
+    void shouldReturnNotFoundWhenPlotDoesNotExistInAcl() throws Exception {
+        when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("Plot", plotId.toString())));
+
+        mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots/{plotId}/harvest-records should return 400 Bad Request on invalid campaign year")
+    void shouldReturnBadRequestOnInvalidCampaignYear() throws Exception {
+        mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records?campaignYear=1900", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
     }
 }
