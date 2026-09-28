@@ -209,4 +209,104 @@ class HarvestRecordControllerIntegrationTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/harvest-records/{recordId} should return 200 OK and ETag when valid")
+    void shouldReturnOkWhenRectifyingHarvestRecordIsValid() throws Exception {
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId.toString()), new CampaignYear(2025));
+        var entry = tracker.recordHarvest(new CampaignYear(2025), new HarvestYield(14250.0, 8200.0, 6050.0));
+        var recordId = entry.snapshot().id().harvestEntryId();
+
+        when(harvestRecordCommandService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand.class)))
+                .thenReturn(Result.success(recordId));
+        when(trackerRepository.findByPlotId(any(PlotId.class)))
+                .thenReturn(Optional.of(tracker));
+
+        String payload = """
+                {
+                    "totalYieldKg": 14500.0,
+                    "greenKg": 8300.0,
+                    "blackKg": 6200.0,
+                    "notes": "Correction after recalibration"
+                }
+                """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(recordId)))
+                .andExpect(jsonPath("$.totalYieldKg", is(14250.0)));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/harvest-records/{recordId} should return 412 Precondition Failed when revision mismatches")
+    void shouldReturnPreconditionFailedWhenRevisionMismatches() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.preconditionFailed("tracker", "phenology.tracker.revision.mismatch")));
+
+        String payload = """
+                {
+                    "totalYieldKg": 14500.0,
+                    "greenKg": 8300.0,
+                    "blackKg": 6200.0
+                }
+                """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isPreconditionFailed());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/harvest-records/{recordId} should return 400 Bad Request on malformed If-Match")
+    void shouldReturnBadRequestOnMalformedIfMatch() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        String payload = """
+                {
+                    "totalYieldKg": 14500.0,
+                    "greenKg": 8300.0,
+                    "blackKg": 6200.0
+                }
+                """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "abc-invalid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/plots/{plotId}/harvest-records/{recordId} should return 404 Not Found when harvest record not found")
+    void shouldReturnNotFoundWhenHarvestRecordNotFound() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("HarvestRecord", recordId)));
+
+        String payload = """
+                {
+                    "totalYieldKg": 14500.0,
+                    "greenKg": 8300.0,
+                    "blackKg": 6200.0
+                }
+                """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isNotFound());
+    }
 }
+
