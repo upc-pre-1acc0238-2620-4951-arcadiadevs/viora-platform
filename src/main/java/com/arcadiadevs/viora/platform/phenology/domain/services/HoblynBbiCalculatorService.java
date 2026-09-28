@@ -1,7 +1,9 @@
 package com.arcadiadevs.viora.platform.phenology.domain.services;
 
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.HistoricalHarvestEntry;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.BbiAlternationCategory;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.BiennialBearingIndex;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.SampleSufficiency;
 
 import java.util.Comparator;
 import java.util.List;
@@ -19,6 +21,16 @@ import java.util.List;
 public final class HoblynBbiCalculatorService {
 
     private HoblynBbiCalculatorService() {
+    }
+
+    /**
+     * Evaluates sample sufficiency according to domain requirements (minimum 3 campaigns).
+     *
+     * @param sampleSize the number of evaluated harvest campaigns
+     * @return the {@link SampleSufficiency} assessment
+     */
+    public static SampleSufficiency evaluateSufficiency(int sampleSize) {
+        return SampleSufficiency.of(sampleSize);
     }
 
     /**
@@ -60,4 +72,29 @@ public final class HoblynBbiCalculatorService {
         double clamped = Math.max(0.00, Math.min(1.00, Math.round(bbiValue * 1000.0) / 1000.0));
         return new BiennialBearingIndex(clamped);
     }
+
+    /**
+     * Determines the qualitative alternation category according to Hoblyn BBI agronomic thresholds.
+     *
+     * @param bbi        the calculated BBI value object
+     * @param sampleSize the number of evaluated harvest campaigns
+     * @return the corresponding {@link BbiAlternationCategory}
+     */
+    public static BbiAlternationCategory classifyAlternation(
+            BiennialBearingIndex bbi,
+            int sampleSize
+    ) {
+        if (bbi == null || sampleSize < 2) {
+            return BbiAlternationCategory.INSUFFICIENT_DATA;
+        }
+        double val = bbi.value();
+        if (val < 0.25) {
+            return BbiAlternationCategory.REGULAR;
+        } else if (val <= 0.50) {
+            return BbiAlternationCategory.MODERATE_ALTERNATION;
+        } else {
+            return BbiAlternationCategory.SEVERE_ALTERNATION;
+        }
+    }
 }
+
