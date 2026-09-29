@@ -175,5 +175,18 @@ class TelemetryEndpointsE2EIntegrationTest {
         // 9. DELETE: Unlink already unlinked device should fail with 409 Conflict
         mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
                 .andExpect(status().isConflict());
+
+        // 10. GET: Query telemetry series for the active plot (initially returns 200 OK empty list)
+        mockMvc.perform(get("/api/v1/plots/{plotId}/telemetries", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        // 11. GET: Query telemetry series for a non-existent plot should fail with 404 ProblemDetail
+        mockMvc.perform(get("/api/v1/plots/{plotId}/telemetries", UUID.randomUUID())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status", is(404)))
+                .andExpect(jsonPath("$.title", is("Not Found")));
     }
 }
