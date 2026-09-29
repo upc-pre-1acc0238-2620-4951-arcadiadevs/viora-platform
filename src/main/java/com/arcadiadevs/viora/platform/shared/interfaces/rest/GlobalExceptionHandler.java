@@ -73,10 +73,21 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleResourceNotFoundException(ResourceNotFoundException ex) {
-        var applicationError = ApplicationError.notFound(
-                "resource",
-                ex.getMessage() != null ? ex.getMessage() : resolveMessageOrDefault("error.not-found.message", "Resource not found")
-        );
+        String detailMessage;
+        if (ex.getIdentifier() != null) {
+            detailMessage = resolveMessageOrDefault(
+                    ex.getMessage() != null ? ex.getMessage() : "error.resource.not-found",
+                    "Resource %s with id %s was not found.".formatted(ex.getResourceName(), ex.getIdentifier()),
+                    ex.getResourceName(),
+                    ex.getIdentifier()
+            );
+        } else if (ex.getMessage() != null) {
+            detailMessage = resolveMessageOrDefault(ex.getMessage(), ex.getMessage());
+        } else {
+            detailMessage = resolveMessageOrDefault("error.not-found.message", "Resource not found");
+        }
+
+        var applicationError = ApplicationError.notFound("resource", detailMessage);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 
