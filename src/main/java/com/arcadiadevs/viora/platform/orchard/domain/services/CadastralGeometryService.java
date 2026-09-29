@@ -62,6 +62,29 @@ public class CadastralGeometryService {
         return new PlotGeometry(geoJson, areaHa);
     }
 
+    /**
+     * Computes the centroid coordinates [latitude, longitude] for a valid GeoJSON polygon.
+     *
+     * @param geoJson the raw GeoJSON polygon string
+     * @return double array where index 0 is latitude and index 1 is longitude
+     */
+    public double[] computeCentroid(String geoJson) {
+        validate(geoJson);
+        var coords = parseCoordinates(geoJson);
+        double sumLat = 0.0;
+        double sumLon = 0.0;
+        int n = coords.size() - 1;
+        if (n < 3) {
+            n = coords.size();
+        }
+        for (int i = 0; i < n; i++) {
+            double[] pt = coords.get(i);
+            sumLon += pt[0];
+            sumLat += pt[1];
+        }
+        return new double[]{sumLat / n, sumLon / n};
+    }
+
     private List<double[]> parseCoordinates(String geoJson) {
         var matcher = COORD_PAIR_PATTERN.matcher(geoJson);
         List<double[]> coords = new ArrayList<>();
