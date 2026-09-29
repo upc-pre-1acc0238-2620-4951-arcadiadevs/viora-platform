@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.PlotId;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 /**
  * Outbound ACL service used by the Telemetry bounded context to interact with Orchard capabilities.
  *
@@ -35,5 +37,18 @@ public class ExternalOrchardService {
             return false;
         }
         return orchardContextFacade.existsActivePlot(plotId.plotId());
+    }
+
+    /**
+     * Retrieves the calculated centroid coordinates [latitude, longitude] for an active plot.
+     *
+     * @param plotId the Telemetry PlotId value object
+     * @return Optional containing double array [latitude, longitude], or empty if plot is not found or not active
+     */
+    public Optional<double[]> findPlotCentroid(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotCentroid(plotId.plotId());
     }
 }

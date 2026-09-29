@@ -3,9 +3,12 @@ package com.arcadiadevs.viora.platform.orchard.application.acl;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
+import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
 import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 /**
  * Application-layer implementation of the {@link OrchardContextFacade} ACL interface.
@@ -18,14 +21,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrchardContextFacadeImpl implements OrchardContextFacade {
 
     private final PlotRepository plotRepository;
+    private final CadastralGeometryService cadastralGeometryService;
 
     /**
-     * Constructs the facade implementation injecting the domain repository port.
+     * Constructs the facade implementation injecting domain repository and default geometry service.
      *
      * @param plotRepository domain repository port
      */
     public OrchardContextFacadeImpl(PlotRepository plotRepository) {
+        this(plotRepository, new CadastralGeometryService());
+    }
+
+    /**
+     * Constructs the facade implementation injecting domain repository and geometry service.
+     *
+     * @param plotRepository           domain repository port
+     * @param cadastralGeometryService cadastral geometry domain service
+     */
+    public OrchardContextFacadeImpl(PlotRepository plotRepository, CadastralGeometryService cadastralGeometryService) {
         this.plotRepository = plotRepository;
+        this.cadastralGeometryService = cadastralGeometryService != null ? cadastralGeometryService : new CadastralGeometryService();
     }
 
     @Override
@@ -41,6 +56,21 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
         } catch (IllegalArgumentException ex) {
             // Malformed UUID or VO validation failure means plot does not exist
             return false;
+        }
+    }
+
+    @Override
+    public Optional<double[]> findPlotCentroid(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            var domainPlotId = new PlotId(plotId);
+            return plotRepository.findById(domainPlotId)
+                    .filter(plot -> plot.snapshot().status() == PlotStatus.ACTIVE)
+                    .map(plot -> cadastralGeometryService.computeCentroid(plot.snapshot().geometry().geoJson()));
+        } catch (Exception ex) {
+            return Optional.empty();
         }
     }
 }
