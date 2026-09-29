@@ -1,7 +1,7 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects;
 
 /**
- * Value Object representing the domain identifier of an offline field sampling batch.
+ * Value Object representing the domain identifier of a field sampling batch.
  *
  * <p>Captures the provenance and external session identity of a batch collected by a field
  * technician or olive producer, providing business-level idempotency and auditability.</p>
