@@ -38,6 +38,7 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
      * @param plotRepository           domain repository port
      * @param cadastralGeometryService cadastral geometry domain service
      */
+    @org.springframework.beans.factory.annotation.Autowired
     public OrchardContextFacadeImpl(PlotRepository plotRepository, CadastralGeometryService cadastralGeometryService) {
         this.plotRepository = plotRepository;
         this.cadastralGeometryService = cadastralGeometryService != null ? cadastralGeometryService : new CadastralGeometryService();
