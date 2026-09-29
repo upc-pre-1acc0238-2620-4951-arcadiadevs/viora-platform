@@ -41,7 +41,13 @@ public final class ErrorResponseAssembler {
         String detailMessage;
         if (error.details() != null && !error.details().isBlank()) {
             String localizedDetail = toLocalizedMessageOrNull(error.details());
-            detailMessage = (localizedDetail != null) ? localizedDetail : error.details();
+            if (localizedDetail != null) {
+                detailMessage = localizedDetail;
+            } else if (error.code().endsWith("_NOT_FOUND") && !error.details().contains(" ")) {
+                detailMessage = toLocalizedNotFoundMessage(error);
+            } else {
+                detailMessage = error.details();
+            }
         } else {
             detailMessage = toLocalizedMessageFromApplicationError(error);
         }
@@ -145,6 +151,42 @@ public final class ErrorResponseAssembler {
             return errorCode.replace("_CONFLICT", "").toLowerCase(Locale.ROOT);
         }
         return "resource";
+    }
+
+    private static String toLocalizedNotFoundMessage(ApplicationError error) {
+        String entityName = extractResourceName(error);
+        String identifier = error.details() != null ? error.details() : "";
+        return toLocalizedMessageWithFallback(
+                "error.resource.not-found",
+                "Resource {0} with id {1} was not found.",
+                entityName,
+                identifier
+        );
+    }
+
+    private static String extractResourceName(ApplicationError error) {
+        if (error.message() != null && error.message().contains(" not found:")) {
+            return error.message().substring(0, error.message().indexOf(" not found:"));
+        }
+        if (error.code().endsWith("_NOT_FOUND")) {
+            String raw = error.code().substring(0, error.code().length() - "_NOT_FOUND".length());
+            return toPascalCase(raw);
+        }
+        return "Resource";
+    }
+
+    private static String toPascalCase(String raw) {
+        String[] parts = raw.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                if (part.length() > 1) {
+                    sb.append(part.substring(1).toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        return sb.toString();
     }
 
     private static String toLocalizedMessageOrNull(String key, Object... args) {
