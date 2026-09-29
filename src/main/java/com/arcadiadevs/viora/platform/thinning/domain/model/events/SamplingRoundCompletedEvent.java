@@ -3,7 +3,7 @@ package com.arcadiadevs.viora.platform.thinning.domain.model.events;
 import java.time.Instant;
 
 /**
- * Domain Event emitted when cumulative field samplings achieve representative statistical coverage ($N \ge 5$).
+ * Domain Event emitted when cumulative field samplings achieve representative statistical coverage (minimum 5 trees evaluated).
  *
  * @param prescriptionId the identifier of the prescription aggregate
  * @param plotId         the referenced plot identifier
