@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
  * @param sampledTreesCount  total unique evaluated trees
  * @param sampledShootsCount total shoots counted
  * @param meanFruitsPerMeter average fruit load density per canopy meter
- * @param isRepresentative   whether minimum statistical confidence was reached ($N \ge 5$)
+ * @param isRepresentative   whether minimum statistical confidence was reached (minimum 5 trees)
  * @param treesNeeded        count of additional trees needed to achieve representativeness
  */
 @Schema(
@@ -36,7 +36,7 @@ public record SamplingSummaryResource(
         @Schema(description = "Assessed mean fruit set density per linear canopy meter", example = "54.2")
         Double meanFruitsPerMeter,
 
-        @Schema(description = "Whether the sample fulfills the statistical threshold ($N \\ge 5$)", example = "true")
+        @Schema(description = "Whether the sample fulfills the statistical threshold of at least 5 evaluated trees", example = "true")
         Boolean isRepresentative,
 
         @Schema(description = "Number of additional trees required to achieve statistical confidence", example = "0")

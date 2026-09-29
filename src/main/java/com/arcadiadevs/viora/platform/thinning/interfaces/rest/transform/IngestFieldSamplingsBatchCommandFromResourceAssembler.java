@@ -17,13 +17,14 @@ public final class IngestFieldSamplingsBatchCommandFromResourceAssembler {
     }
 
     /**
-     * Converts the HTTP request body resource and route plotId to domain command.
+     * Converts the HTTP request body resource, route plotId, and authenticated actorId to domain command.
      *
      * @param plotId   the plot UUID string
+     * @param actorId  the authenticated user UUID string
      * @param resource the request body resource
      * @return consistent IngestFieldSamplingsBatchCommand
      */
-    public static IngestFieldSamplingsBatchCommand toCommandFromResource(String plotId, SubmitSamplingResource resource) {
+    public static IngestFieldSamplingsBatchCommand toCommandFromResource(String plotId, String actorId, SubmitSamplingResource resource) {
         if (resource == null) {
             throw new IllegalArgumentException("thinning.command.null");
         }
@@ -41,7 +42,7 @@ public final class IngestFieldSamplingsBatchCommandFromResourceAssembler {
         }
         return new IngestFieldSamplingsBatchCommand(
                 plotId,
-                resource.actorId(),
+                actorId,
                 resource.campaignYear(),
                 resource.clientBatchId(),
                 sampleItems

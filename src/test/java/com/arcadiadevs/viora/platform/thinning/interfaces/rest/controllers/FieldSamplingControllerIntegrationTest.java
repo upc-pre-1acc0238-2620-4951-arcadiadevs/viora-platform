@@ -78,7 +78,6 @@ class FieldSamplingControllerIntegrationTest {
         String requestBody = """
                 {
                   "clientBatchId": "d3b07384-d113-496e-bc35-cf21eb943c5a",
-                  "actorId": "550e8400-e29b-41d4-a716-446655440000",
                   "campaignYear": 2026,
                   "samples": [
                     {
@@ -112,7 +111,6 @@ class FieldSamplingControllerIntegrationTest {
         String requestBody = """
                 {
                   "clientBatchId": "d3b07384-d113-496e-bc35-cf21eb943c5a",
-                  "actorId": "550e8400-e29b-41d4-a716-446655440000",
                   "campaignYear": 2026,
                   "samples": [
                     {
@@ -139,7 +137,6 @@ class FieldSamplingControllerIntegrationTest {
         String invalidBody = """
                 {
                   "clientBatchId": "",
-                  "actorId": "550e8400-e29b-41d4-a716-446655440000",
                   "campaignYear": 2026,
                   "samples": []
                 }

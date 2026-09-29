@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,14 +32,39 @@ import org.springframework.web.bind.annotation.*;
 public class FieldSamplingController {
 
     private final FruitThinningPrescriptionCommandService thinningCommandService;
+    private final String defaultActorId;
 
     /**
-     * Constructs the controller injecting the aggregate command service.
+     * Primary constructor injecting command service and configured fallback actor identifier.
+     *
+     * @param thinningCommandService the command service orchestrating thinning prescription operations
+     * @param defaultActorId         the default mock user/actor identifier from application properties
+     */
+    @Autowired
+    public FieldSamplingController(
+            FruitThinningPrescriptionCommandService thinningCommandService,
+            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultActorId
+    ) {
+        this.thinningCommandService = thinningCommandService;
+        this.defaultActorId = defaultActorId;
+    }
+
+    /**
+     * Test-convenience constructor using default actor identifier.
      *
      * @param thinningCommandService the command service orchestrating thinning prescription operations
      */
     public FieldSamplingController(FruitThinningPrescriptionCommandService thinningCommandService) {
-        this.thinningCommandService = thinningCommandService;
+        this(thinningCommandService, "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    /**
+     * Resolves the current authenticated user/actor identifier.
+     *
+     * @return the resolved user UUID string
+     */
+    private String resolveEffectiveActorId() {
+        return defaultActorId;
     }
 
     /**
@@ -50,7 +77,7 @@ public class FieldSamplingController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Submit field sampling batch",
-            description = "Ingests a batch of tree and shoot counts, deduplicating trees and checking statistical representativeness ($N \\ge 5$)."
+            description = "Ingests a batch of tree and shoot counts, deduplicating trees and checking statistical representativeness (minimum 5 trees evaluated)."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -67,7 +94,8 @@ public class FieldSamplingController {
             @PathVariable String plotId,
             @Valid @RequestBody SubmitSamplingResource resource
     ) {
-        var command = IngestFieldSamplingsBatchCommandFromResourceAssembler.toCommandFromResource(plotId, resource);
+        String actorId = resolveEffectiveActorId();
+        var command = IngestFieldSamplingsBatchCommandFromResourceAssembler.toCommandFromResource(plotId, actorId, resource);
         var result = thinningCommandService.handle(command);
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 result,
