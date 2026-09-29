@@ -59,6 +59,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleResourceNotFoundExceptionReturnsNotFound() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
         var handler = new GlobalExceptionHandler();
         var response = handler.handleResourceNotFoundException(
                 new ResourceNotFoundException("Item", 42L)
@@ -68,6 +69,23 @@ class GlobalExceptionHandlerTest {
         assertEquals(404, response.getStatusCode().value());
         assertEquals("Not Found", problemDetail.getTitle());
         assertTrue(problemDetail.getDetail().contains("Resource Item with id 42 was not found."));
+        assertEquals("https://api.viora.com/errors/resource-not-found", problemDetail.getType().toString());
+        assertNotNull(problemDetail.getProperties());
+        assertNotNull(problemDetail.getProperties().get("timestamp"));
+    }
+
+    @Test
+    void handleResourceNotFoundExceptionReturnsNotFoundInSpanish() {
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("es"));
+        var handler = new GlobalExceptionHandler();
+        var response = handler.handleResourceNotFoundException(
+                new ResourceNotFoundException("Item", 42L)
+        );
+        var problemDetail = Objects.requireNonNull((ProblemDetail) response.getBody());
+
+        assertEquals(404, response.getStatusCode().value());
+        assertEquals("Not Found", problemDetail.getTitle());
+        assertTrue(problemDetail.getDetail().contains("No se encontro el recurso Item con id 42."));
         assertEquals("https://api.viora.com/errors/resource-not-found", problemDetail.getType().toString());
         assertNotNull(problemDetail.getProperties());
         assertNotNull(problemDetail.getProperties().get("timestamp"));
