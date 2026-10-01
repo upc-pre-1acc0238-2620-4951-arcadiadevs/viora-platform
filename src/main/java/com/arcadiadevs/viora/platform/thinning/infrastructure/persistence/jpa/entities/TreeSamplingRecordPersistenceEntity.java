@@ -8,7 +8,7 @@ import java.util.UUID;
  * JPA entity representing the persistence table {@code crop_load.tree_sampling_records}.
  */
 @Entity
-@Table(name = "tree_sampling_records", schema = "crop_load")
+@Table(name = "tree_sampling_records")
 public class TreeSamplingRecordPersistenceEntity {
 
     @Id

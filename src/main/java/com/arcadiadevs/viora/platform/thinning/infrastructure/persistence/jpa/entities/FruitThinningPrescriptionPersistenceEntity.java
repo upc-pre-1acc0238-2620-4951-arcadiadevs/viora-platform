@@ -12,7 +12,6 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "thinning_prescriptions",
-        schema = "crop_load",
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uq_active_prescription_per_plot_campaign",

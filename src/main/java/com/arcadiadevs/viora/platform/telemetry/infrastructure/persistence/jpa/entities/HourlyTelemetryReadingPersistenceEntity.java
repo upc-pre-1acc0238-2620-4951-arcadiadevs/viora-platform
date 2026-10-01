@@ -13,7 +13,7 @@ import java.util.UUID;
  * JPA entity mapping the {@code telemetry.hourly_telemetry_readings} relational database table.
  */
 @Entity
-@Table(name = "hourly_telemetry_readings", schema = "telemetry")
+@Table(name = "hourly_telemetry_readings")
 @Getter
 @Setter
 @NoArgsConstructor

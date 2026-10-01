@@ -13,7 +13,7 @@ import java.util.UUID;
  * JPA entity mapping the {@code phenology.harvest_records} relational database table.
  */
 @Entity
-@Table(name = "harvest_records", schema = "phenology")
+@Table(name = "harvest_records")
 @Getter
 @Setter
 @NoArgsConstructor
