@@ -12,7 +12,6 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "field_sampling_rounds",
-        schema = "crop_load",
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uq_sampling_idempotency",

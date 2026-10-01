@@ -22,7 +22,7 @@ import java.time.LocalDate;
  * JPA entity mapping the {@code orchard.plots} relational database table.
  */
 @Entity
-@Table(name = "plots", schema = "orchard")
+@Table(name = "plots")
 @Getter
 @Setter
 @NoArgsConstructor
