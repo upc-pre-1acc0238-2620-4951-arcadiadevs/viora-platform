@@ -42,11 +42,13 @@ class OpenApiContractIntegrationTest {
                 .andExpect(jsonPath("$.info.license.url").value("https://www.apache.org/licenses/LICENSE-2.0.html"))
                 .andExpect(jsonPath("$.externalDocs.description").value("Viora Platform Documentation"))
                 .andExpect(jsonPath("$.externalDocs.url").value("https://docs.viora.com"))
-                .andExpect(jsonPath("$.servers", hasSize(2)))
-                .andExpect(jsonPath("$.servers[0].url").value("http://localhost:8080"))
-                .andExpect(jsonPath("$.servers[0].description").value("Local Development Server"))
-                .andExpect(jsonPath("$.servers[1].url").value("https://api.viora.com"))
-                .andExpect(jsonPath("$.servers[1].description").value("Production Server"));
+                .andExpect(jsonPath("$.servers", hasSize(3)))
+                .andExpect(jsonPath("$.servers[0].url").value("/"))
+                .andExpect(jsonPath("$.servers[0].description").value("Default / Current Server"))
+                .andExpect(jsonPath("$.servers[1].url").value("http://localhost:8080"))
+                .andExpect(jsonPath("$.servers[1].description").value("Local Development Server"))
+                .andExpect(jsonPath("$.servers[2].url").value("https://api.viora.com"))
+                .andExpect(jsonPath("$.servers[2].description").value("Production Server"));
     }
 
     @Test
