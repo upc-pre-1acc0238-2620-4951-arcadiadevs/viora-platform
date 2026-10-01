@@ -1,0 +1,12 @@
+**/.git
+**/.gitattributes
+**/.gitignore
+**/.idea
+**/.junie
+**/.vscode
+**/target
+**/*.cmd
+docs/
+HELP.md
+Dockerfile
+.dockerignore
