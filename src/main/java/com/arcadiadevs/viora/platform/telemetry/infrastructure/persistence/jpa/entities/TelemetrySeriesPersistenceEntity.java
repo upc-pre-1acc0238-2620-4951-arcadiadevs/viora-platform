@@ -14,7 +14,7 @@ import java.util.UUID;
  * JPA entity mapping the {@code telemetry.telemetry_series} relational database table.
  */
 @Entity
-@Table(name = "telemetry_series", schema = "telemetry")
+@Table(name = "telemetry_series")
 @Getter
 @Setter
 @NoArgsConstructor

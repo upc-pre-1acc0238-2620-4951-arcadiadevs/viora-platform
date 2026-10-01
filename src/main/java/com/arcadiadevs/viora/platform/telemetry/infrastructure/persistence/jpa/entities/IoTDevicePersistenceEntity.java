@@ -17,7 +17,7 @@ import java.time.Instant;
  * JPA entity mapping the {@code telemetry.iot_devices} relational database table.
  */
 @Entity
-@Table(name = "iot_devices", schema = "telemetry")
+@Table(name = "iot_devices")
 @Getter
 @Setter
 @NoArgsConstructor

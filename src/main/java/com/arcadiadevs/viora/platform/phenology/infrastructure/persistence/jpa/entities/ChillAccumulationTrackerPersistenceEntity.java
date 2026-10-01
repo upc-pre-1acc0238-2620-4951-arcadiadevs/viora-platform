@@ -14,7 +14,7 @@ import java.util.UUID;
  * JPA entity mapping the {@code phenology.chill_trackers} relational database table.
  */
 @Entity
-@Table(name = "chill_trackers", schema = "phenology")
+@Table(name = "chill_trackers")
 @Getter
 @Setter
 @NoArgsConstructor
