@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Adapter between the agronomic report port and Spring Data JPA. */
+/** Adapter between the agronomic report port and Spring Data JPA; settlements and certifications are append-only. */
 @Repository
 public class AgronomicReportRepositoryImpl implements AgronomicReportRepository {
 
@@ -45,6 +45,7 @@ public class AgronomicReportRepositoryImpl implements AgronomicReportRepository 
         var entity = persistenceRepository.findById(UUID.fromString(snapshot.id().reportId()))
                 .map(existing -> {
                     AgronomicReportPersistenceAssembler.appendNewSettlements(existing, snapshot);
+                    AgronomicReportPersistenceAssembler.appendNewCertifications(existing, snapshot);
                     return existing;
                 })
                 .orElseGet(() -> AgronomicReportPersistenceAssembler.toNewEntity(report));

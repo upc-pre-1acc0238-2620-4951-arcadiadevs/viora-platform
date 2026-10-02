@@ -32,4 +32,8 @@ public class AgronomicReportPersistenceEntity {
     @OneToMany(mappedBy = "report", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @OrderBy("campaignYear ASC")
     private List<HarvestSettlementPersistenceEntity> settlements = new ArrayList<>();
+
+    @OneToMany(mappedBy = "report", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OrderBy("campaignYear ASC")
+    private List<DossierCertificationPersistenceEntity> certifications = new ArrayList<>();
 }
