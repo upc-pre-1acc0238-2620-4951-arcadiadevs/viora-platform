@@ -90,7 +90,7 @@ class OpenPdfAgronomicDossierAdapterTest {
         assertTrue(text.contains("49120"));
         assertTrue(text.contains("Ing. Sánchez Núñez"));
         assertTrue(text.contains("Verificación de campaña – Sánchez, ¿ñandú? ¡Güemes!"));
-        assertTrue(text.contains("2026-10-03T09:30:00Z"));
+        assertTrue(text.contains("2026-10-03T09:30:00.000000Z"));
     }
 
     @Test
@@ -102,7 +102,7 @@ class OpenPdfAgronomicDossierAdapterTest {
         assertTrue(text.contains("Total harvest (kg) 8200.00"));
         assertTrue(text.contains("Commercial caliber (fruits/kg) 105.00"));
         assertTrue(text.contains("Settlement status SETTLED"));
-        assertTrue(text.contains("2026-10-02T12:00:00Z"));
+        assertTrue(text.contains("2026-10-02T12:00:00.000000Z"));
         assertTrue(text.contains("Notes None"));
     }
 
@@ -153,7 +153,25 @@ class OpenPdfAgronomicDossierAdapterTest {
         assertEquals(StabilizationStatus.INSUFFICIENT_SETTLEMENTS, insufficient.settlement().trendCurve().status());
         var insufficientText = text(adapter.renderPdf(insufficient));
         assertFalse(insufficientText.contains("ARR"));
-        assertTrue(insufficientText.contains("fewer than two consecutive settled campaigns"));
+        assertTrue(insufficientText.contains("fewer than three consecutive settled campaigns"));
+    }
+
+    @Test
+    void printsInstantsWithAFixedUtcMicrosecondFormat() throws IOException {
+        var zeroFraction = simple("Verified");
+        var micros = new AgronomicDossierContent(zeroFraction.reportId(), zeroFraction.plotId(),
+                zeroFraction.producerId(), zeroFraction.campaignYear(), zeroFraction.settlement(),
+                zeroFraction.certifier(), zeroFraction.signature(), zeroFraction.notes(),
+                Instant.parse("2026-10-03T09:30:00.123456Z"));
+
+        var zeroText = text(adapter.renderPdf(zeroFraction));
+        var microsText = text(adapter.renderPdf(micros));
+
+        // Instant.toString() would print "...09:30:00Z" here: the fraction digits are always six.
+        assertTrue(zeroText.contains("Certified at (UTC) 2026-10-03T09:30:00.000000Z"));
+        assertTrue(zeroText.contains("Settled at (UTC) 2026-10-02T12:00:00.000000Z"));
+        assertFalse(zeroText.contains("2026-10-03T09:30:00Z"));
+        assertTrue(microsText.contains("Certified at (UTC) 2026-10-03T09:30:00.123456Z"));
     }
 
     @Test

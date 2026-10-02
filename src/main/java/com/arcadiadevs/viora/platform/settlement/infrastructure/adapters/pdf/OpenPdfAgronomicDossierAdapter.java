@@ -30,6 +30,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -53,6 +54,9 @@ public class OpenPdfAgronomicDossierAdapter implements AgronomicDossierPdfGenera
     private static final String NOT_RECORDED = "Not recorded";
     private static final Color LABEL_BACKGROUND = new Color(0xEE, 0xF2, 0xEA);
     private static final Charset WIN_ANSI = Charset.forName("windows-1252");
+    /** Instants are printed in UTC with a fixed six-digit fraction, so equal moments always read the same. */
+    private static final DateTimeFormatter INSTANT_TEXT =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS'Z'").withZone(ZoneOffset.UTC);
 
     /**
      * {@inheritDoc}
@@ -125,7 +129,7 @@ public class OpenPdfAgronomicDossierAdapter implements AgronomicDossierPdfGenera
         row(certification, fonts, "Auditor signature", content.signature().value());
         row(certification, fonts, "Notes", content.notes() == null || content.notes().isBlank()
                 ? "None" : content.notes());
-        row(certification, fonts, "Certified at (UTC)", content.certifiedAt().toString());
+        row(certification, fonts, "Certified at (UTC)", INSTANT_TEXT.format(content.certifiedAt()));
         document.add(certification);
 
         var footer = new Paragraph("The SHA-256 verification hash is computed over the bytes of this file and is "
@@ -145,7 +149,7 @@ public class OpenPdfAgronomicDossierAdapter implements AgronomicDossierPdfGenera
         row(table, fonts, "Commercial caliber (fruits/kg)", settlement.commercialFruitsPerKg() == null
                 ? NOT_RECORDED : number(settlement.commercialFruitsPerKg(), 2));
         row(table, fonts, "Settlement status", settlement.status().name());
-        row(table, fonts, "Settled at (UTC)", settlement.settledAt().toString());
+        row(table, fonts, "Settled at (UTC)", INSTANT_TEXT.format(settlement.settledAt()));
         return table;
     }
 
@@ -190,7 +194,9 @@ public class OpenPdfAgronomicDossierAdapter implements AgronomicDossierPdfGenera
                     + "consecutive campaigns of baseline history before the first settlement (baseline missing).";
             case NO_BASELINE_ALTERNATION -> "Stabilization is not determinable: the baseline history shows no "
                     + "alternation, so there is no amplitude to reduce.";
-            case INSUFFICIENT_SETTLEMENTS -> "Stabilization is not determinable: fewer than two consecutive "
+            // Unreachable for certified dossiers (certification requires three consecutive settled campaigns),
+            // kept so the switch stays exhaustive over every frozen curve status.
+            case INSUFFICIENT_SETTLEMENTS -> "Stabilization is not determinable: fewer than three consecutive "
                     + "settled campaigns exist.";
         };
     }

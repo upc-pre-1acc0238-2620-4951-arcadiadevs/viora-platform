@@ -234,8 +234,8 @@ class AgronomicReportCertificationControllerIntegrationTest {
         certify(plotId, 2026, "sig", "Ing", "1", null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DOSSIERCERTIFICATION_CONFLICT"))
-                .andExpect(jsonPath("$.detail").value("The stabilization curve of this campaign has insufficient "
-                        + "settlement history; it cannot be certified yet."));
+                .andExpect(jsonPath("$.detail").value("Certification requires at least three consecutive settled "
+                        + "campaigns in the stabilization curve of this campaign; it cannot be certified yet."));
         certify(plotId, 2027, "sig", "Ing", "1", null).andExpect(status().isConflict());
         assertEquals(0, certificationCount(plotId));
         assertTrue(eventsOf(plotId).isEmpty());
@@ -249,8 +249,8 @@ class AgronomicReportCertificationControllerIntegrationTest {
         certify(plotId, 2026, "sig", "Ing", "1", null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DOSSIERCERTIFICATION_CONFLICT"))
-                .andExpect(jsonPath("$.detail").value("The stabilization curve of this campaign has insufficient "
-                        + "settlement history; it cannot be certified yet."));
+                .andExpect(jsonPath("$.detail").value("Certification requires at least three consecutive settled "
+                        + "campaigns in the stabilization curve of this campaign; it cannot be certified yet."));
         settle(plotId, 2027, 300, 100).andExpect(status().isCreated());
         certify(plotId, 2027, "sig", "Ing", "1", null)
                 .andExpect(status().isConflict())

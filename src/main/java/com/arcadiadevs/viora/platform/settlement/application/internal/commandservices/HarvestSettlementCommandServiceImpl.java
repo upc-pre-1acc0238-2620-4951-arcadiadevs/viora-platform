@@ -29,15 +29,17 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
     private final ExternalOrchardService externalOrchardService;
     private final ExternalPhenologyService externalPhenologyService;
     private final ApplicationEventPublisher publisher;
+    private final Clock clock;
 
     public HarvestSettlementCommandServiceImpl(AgronomicReportRepository reportRepository,
             ThinningExecutionRecordRepository thinningRecordRepository, ExternalOrchardService externalOrchardService,
-            ExternalPhenologyService externalPhenologyService, ApplicationEventPublisher publisher) {
+            ExternalPhenologyService externalPhenologyService, ApplicationEventPublisher publisher, Clock clock) {
         this.reportRepository = reportRepository;
         this.thinningRecordRepository = thinningRecordRepository;
         this.externalOrchardService = externalOrchardService;
         this.externalPhenologyService = externalPhenologyService;
         this.publisher = publisher;
+        this.clock = clock;
     }
 
     @Override
@@ -65,7 +67,7 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
         try {
             settlement = report.settleCampaign(campaignYear, new OliveWeight(command.greenOlivesKg()),
                     new OliveWeight(command.blackOlivesKg()), command.commercialFruitsPerKg(), command.notes(),
-                    balance, history, Clock.systemUTC());
+                    balance, history, clock);
         } catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.validationError("settlement", exception.getMessage()));
         } catch (IllegalStateException exception) {
