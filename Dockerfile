@@ -8,17 +8,13 @@
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Copiar archivos del wrapper y dependencias para cachear capas
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-RUN chmod +x mvnw
-
-# Descargar dependencias de forma offline
-RUN ./mvnw dependency:go-offline -B
+# Copiar el descriptor del proyecto y descargar dependencias para cachear capas
+COPY pom.xml ./
+RUN mvn dependency:go-offline -B
 
 # Copiar código fuente y compilar artefacto omitiendo tests
 COPY src ./src
-RUN ./mvnw clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B
 
 # ==========================================
 # Step 2: Runtime Stage
