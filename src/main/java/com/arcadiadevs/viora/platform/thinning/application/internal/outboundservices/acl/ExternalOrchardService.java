@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 /**
  * Outbound ACL service used by Thinning context to interact with Orchard capabilities.
  *
@@ -35,5 +37,18 @@ public class ExternalOrchardService {
             return false;
         }
         return orchardContextFacade.existsActivePlot(plotId.plotId());
+    }
+
+    /**
+     * Resolves the olive variety of an active plot, used to pick the caliber model calibration.
+     *
+     * @param plotId the Thinning PlotId value object
+     * @return the variety name, or empty when the plot is unknown or not active
+     */
+    public Optional<String> findPlotVariety(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotVariety(plotId.plotId());
     }
 }

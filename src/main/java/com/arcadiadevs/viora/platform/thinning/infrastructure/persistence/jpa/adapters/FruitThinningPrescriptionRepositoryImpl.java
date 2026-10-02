@@ -37,6 +37,12 @@ public class FruitThinningPrescriptionRepositoryImpl implements FruitThinningPre
     }
 
     @Override
+    public Optional<FruitThinningPrescription> findByIdForUpdate(PrescriptionId id) {
+        return prescriptionPersistenceRepository.findByIdForUpdate(UUID.fromString(id.prescriptionId()))
+                .map(FruitThinningPrescriptionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
     public Optional<FruitThinningPrescription> findByPlotIdAndCampaignYear(PlotId plotId, CampaignYear year) {
         return prescriptionPersistenceRepository.findByPlotIdAndCampaignYear(UUID.fromString(plotId.plotId()), year.value())
                 .map(FruitThinningPrescriptionPersistenceAssembler::toDomainFromPersistence);

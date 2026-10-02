@@ -11,6 +11,10 @@ import com.arcadiadevs.viora.platform.thinning.domain.services.FieldSamplingDedu
 import com.arcadiadevs.viora.platform.thinning.domain.services.SamplingCoverageEvaluator;
 
 import java.time.Instant;
+import java.time.Clock;
+import java.util.UUID;
+import com.arcadiadevs.viora.platform.thinning.domain.model.entities.ExecutionConfirmation;
+import com.arcadiadevs.viora.platform.thinning.domain.model.events.ThinningExecutionConfirmedEvent;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -190,11 +194,60 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         ));
     }
 
+    /** Records field execution using the current UTC date and no caliber calibration. */
+    public void confirmExecution(LocalDate executionDate, double removedKg,
+            double actualRemovalPercentage, int laborCrewSize, String notes) {
+        confirmExecution(executionDate, removedKg, actualRemovalPercentage, laborCrewSize, notes,
+                CaliberCalibration.none(), Clock.systemUTC());
+    }
+
+    /** Records field execution with an explicit clock and no caliber calibration. */
+    public void confirmExecution(LocalDate executionDate, double removedKg,
+            double actualRemovalPercentage, int laborCrewSize, String notes, Clock clock) {
+        confirmExecution(executionDate, removedKg, actualRemovalPercentage, laborCrewSize, notes,
+                CaliberCalibration.none(), clock);
+    }
+
     /**
-     * Returns an immutable snapshot representing the internal state of this aggregate.
+     * Records execution once, including late labor, together with the load balance it leaves and the
+     * commercial caliber projection allowed by the calibration of the plot variety.
      *
-     * @return an immutable {@link FruitThinningPrescriptionSnapshot}
+     * @param executionDate           date the labor was completed
+     * @param removedKg               removed biomass in kilograms
+     * @param actualRemovalPercentage percentage of fruits actually removed
+     * @param laborCrewSize           number of workers
+     * @param notes                   optional field notes
+     * @param calibration             caliber model calibration of the plot variety
+     * @param clock                   clock used to reject future dates
      */
+    public void confirmExecution(LocalDate executionDate, double removedKg,
+            double actualRemovalPercentage, int laborCrewSize, String notes,
+            CaliberCalibration calibration, Clock clock) {
+        if (status != PrescriptionStatus.PRESCRIBED || executionConfirmation != null) {
+            throw new IllegalStateException("thinning.prescription.not_prescribed");
+        }
+        if (sustainableLoad == null || sustainableLoad.windowClosesOn() == null
+                || sustainableLoad.targetFruitsPerMeter() == null || sustainableLoad.percentageToRemove() == null) {
+            throw new IllegalStateException("thinning.execution.window.missing");
+        }
+        var biomass = new RemovedBiomass(removedKg, actualRemovalPercentage);
+        var crew = new LaborCrewSize(laborCrewSize);
+        if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
+            throw new IllegalStateException("thinning.sampling.not_representative");
+        }
+        var loadBalance = LoadBalance.of(SamplingCoverageEvaluator.computeMeanFruitsPerMeter(samplingRounds),
+                biomass.actualRemovalPercentage(), sustainableLoad.targetFruitsPerMeter());
+        var confirmation = ExecutionConfirmation.create(executionDate, biomass, crew, notes,
+                sustainableLoad.windowClosesOn(), loadBalance, calibration, clock);
+        executionConfirmation = confirmation.snapshot();
+        status = PrescriptionStatus.EXECUTED;
+        registerDomainEvent(new ThinningExecutionConfirmedEvent(UUID.randomUUID().toString(),
+                executionConfirmation.id().confirmationId(), id.prescriptionId(), plotId.plotId(),
+                campaignYear.value(), executionDate, actualRemovalPercentage, removedKg, laborCrewSize,
+                executionConfirmation.timeliness().name(), executionConfirmation.recordedAt()));
+    }
+
+    /** Returns the immutable state for persistence and queries. */
     public FruitThinningPrescriptionSnapshot snapshot() {
         List<SamplingRoundSnapshot> roundSnapshots = new ArrayList<>();
         for (SamplingRound round : samplingRounds) {
