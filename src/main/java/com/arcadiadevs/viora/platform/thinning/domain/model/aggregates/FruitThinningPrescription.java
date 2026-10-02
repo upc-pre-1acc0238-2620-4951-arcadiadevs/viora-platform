@@ -4,11 +4,14 @@ import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDom
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.SamplingRound;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
 import com.arcadiadevs.viora.platform.thinning.domain.model.events.SamplingRoundCompletedEvent;
+import com.arcadiadevs.viora.platform.thinning.domain.model.events.SustainableCropLoadDeterminedEvent;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancingCalculatorService;
 import com.arcadiadevs.viora.platform.thinning.domain.services.FieldSamplingDeduplicator;
 import com.arcadiadevs.viora.platform.thinning.domain.services.SamplingCoverageEvaluator;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +26,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
     private Long observedPlotRevision;
     private PrescriptionStatus status;
     private SustainableCropLoad sustainableLoad;
+    private Instant issuedAt;
     private final List<SamplingRound> samplingRounds;
     private ExecutionConfirmationSnapshot executionConfirmation;
     private Long revision;
@@ -34,6 +38,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             Long observedPlotRevision,
             PrescriptionStatus status,
             SustainableCropLoad sustainableLoad,
+            Instant issuedAt,
             List<SamplingRound> samplingRounds,
             ExecutionConfirmationSnapshot executionConfirmation,
             Long revision
@@ -44,6 +49,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         this.observedPlotRevision = observedPlotRevision;
         this.status = status;
         this.sustainableLoad = sustainableLoad;
+        this.issuedAt = issuedAt;
         this.samplingRounds = new ArrayList<>(samplingRounds);
         this.executionConfirmation = executionConfirmation;
         this.revision = revision;
@@ -69,6 +75,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 observedPlotRevision,
                 PrescriptionStatus.SAMPLING_IN_PROGRESS,
                 SustainableCropLoad.empty(),
+                null,
                 new ArrayList<>(),
                 null,
                 0L
@@ -96,6 +103,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 snapshot.observedPlotRevision(),
                 snapshot.status(),
                 snapshot.sustainableLoad(),
+                snapshot.issuedAt(),
                 rounds,
                 snapshot.executionConfirmation(),
                 snapshot.revision()
@@ -114,13 +122,10 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             SamplingBatchId batchId,
             List<TreeSamplingRecord> treeRecords
     ) {
-        // Deduplicate records in current batch
         List<TreeSamplingRecord> validatedRecords = FieldSamplingDeduplicator.validateNoDuplicates(treeRecords);
 
-        // Check if batchId already exists in this aggregate
         for (SamplingRound existingRound : samplingRounds) {
             if (existingRound.batchId().equals(batchId)) {
-                // Idempotent return without duplicate addition
                 return;
             }
         }
@@ -145,6 +150,47 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
     }
 
     /**
+     * Determines the sustainable crop load after representative field sampling is available.
+     *
+     * @param calculator      pure domain calculator using calibrated agronomic target data
+     * @param bbi             historical Biennial Bearing Index
+     * @param windowClosesOn  latest recommended thinning date
+     */
+    public void determineSustainableCropLoad(
+            CropLoadBalancingCalculatorService calculator,
+            double bbi,
+            LocalDate windowClosesOn
+    ) {
+        if (calculator == null) {
+            throw new IllegalArgumentException("thinning.calculator.null");
+        }
+        if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
+            throw new IllegalStateException("thinning.sampling.not_representative");
+        }
+        if (status == PrescriptionStatus.CONFIRMED || status == PrescriptionStatus.EXECUTED) {
+            throw new IllegalStateException("thinning.prescription.already_confirmed");
+        }
+
+        double currentFruitsPerMeter = SamplingCoverageEvaluator.computeMeanFruitsPerMeter(samplingRounds);
+        SustainableCropLoad calculatedLoad = calculator.calculate(
+                currentFruitsPerMeter,
+                bbi,
+                windowClosesOn
+        );
+
+        this.sustainableLoad = calculatedLoad;
+        this.status = PrescriptionStatus.PRESCRIBED;
+        this.issuedAt = Instant.now();
+
+        registerDomainEvent(new SustainableCropLoadDeterminedEvent(
+                id.prescriptionId(),
+                plotId.plotId(),
+                calculatedLoad.percentageToRemove(),
+                issuedAt
+        ));
+    }
+
+    /**
      * Returns an immutable snapshot representing the internal state of this aggregate.
      *
      * @return an immutable {@link FruitThinningPrescriptionSnapshot}
@@ -161,6 +207,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 observedPlotRevision,
                 status,
                 sustainableLoad,
+                issuedAt,
                 roundSnapshots,
                 executionConfirmation,
                 revision
