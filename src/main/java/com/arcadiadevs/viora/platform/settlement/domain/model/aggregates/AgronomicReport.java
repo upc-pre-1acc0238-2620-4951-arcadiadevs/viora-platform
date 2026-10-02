@@ -124,7 +124,7 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
 
     /**
      * Certifies the dossier of one settled campaign: renders its PDF from the frozen settlement, hashes the exact
-     * final bytes, appends the immutable certification and registers {@link AgronomicDossierGeneratedEvent}.
+     * final bytes, appends the immutable certification metadata and registers {@link AgronomicDossierGeneratedEvent}.
      *
      * <p>Existing settlements and certifications are never touched, so certifying campaign N+1 keeps the bytes,
      * hash and metadata of campaign N. One instant is read from the clock and used for the whole operation.</p>
@@ -136,7 +136,8 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      * @param pdfGenerator output port rendering the frozen content
      * @param hashService  service computing the SHA-256 of the rendered bytes
      * @param clock        clock stamping the certification
-     * @return the new certification
+     * @return the new certification metadata together with the rendered document, which the caller must store
+     *         through {@link com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository}
      * @throws IllegalArgumentException    if an argument is missing or invalid
      * @throws BusinessRuleException       if the campaign has no settlement
      * @throws IllegalStateException       if the campaign is already certified or its frozen curve lacks the
@@ -144,7 +145,7 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      *                                     whatever the baseline
      * @throws DossierRenderingException   if the PDF cannot be rendered; nothing is certified
      */
-    public DossierCertificationSnapshot certifyCampaign(CampaignYear campaignYear, AuditorSignature signature,
+    public CertifiedDossier certifyCampaign(CampaignYear campaignYear, AuditorSignature signature,
             CertifierIdentity certifier, String notes, AgronomicDossierPdfGenerator pdfGenerator,
             CryptographicHashService hashService, Clock clock) {
         if (campaignYear == null) {
@@ -179,13 +180,13 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         }
         var metadata = new DossierMetadata(hashService.sha256(document.content()), signature, certifiedAt);
 
-        var certification = DossierCertification.create(id, plotId, campaignYear, metadata, certifier, notes,
-                document).snapshot();
+        var certification = DossierCertification.create(id, plotId, campaignYear, metadata, certifier,
+                notes).snapshot();
         certifications.add(certification);
         registerDomainEvent(new AgronomicDossierGeneratedEvent(UUID.randomUUID().toString(),
                 certification.id().certificationId(), id.reportId(), plotId.plotId(), campaignYear.value(),
                 metadata.verificationHash().value(), signature.value(), certifiedAt));
-        return certification;
+        return new CertifiedDossier(certification, document);
     }
 
     /**

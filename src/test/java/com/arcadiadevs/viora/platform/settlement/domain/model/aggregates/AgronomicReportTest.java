@@ -166,9 +166,13 @@ class AgronomicReportTest {
         settle(report, 2028, 150, 100);
     }
 
-    private DossierCertificationSnapshot certify(AgronomicReport report, int year) {
+    private CertifiedDossier certifyWithDocument(AgronomicReport report, int year) {
         return report.certifyCampaign(new CampaignYear(year), signature, certifier, "Verified", generator,
                 hashService, CERTIFICATION_CLOCK);
+    }
+
+    private DossierCertificationSnapshot certify(AgronomicReport report, int year) {
+        return certifyWithDocument(report, year).certification();
     }
 
     @Test
@@ -204,9 +208,10 @@ class AgronomicReportTest {
         var report = AgronomicReport.createForPlot(plotId, producer);
         settleThreeConsecutive(report);
 
-        var certification = certify(report, 2028);
+        var certified = certifyWithDocument(report, 2028);
 
-        var bytes = certification.document().content();
+        var certification = certified.certification();
+        var bytes = certified.document().content();
         assertEquals(hashService.sha256(bytes), certification.metadata().verificationHash());
         assertEquals(CERTIFICATION_CLOCK.instant(), certification.metadata().certifiedAt());
         assertEquals(1, rendered.size());
@@ -320,8 +325,8 @@ class AgronomicReportTest {
     void certifyingALaterCampaignKeepsTheEarlierCertificationIdentical() {
         var report = AgronomicReport.createForPlot(plotId, producer);
         settleThreeConsecutive(report);
-        var first = certify(report, 2028);
-        var firstBytes = first.document().content();
+        var firstCertified = certifyWithDocument(report, 2028);
+        var first = firstCertified.certification();
         var firstHash = first.metadata().verificationHash();
 
         settle(report, 2029, 300, 100);
@@ -329,7 +334,7 @@ class AgronomicReportTest {
 
         var reloaded = report.certificationOf(new CampaignYear(2028)).orElseThrow();
         assertEquals(first, reloaded);
-        assertArrayEquals(firstBytes, reloaded.document().content());
+        assertEquals(hashService.sha256(firstCertified.document().content()), reloaded.metadata().verificationHash());
         assertEquals(firstHash, reloaded.metadata().verificationHash());
         assertEquals(first.metadata(), reloaded.metadata());
         assertEquals(2, report.snapshot().certifications().size());
@@ -348,18 +353,20 @@ class AgronomicReportTest {
     }
 
     @Test
-    void theSnapshotExposesDefensiveCopiesOfTheDocument() {
+    void theAggregateStateCarriesNoDocumentBytesAndTheResultCopiesThem() {
         var report = AgronomicReport.createForPlot(plotId, producer);
         settleThreeConsecutive(report);
-        var certification = certify(report, 2028);
-        var original = certification.document().content();
+        var certified = certifyWithDocument(report, 2028);
+        var original = certified.document().content();
 
-        var tampered = certification.document().content();
+        var tampered = certified.document().content();
         tampered[tampered.length - 1] ^= 0x01;
 
-        assertArrayEquals(original, report.snapshot().certifications().getFirst().document().content());
-        assertEquals(certification.metadata().verificationHash(), hashService.sha256(
-                report.snapshot().certifications().getFirst().document().content()));
+        assertArrayEquals(original, certified.document().content());
+        assertEquals(certified.certification().metadata().verificationHash(), hashService.sha256(
+                certified.document().content()));
+        assertFalse(java.util.Arrays.stream(DossierCertificationSnapshot.class.getRecordComponents())
+                .anyMatch(component -> component.getType().equals(DossierDocument.class)));
         assertThrows(UnsupportedOperationException.class, () -> report.snapshot().certifications().clear());
     }
 

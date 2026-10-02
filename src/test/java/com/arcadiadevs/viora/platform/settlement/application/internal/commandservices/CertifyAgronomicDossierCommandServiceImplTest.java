@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.model.events.AgronomicDo
 import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierPdfGenerator;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
+import com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository;
 import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHashService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,11 +30,12 @@ class CertifyAgronomicDossierCommandServiceImplTest {
     private static final Clock SETTLEMENT_CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
     private static final Clock CERTIFICATION_CLOCK = Clock.fixed(Instant.parse("2026-10-03T09:30:00Z"), ZoneOffset.UTC);
     private final AgronomicReportRepository reports = mock(AgronomicReportRepository.class);
+    private final CertifiedDossierDocumentRepository documents = mock(CertifiedDossierDocumentRepository.class);
     private final ExternalOrchardService orchard = mock(ExternalOrchardService.class);
     private final AgronomicDossierPdfGenerator pdf = mock(AgronomicDossierPdfGenerator.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final CertifyAgronomicDossierCommandServiceImpl service = new CertifyAgronomicDossierCommandServiceImpl(
-            reports, orchard, pdf, new CryptographicHashService(), publisher, CERTIFICATION_CLOCK);
+            reports, documents, orchard, pdf, new CryptographicHashService(), publisher, CERTIFICATION_CLOCK);
     private final String plotId = UUID.randomUUID().toString();
     private final String owner = UUID.randomUUID().toString();
     private CertifyAgronomicDossierCommand command;
@@ -80,7 +82,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         when(orchard.findActivePlotOwner(any())).thenReturn(Optional.empty());
         var error = service.handle(command).failure().orElseThrow();
         assertEquals("PLOT_NOT_FOUND", error.code());
-        verifyNoInteractions(reports, publisher, pdf);
+        verifyNoInteractions(reports, documents, publisher, pdf);
     }
 
     @Test
@@ -90,7 +92,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         assertEquals("BUSINESS_RULE_VIOLATION", error.code());
         assertEquals("settlement.certification.campaign_not_settled", error.details());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher, pdf);
+        verifyNoInteractions(documents, publisher, pdf);
     }
 
     @Test
@@ -100,7 +102,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         assertEquals("BUSINESS_RULE_VIOLATION", error.code());
         assertEquals("settlement.certification.campaign_not_settled", error.details());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher, pdf);
+        verifyNoInteractions(documents, publisher, pdf);
     }
 
     @Test
@@ -111,7 +113,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         assertEquals("DOSSIERCERTIFICATION_CONFLICT", error.code());
         assertEquals("settlement.certification.insufficient_settlements", error.details());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher, pdf);
+        verifyNoInteractions(documents, publisher, pdf);
     }
 
     @Test
@@ -119,14 +121,14 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         var report = reportWithThreeConsecutiveSettlements();
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(report));
         assertTrue(service.handle(command).isSuccess());
-        clearInvocations(reports, publisher, pdf);
+        clearInvocations(reports, documents, publisher, pdf);
 
         var error = service.handle(command).failure().orElseThrow();
 
         assertEquals("DOSSIERCERTIFICATION_CONFLICT", error.code());
         assertEquals("settlement.certification.already_certified", error.details());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher, pdf);
+        verifyNoInteractions(documents, publisher, pdf);
     }
 
     @Test
@@ -139,7 +141,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         assertEquals("UNEXPECTED_ERROR", error.code());
         assertEquals("settlement.certification.render.failed", error.details());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher);
+        verifyNoInteractions(documents, publisher);
     }
 
     @Test
@@ -154,11 +156,37 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         assertEquals("Ing. Sanchez", certification.certifier().name());
         assertEquals("49120", certification.certifier().cipNumber());
         assertEquals("Verified", certification.notes());
-        var order = inOrder(reports, publisher);
+        var order = inOrder(reports, documents, publisher);
         order.verify(reports).save(report);
+        order.verify(documents).save(eq(certification.id()), any(DossierDocument.class));
         order.verify(publisher).publishEvent(any(AgronomicDossierGeneratedEvent.class));
         verify(publisher, times(1)).publishEvent(any(Object.class));
         assertTrue(report.domainEvents().isEmpty());
+    }
+
+    @Test
+    void storesTheRenderedBytesExactlyOnceAndTheirHashMatchesTheCertification() {
+        var report = reportWithThreeConsecutiveSettlements();
+        when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(report));
+        var rendered = "%PDF-1.7 dossier".getBytes(StandardCharsets.US_ASCII);
+        var saved = org.mockito.ArgumentCaptor.forClass(DossierDocument.class);
+
+        var certification = service.handle(command).success().orElseThrow();
+
+        verify(documents, times(1)).save(eq(certification.id()), saved.capture());
+        assertArrayEquals(rendered, saved.getValue().content());
+        assertEquals(new CryptographicHashService().sha256(rendered), certification.metadata().verificationHash());
+    }
+
+    @Test
+    void aRenderingFailureStoresNeitherTheReportNorTheDocument() {
+        when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(reportWithThreeConsecutiveSettlements()));
+        when(pdf.renderPdf(any())).thenThrow(new DossierRenderingException("settlement.certification.render.failed"));
+
+        assertTrue(service.handle(command).failure().isPresent());
+
+        verify(reports, never()).save(any());
+        verify(documents, never()).save(any(), any());
     }
 
     @Test
@@ -173,7 +201,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         var event = (AgronomicDossierGeneratedEvent) captured.getValue();
         assertEquals(certification.metadata().verificationHash().value(), event.verificationHash());
         assertEquals(certification.id().certificationId(), event.certificationId());
-        assertEquals(new CryptographicHashService().sha256(certification.document().content()),
+        assertEquals(new CryptographicHashService().sha256("%PDF-1.7 dossier".getBytes(StandardCharsets.US_ASCII)),
                 certification.metadata().verificationHash());
     }
 
@@ -190,7 +218,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(reportWithSettlement(2026, new TreeMap<>())));
         assertEquals("VALIDATION_ERROR", service.handle(longNotes).failure().orElseThrow().code());
         verify(reports, never()).save(any());
-        verifyNoInteractions(publisher, pdf);
+        verifyNoInteractions(documents, publisher, pdf);
     }
 
     @Test

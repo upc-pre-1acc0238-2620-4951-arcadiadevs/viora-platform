@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.settlement.application.internal.commandse
 import com.arcadiadevs.viora.platform.settlement.application.commandservices.CertifyAgronomicDossierCommandService;
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierRenderingException;
+import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.CertifiedDossier;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.DossierCertificationSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.commands.CertifyAgronomicDossierCommand;
 import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierPdfGenerator;
@@ -11,6 +12,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.Campa
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CertifierIdentity;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
+import com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository;
 import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHashService;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -23,7 +25,8 @@ import java.time.Clock;
 
 /**
  * Certifies one settled campaign: verifies the plot, locks the plot report, lets the aggregate render, hash and
- * append the certification, then persists it and publishes {@code AgronomicDossierGeneratedEvent}.
+ * append the certification, then persists the report and the immutable document in the same transaction and
+ * publishes {@code AgronomicDossierGeneratedEvent}.
  *
  * <p>Error mapping: missing or inactive plot is a not-found; a campaign without settlement (including a plot
  * without report) is a business-rule violation (422); an already certified campaign or a campaign whose frozen
@@ -38,6 +41,7 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
     private static final String RESOURCE = "DossierCertification";
 
     private final AgronomicReportRepository reportRepository;
+    private final CertifiedDossierDocumentRepository documentRepository;
     private final ExternalOrchardService externalOrchardService;
     private final AgronomicDossierPdfGenerator pdfGenerator;
     private final CryptographicHashService hashService;
@@ -45,9 +49,10 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
     private final Clock clock;
 
     public CertifyAgronomicDossierCommandServiceImpl(AgronomicReportRepository reportRepository,
-            ExternalOrchardService externalOrchardService, AgronomicDossierPdfGenerator pdfGenerator,
+            CertifiedDossierDocumentRepository documentRepository, ExternalOrchardService externalOrchardService, AgronomicDossierPdfGenerator pdfGenerator,
             CryptographicHashService hashService, ApplicationEventPublisher publisher, Clock clock) {
         this.reportRepository = reportRepository;
+        this.documentRepository = documentRepository;
         this.externalOrchardService = externalOrchardService;
         this.pdfGenerator = pdfGenerator;
         this.hashService = hashService;
@@ -81,9 +86,9 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
                     "settlement.certification.campaign_not_settled"));
         }
 
-        DossierCertificationSnapshot certification;
+        CertifiedDossier certified;
         try {
-            certification = report.certifyCampaign(campaignYear, signature, certifier, command.notes(), pdfGenerator,
+            certified = report.certifyCampaign(campaignYear, signature, certifier, command.notes(), pdfGenerator,
                     hashService, clock);
         } catch (BusinessRuleException exception) {
             return Result.failure(ApplicationError.businessRuleViolation(RESOURCE, exception.getMessage()));
@@ -95,8 +100,9 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
             return Result.failure(ApplicationError.unexpected(RESOURCE, "settlement.certification.render.failed"));
         }
         reportRepository.save(report);
+        documentRepository.save(certified.certification().id(), certified.document());
         report.domainEvents().forEach(publisher::publishEvent);
         report.clearDomainEvents();
-        return Result.success(certification);
+        return Result.success(certified.certification());
     }
 }

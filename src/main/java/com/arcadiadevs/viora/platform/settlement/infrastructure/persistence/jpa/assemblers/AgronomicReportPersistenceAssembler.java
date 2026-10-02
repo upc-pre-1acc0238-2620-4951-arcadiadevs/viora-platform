@@ -131,7 +131,6 @@ public final class AgronomicReportPersistenceAssembler {
         entity.setCipNumber(snapshot.certifier().cipNumber());
         entity.setNotes(snapshot.notes());
         entity.setCertifiedAt(snapshot.metadata().certifiedAt());
-        entity.setDocumentContent(snapshot.document().content());
         return entity;
     }
 
@@ -141,7 +140,6 @@ public final class AgronomicReportPersistenceAssembler {
                 new AuditorSignature(entity.getAuditorSignature()), entity.getCertifiedAt());
         return new DossierCertificationSnapshot(new CertificationId(entity.getId().toString()), reportId, plotId,
                 new CampaignYear(entity.getCampaignYear()), metadata,
-                new CertifierIdentity(entity.getCertifiedBy(), entity.getCipNumber()), entity.getNotes(),
-                new DossierDocument(entity.getDocumentContent()));
+                new CertifierIdentity(entity.getCertifiedBy(), entity.getCipNumber()), entity.getNotes());
     }
 }

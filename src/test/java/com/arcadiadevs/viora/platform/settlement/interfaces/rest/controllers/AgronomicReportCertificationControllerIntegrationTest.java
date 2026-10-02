@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.model.events.AgronomicDo
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
+import com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository;
 import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHashService;
 import com.jayway.jsonpath.JsonPath;
 import org.apache.pdfbox.Loader;
@@ -63,6 +64,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
 
     @Autowired WebApplicationContext context;
     @Autowired AgronomicReportRepository reportRepository;
+    @Autowired CertifiedDossierDocumentRepository documentRepository;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbc;
     @Autowired EventCollector collector;
@@ -99,13 +101,13 @@ class AgronomicReportCertificationControllerIntegrationTest {
         String hash = JsonPath.read(response, "$.verificationHash");
         assertTrue(hash.matches("[0-9a-f]{64}"));
         var stored = stored(plotId, 2028);
-        assertEquals(hash, hashService.sha256(stored.document().content()).value());
+        assertEquals(hash, hashService.sha256(storedBytes(stored)).value());
         assertEquals(hash, stored.metadata().verificationHash().value());
         assertEquals(JsonPath.read(response, "$.certificationId"), stored.id().certificationId());
         assertEquals(Instant.parse(JsonPath.read(response, "$.certifiedAt")), stored.metadata().certifiedAt());
         assertFalse(stored.metadata().certifiedAt().isBefore(before.minusSeconds(1)));
         assertEquals("Verificación de campaña – Sánchez", stored.notes());
-        var text = pdfText(stored.document().content());
+        var text = pdfText(storedBytes(stored));
         assertTrue(text.contains("Campaign 2028"));
         assertTrue(text.contains("CIP-49120-ING-AGRONOMO-SANCHEZ"));
         assertTrue(text.contains("Verificación de campaña – Sánchez"));
@@ -135,7 +137,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
         var plotId = createPlot("CRIOLLA");
         settleThreeConsecutive(plotId);
         certify(plotId, 2028, "sig", "Ing", "1", null).andExpect(status().isCreated());
-        var text = pdfText(stored(plotId, 2028).document().content());
+        var text = pdfText(storedBytes(stored(plotId, 2028)));
         assertTrue(text.contains("Notes None"));
         assertTrue(text.contains("baseline missing"));
         assertFalse(text.contains("ARR"));
@@ -217,7 +219,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
 
         var after = stored(plotId, 2028);
         assertEquals(first, after);
-        assertArrayEquals(first.document().content(), after.document().content());
+        assertArrayEquals(storedBytes(first), storedBytes(after));
         assertEquals(1, certificationCount(plotId));
         assertEquals(1, eventsOf(plotId).size());
     }
@@ -258,7 +260,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
 
         settle(plotId, 2028, 150, 100).andExpect(status().isCreated());
         certify(plotId, 2028, "sig", "Ing", "1", null).andExpect(status().isCreated());
-        assertTrue(pdfText(stored(plotId, 2028).document().content()).contains("baseline missing"));
+        assertTrue(pdfText(storedBytes(stored(plotId, 2028))).contains("baseline missing"));
         assertEquals(1, certificationCount(plotId));
     }
 
@@ -272,7 +274,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
         var firstResponse = certify(plotId, 2028, "sig 2028", "Ing", "1", "campaign 2028")
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         var first = stored(plotId, 2028);
-        var firstBytes = first.document().content();
+        var firstBytes = storedBytes(first);
         String firstHash = JsonPath.read(firstResponse, "$.verificationHash");
         assertEquals(firstHash, hashService.sha256(firstBytes).value());
         var firstText = pdfText(firstBytes);
@@ -283,15 +285,15 @@ class AgronomicReportCertificationControllerIntegrationTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
 
         var firstAfter = stored(plotId, 2028);
-        assertArrayEquals(firstBytes, firstAfter.document().content());
+        assertArrayEquals(firstBytes, storedBytes(firstAfter));
         assertEquals(firstHash, firstAfter.metadata().verificationHash().value());
         assertEquals(first.metadata(), firstAfter.metadata());
         assertEquals("campaign 2028", firstAfter.notes());
         var second = stored(plotId, 2029);
         String secondHash = JsonPath.read(secondResponse, "$.verificationHash");
-        assertEquals(secondHash, hashService.sha256(second.document().content()).value());
+        assertEquals(secondHash, hashService.sha256(storedBytes(second)).value());
         assertNotEquals(firstHash, secondHash);
-        assertTrue(pdfText(second.document().content()).contains("Campaign 2029"));
+        assertTrue(pdfText(storedBytes(second)).contains("Campaign 2029"));
         assertEquals(2, certificationCount(plotId));
         assertEquals(2, eventsOf(plotId).size());
     }
@@ -324,6 +326,13 @@ class AgronomicReportCertificationControllerIntegrationTest {
             String plotId, int year) {
         return transactions.execute(tx -> reportRepository.findByPlotId(new PlotId(plotId)).orElseThrow()
                 .certificationOf(new CampaignYear(year)).orElseThrow());
+    }
+
+    /** Reads the immutable bytes through the document port: the report itself carries none. */
+    private byte[] storedBytes(
+            com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.DossierCertificationSnapshot certification) {
+        return transactions.execute(tx -> documentRepository.findByCertificationId(certification.id()).orElseThrow()
+                .content());
     }
 
     private int certificationCount(String plotId) {
