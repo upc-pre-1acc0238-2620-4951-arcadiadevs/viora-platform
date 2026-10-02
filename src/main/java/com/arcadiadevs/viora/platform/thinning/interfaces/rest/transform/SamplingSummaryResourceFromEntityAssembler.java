@@ -1,8 +1,13 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.transform;
 
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingDetailedResult;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingStatisticalSummary;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingTreeObservation;
 import com.arcadiadevs.viora.platform.thinning.domain.services.SamplingCoverageEvaluator;
+import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.SamplingDetailedResource;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.SamplingSummaryResource;
+import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.SamplingTreeResource;
 
 /**
  * REST resource assembler mapping {@link FruitThinningPrescription} aggregate to presentation {@link SamplingSummaryResource}.
@@ -39,6 +44,64 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 meanFruits,
                 isRepresentative,
                 needed
+        );
+    }
+
+    /**
+     * Converts the query-service statistical summary into the existing GET sampling resource.
+     *
+     * @param summary statistical sampling summary
+     * @return the presentation DTO
+     */
+    public static SamplingSummaryResource toResourceFromDomain(SamplingStatisticalSummary summary) {
+        if (summary == null) {
+            return null;
+        }
+        return new SamplingSummaryResource(
+                summary.plotId().plotId(),
+                summary.campaignYear().value(),
+                summary.sampledTreesCount(),
+                summary.sampledShootsCount(),
+                summary.meanFruitsPerMeter(),
+                summary.isRepresentative(),
+                summary.treesNeeded()
+        );
+    }
+
+    /**
+     * Converts the detailed query result into a REST resource.
+     *
+     * @param detailedResult detailed sampling result
+     * @return the detailed presentation DTO
+     */
+    public static SamplingDetailedResource toDetailedResource(SamplingDetailedResult detailedResult) {
+        if (detailedResult == null) {
+            return null;
+        }
+        var summary = detailedResult.summary();
+        var trees = detailedResult.observations().stream()
+                .map(SamplingSummaryResourceFromEntityAssembler::toTreeResource)
+                .toList();
+        return new SamplingDetailedResource(
+                summary.plotId().plotId(),
+                summary.campaignYear().value(),
+                summary.sampledTreesCount(),
+                summary.sampledShootsCount(),
+                summary.meanFruitsPerMeter(),
+                summary.isRepresentative(),
+                summary.treesNeeded(),
+                trees
+        );
+    }
+
+    private static SamplingTreeResource toTreeResource(SamplingTreeObservation observation) {
+        return new SamplingTreeResource(
+                observation.roundId().roundId(),
+                observation.treeTag().value(),
+                observation.shootCount(),
+                observation.fruitSetCount(),
+                observation.trunkDiameterMm(),
+                observation.samplingDate()
         );
     }
 }
