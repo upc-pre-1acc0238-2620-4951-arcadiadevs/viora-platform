@@ -46,6 +46,9 @@ public class FruitThinningPrescriptionPersistenceEntity {
     @Column(name = "window_closes_on")
     private java.time.LocalDate windowClosesOn;
 
+    @Column(name = "issued_at")
+    private Instant issuedAt;
+
     @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SamplingRoundPersistenceEntity> samplingRounds = new ArrayList<>();
 
@@ -137,6 +140,14 @@ public class FruitThinningPrescriptionPersistenceEntity {
 
     public void setWindowClosesOn(java.time.LocalDate windowClosesOn) {
         this.windowClosesOn = windowClosesOn;
+    }
+
+    public Instant getIssuedAt() {
+        return issuedAt;
+    }
+
+    public void setIssuedAt(Instant issuedAt) {
+        this.issuedAt = issuedAt;
     }
 
     public List<SamplingRoundPersistenceEntity> getSamplingRounds() {
