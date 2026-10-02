@@ -49,6 +49,17 @@ public class FruitThinningPrescriptionPersistenceEntity {
     @Column(name = "issued_at")
     private Instant issuedAt;
 
+    @OneToOne(mappedBy = "prescription", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private ExecutionConfirmationPersistenceEntity executionConfirmation;
+
+    public ExecutionConfirmationPersistenceEntity getExecutionConfirmation() {
+        return executionConfirmation;
+    }
+
+    public void setExecutionConfirmation(ExecutionConfirmationPersistenceEntity executionConfirmation) {
+        this.executionConfirmation = executionConfirmation;
+    }
+
     @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SamplingRoundPersistenceEntity> samplingRounds = new ArrayList<>();
 

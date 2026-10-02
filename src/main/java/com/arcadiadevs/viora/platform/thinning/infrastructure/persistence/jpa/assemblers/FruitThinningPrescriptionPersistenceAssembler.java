@@ -12,6 +12,8 @@ import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.en
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.ExecutionConfirmationSnapshot;
+import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.ExecutionConfirmationPersistenceEntity;
 
 /**
  * Unified persistence assembler bridging domain {@link FruitThinningPrescription} aggregate roots
@@ -45,6 +47,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             entity.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
         }
         entity.setIssuedAt(snap.issuedAt());
+        appendConfirmation(entity, snap.executionConfirmation());
 
         var roundEntities = new ArrayList<SamplingRoundPersistenceEntity>();
         for (var roundSnap : snap.samplingRounds()) {
@@ -94,6 +97,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             target.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
         }
         target.setIssuedAt(snap.issuedAt());
+        appendConfirmation(target, snap.executionConfirmation());
 
         // Synchronize sampling rounds (add newly appended rounds)
         for (var roundSnap : snap.samplingRounds()) {
@@ -176,10 +180,76 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 load,
                 entity.getIssuedAt(),
                 roundSnapshots,
-                null,
+                confirmationSnapshot(entity.getExecutionConfirmation()),
                 entity.getRevision()
         );
 
         return FruitThinningPrescription.reconstitute(snapshot);
+    }
+
+    private static void appendConfirmation(FruitThinningPrescriptionPersistenceEntity parent,
+            ExecutionConfirmationSnapshot snapshot) {
+        if (snapshot == null || parent.getExecutionConfirmation() != null) {
+            return;
+        }
+        var entity = new ExecutionConfirmationPersistenceEntity();
+        entity.setId(UUID.fromString(snapshot.id().confirmationId()));
+        entity.setPrescription(parent);
+        entity.setExecutionDate(snapshot.executionDate());
+        entity.setActualRemovalPercentage(snapshot.actualRemovalPercentage());
+        entity.setRemovedKg(snapshot.removedKg());
+        entity.setLaborCrewSize(snapshot.laborCrewSize());
+        entity.setTimeliness(snapshot.timeliness().name());
+        entity.setRecordedAt(snapshot.recordedAt());
+        entity.setNotes(snapshot.notes());
+        var balance = snapshot.loadBalance();
+        if (balance != null) {
+            entity.setPreThinningFruitsPerMeter(balance.preThinningFruitsPerMeter());
+            entity.setResidualFruitsPerMeter(balance.residualFruitsPerMeter());
+            entity.setTargetFruitsPerMeter(balance.targetFruitsPerMeter());
+            entity.setDeltaFruitsPerMeter(balance.deltaFruitsPerMeter());
+            entity.setLoadRatio(balance.loadRatio());
+            entity.setLoadState(balance.loadState().name());
+        }
+        var projection = snapshot.caliberProjection();
+        if (projection != null) {
+            entity.setCaliberStatus(projection.status().name());
+            entity.setCaliberMostLikelyFruitsPerKg(projection.mostLikelyFruitsPerKg());
+            entity.setCaliberFruitsPerKgLow(projection.fruitsPerKgLow());
+            entity.setCaliberFruitsPerKgHigh(projection.fruitsPerKgHigh());
+            entity.setCaliberConfidenceLevel(projection.confidenceLevel());
+            entity.setCaliberCalibrationObservations(projection.calibrationObservations());
+            entity.setCaliberModelVersion(projection.modelVersion());
+        }
+        parent.setExecutionConfirmation(entity);
+    }
+
+    private static ExecutionConfirmationSnapshot confirmationSnapshot(ExecutionConfirmationPersistenceEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return new ExecutionConfirmationSnapshot(new ConfirmationId(entity.getId().toString()),
+                entity.getExecutionDate(), entity.getActualRemovalPercentage(), entity.getLaborCrewSize(),
+                ExecutionTimeliness.valueOf(entity.getTimeliness()), entity.getRecordedAt(),
+                entity.getRemovedKg(), entity.getNotes(), loadBalance(entity), caliberProjection(entity));
+    }
+
+    private static LoadBalance loadBalance(ExecutionConfirmationPersistenceEntity entity) {
+        if (entity.getLoadState() == null) {
+            return null;
+        }
+        return new LoadBalance(entity.getPreThinningFruitsPerMeter(), entity.getResidualFruitsPerMeter(),
+                entity.getTargetFruitsPerMeter(), entity.getDeltaFruitsPerMeter(), entity.getLoadRatio(),
+                LoadState.valueOf(entity.getLoadState()));
+    }
+
+    private static CaliberProjection caliberProjection(ExecutionConfirmationPersistenceEntity entity) {
+        if (entity.getCaliberStatus() == null) {
+            return null;
+        }
+        return new CaliberProjection(CaliberProjectionStatus.valueOf(entity.getCaliberStatus()),
+                entity.getCaliberMostLikelyFruitsPerKg(), entity.getCaliberFruitsPerKgLow(),
+                entity.getCaliberFruitsPerKgHigh(), entity.getCaliberConfidenceLevel(),
+                entity.getCaliberCalibrationObservations(), entity.getCaliberModelVersion());
     }
 }
