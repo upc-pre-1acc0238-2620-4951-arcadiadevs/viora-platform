@@ -1,12 +1,21 @@
 package com.arcadiadevs.viora.platform.settlement.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierRenderingException;
+import com.arcadiadevs.viora.platform.settlement.domain.model.entities.DossierCertification;
 import com.arcadiadevs.viora.platform.settlement.domain.model.entities.HarvestSettlement;
+import com.arcadiadevs.viora.platform.settlement.domain.model.events.AgronomicDossierGeneratedEvent;
 import com.arcadiadevs.viora.platform.settlement.domain.model.events.CampaignHarvestSettledEvent;
+import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierContent;
+import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierPdfGenerator;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHashService;
 import com.arcadiadevs.viora.platform.settlement.domain.services.StabilizationCurveCalculatorService;
+import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,14 +36,17 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
     private final PlotId plotId;
     private final UserId producerId;
     private final List<HarvestSettlementSnapshot> settlements;
+    private final List<DossierCertificationSnapshot> certifications;
     private final Long revision;
 
     private AgronomicReport(ReportId id, PlotId plotId, UserId producerId,
-            List<HarvestSettlementSnapshot> settlements, Long revision) {
+            List<HarvestSettlementSnapshot> settlements, List<DossierCertificationSnapshot> certifications,
+            Long revision) {
         this.id = id;
         this.plotId = plotId;
         this.producerId = producerId;
         this.settlements = new ArrayList<>(settlements);
+        this.certifications = new ArrayList<>(certifications);
         this.revision = revision;
     }
 
@@ -49,7 +61,7 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         if (plotId == null || producerId == null) {
             throw new IllegalArgumentException("settlement.reference.null");
         }
-        return new AgronomicReport(new ReportId(), plotId, producerId, List.of(), null);
+        return new AgronomicReport(new ReportId(), plotId, producerId, List.of(), List.of(), null);
     }
 
     public static AgronomicReport reconstitute(AgronomicReportSnapshot snapshot) {
@@ -57,7 +69,7 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
             throw new IllegalArgumentException("settlement.report.snapshot.null");
         }
         return new AgronomicReport(snapshot.id(), snapshot.plotId(), snapshot.producerId(),
-                snapshot.settlements(), snapshot.revision());
+                snapshot.settlements(), snapshot.certifications(), snapshot.revision());
     }
 
     /**
@@ -110,6 +122,79 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         return settlements.stream().filter(s -> s.campaignYear().equals(campaignYear)).findFirst();
     }
 
+    /**
+     * Certifies the dossier of one settled campaign: renders its PDF from the frozen settlement, hashes the exact
+     * final bytes, appends the immutable certification and registers {@link AgronomicDossierGeneratedEvent}.
+     *
+     * <p>Existing settlements and certifications are never touched, so certifying campaign N+1 keeps the bytes,
+     * hash and metadata of campaign N. One instant is read from the clock and used for the whole operation.</p>
+     *
+     * @param campaignYear campaign to certify
+     * @param signature    declared collegiate signature
+     * @param certifier    declared certifying professional
+     * @param notes        optional notes, at most {@value DossierCertification#MAX_NOTES_LENGTH} characters
+     * @param pdfGenerator output port rendering the frozen content
+     * @param hashService  service computing the SHA-256 of the rendered bytes
+     * @param clock        clock stamping the certification
+     * @return the new certification
+     * @throws IllegalArgumentException    if an argument is missing or invalid
+     * @throws BusinessRuleException       if the campaign has no settlement
+     * @throws IllegalStateException       if the campaign is already certified or its frozen curve is
+     *                                     {@code INSUFFICIENT_SETTLEMENTS}
+     * @throws DossierRenderingException   if the PDF cannot be rendered; nothing is certified
+     */
+    public DossierCertificationSnapshot certifyCampaign(CampaignYear campaignYear, AuditorSignature signature,
+            CertifierIdentity certifier, String notes, AgronomicDossierPdfGenerator pdfGenerator,
+            CryptographicHashService hashService, Clock clock) {
+        if (campaignYear == null) {
+            throw new IllegalArgumentException("settlement.campaign_year.null");
+        }
+        if (signature == null || certifier == null || pdfGenerator == null || hashService == null || clock == null) {
+            throw new IllegalArgumentException("settlement.certification.reference.null");
+        }
+        if (notes != null && notes.length() > DossierCertification.MAX_NOTES_LENGTH) {
+            throw new IllegalArgumentException("settlement.certification.notes.too_long");
+        }
+        var settlement = settlementOf(campaignYear).orElseThrow(
+                () -> new BusinessRuleException("settlement.certification.campaign_not_settled"));
+        if (certificationOf(campaignYear).isPresent()) {
+            throw new IllegalStateException("settlement.certification.already_certified");
+        }
+        if (settlement.trendCurve().status() == StabilizationStatus.INSUFFICIENT_SETTLEMENTS) {
+            throw new IllegalStateException("settlement.certification.insufficient_settlements");
+        }
+
+        // One instant for the whole operation; microseconds are what the database keeps on reload.
+        Instant certifiedAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        var content = new AgronomicDossierContent(id, plotId, producerId, campaignYear, settlement, certifier,
+                signature, notes, certifiedAt);
+        DossierDocument document;
+        try {
+            document = new DossierDocument(pdfGenerator.renderPdf(content));
+        } catch (IllegalArgumentException e) {
+            throw new DossierRenderingException("settlement.certification.render.invalid_output", e);
+        }
+        var metadata = new DossierMetadata(hashService.sha256(document.content()), signature, certifiedAt);
+
+        var certification = DossierCertification.create(id, plotId, campaignYear, metadata, certifier, notes,
+                document).snapshot();
+        certifications.add(certification);
+        registerDomainEvent(new AgronomicDossierGeneratedEvent(UUID.randomUUID().toString(),
+                certification.id().certificationId(), id.reportId(), plotId.plotId(), campaignYear.value(),
+                metadata.verificationHash().value(), signature.value(), certifiedAt));
+        return certification;
+    }
+
+    /**
+     * Selects the certification of a campaign.
+     *
+     * @param campaignYear campaign to look for
+     * @return the certification, if the campaign is certified
+     */
+    public Optional<DossierCertificationSnapshot> certificationOf(CampaignYear campaignYear) {
+        return certifications.stream().filter(c -> c.campaignYear().equals(campaignYear)).findFirst();
+    }
+
     /** Curve of the latest settled campaign, or empty when nothing is settled yet. */
     public Optional<StabilizationTrendCurve> trendCurve() {
         return settlements.stream()
@@ -118,6 +203,6 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
     }
 
     public AgronomicReportSnapshot snapshot() {
-        return new AgronomicReportSnapshot(id, plotId, producerId, settlements, revision);
+        return new AgronomicReportSnapshot(id, plotId, producerId, settlements, certifications, revision);
     }
 }

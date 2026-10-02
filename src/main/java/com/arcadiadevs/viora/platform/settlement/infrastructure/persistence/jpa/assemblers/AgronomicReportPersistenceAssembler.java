@@ -45,7 +45,7 @@ public final class AgronomicReportPersistenceAssembler {
                 .map(s -> toSnapshot(reportId, plotId, s))
                 .toList();
         return AgronomicReport.reconstitute(new AgronomicReportSnapshot(reportId, plotId,
-                new UserId(entity.getProducerId().toString()), settlements, entity.getRevision()));
+                new UserId(entity.getProducerId().toString()), settlements, java.util.List.of(), entity.getRevision()));
     }
 
     private static HarvestSettlementPersistenceEntity toEntity(AgronomicReportPersistenceEntity parent,
