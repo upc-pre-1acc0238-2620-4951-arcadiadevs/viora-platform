@@ -1,12 +1,15 @@
 package com.arcadiadevs.viora.platform.settlement.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierAlreadyCertifiedException;
 import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierRenderingException;
+import com.arcadiadevs.viora.platform.settlement.domain.exceptions.InsufficientSettlementHistoryException;
 import com.arcadiadevs.viora.platform.settlement.domain.model.events.AgronomicDossierGeneratedEvent;
 import com.arcadiadevs.viora.platform.settlement.domain.model.events.CampaignHarvestSettledEvent;
 import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierContent;
 import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierPdfGenerator;
 import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHashService;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
+import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -167,7 +170,8 @@ class AgronomicReportTest {
     }
 
     private CertifiedDossier certifyWithDocument(AgronomicReport report, int year) {
-        return report.certifyCampaign(new CampaignYear(year), signature, certifier, "Verified", generator,
+        return report.certifyCampaign(new CampaignYear(year), signature, certifier, new CertificationNotes("Verified"),
+                generator,
                 hashService, CERTIFICATION_CLOCK);
     }
 
@@ -259,9 +263,10 @@ class AgronomicReportTest {
         var first = certify(report, 2028);
         report.clearDomainEvents();
 
-        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2028));
+        var error = assertThrows(DossierAlreadyCertifiedException.class, () -> certify(report, 2028));
 
         assertEquals("settlement.certification.already_certified", error.getMessage());
+        assertInstanceOf(ResourceConflictException.class, error);
         assertEquals(List.of(first), report.snapshot().certifications());
         assertTrue(report.domainEvents().isEmpty());
         assertEquals(1, renderCount);
@@ -275,7 +280,7 @@ class AgronomicReportTest {
                 report.settlementOf(new CampaignYear(2026)).orElseThrow().trendCurve().status());
         report.clearDomainEvents();
 
-        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2026));
+        var error = assertThrows(InsufficientSettlementHistoryException.class, () -> certify(report, 2026));
 
         assertEquals("settlement.certification.insufficient_settlements", error.getMessage());
         assertTrue(report.snapshot().certifications().isEmpty());
@@ -293,7 +298,7 @@ class AgronomicReportTest {
                 report.settlementOf(new CampaignYear(2027)).orElseThrow().trendCurve().status());
         report.clearDomainEvents();
 
-        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2027));
+        var error = assertThrows(InsufficientSettlementHistoryException.class, () -> certify(report, 2027));
 
         assertEquals("settlement.certification.insufficient_settlements", error.getMessage());
         assertTrue(report.snapshot().certifications().isEmpty());
@@ -318,7 +323,7 @@ class AgronomicReportTest {
                 evaluated.settlementOf(new CampaignYear(2028)).orElseThrow().trendCurve().status());
         assertDoesNotThrow(() -> certify(evaluated, 2028));
         // the first two campaigns keep their frozen insufficient curve and stay uncertifiable
-        assertThrows(IllegalStateException.class, () -> certify(evaluated, 2026));
+        assertThrows(InsufficientSettlementHistoryException.class, () -> certify(evaluated, 2026));
     }
 
     @Test
@@ -379,7 +384,7 @@ class AgronomicReportTest {
             throw new DossierRenderingException("settlement.certification.render.failed");
         };
         assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2028), signature,
-                certifier, null, failing, hashService, CERTIFICATION_CLOCK));
+                certifier, CertificationNotes.none(), failing, hashService, CERTIFICATION_CLOCK));
         assertTrue(report.snapshot().certifications().isEmpty());
         assertTrue(report.domainEvents().isEmpty());
     }
@@ -390,24 +395,24 @@ class AgronomicReportTest {
         settleThreeConsecutive(report);
         AgronomicDossierPdfGenerator notPdf = content -> "{\"json\":true}".getBytes(StandardCharsets.UTF_8);
         assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2028), signature,
-                certifier, null, notPdf, hashService, CERTIFICATION_CLOCK));
+                certifier, CertificationNotes.none(), notPdf, hashService, CERTIFICATION_CLOCK));
         assertTrue(report.snapshot().certifications().isEmpty());
     }
 
     @Test
-    void rejectsMissingArgumentsAndOverlongNotes() {
+    void rejectsMissingArguments() {
         var report = AgronomicReport.createForPlot(plotId, producer);
         settle(report, 2026, 100, 100);
         var year = new CampaignYear(2026);
+        var none = CertificationNotes.none();
         assertThrows(IllegalArgumentException.class, () ->
-                report.certifyCampaign(null, signature, certifier, null, generator, hashService, CERTIFICATION_CLOCK));
+                report.certifyCampaign(null, signature, certifier, none, generator, hashService, CERTIFICATION_CLOCK));
         assertThrows(IllegalArgumentException.class, () ->
-                report.certifyCampaign(year, null, certifier, null, generator, hashService, CERTIFICATION_CLOCK));
+                report.certifyCampaign(year, null, certifier, none, generator, hashService, CERTIFICATION_CLOCK));
         assertThrows(IllegalArgumentException.class, () ->
-                report.certifyCampaign(year, signature, null, null, generator, hashService, CERTIFICATION_CLOCK));
+                report.certifyCampaign(year, signature, null, none, generator, hashService, CERTIFICATION_CLOCK));
         assertThrows(IllegalArgumentException.class, () ->
-                report.certifyCampaign(year, signature, certifier, "x".repeat(1001), generator, hashService,
-                        CERTIFICATION_CLOCK));
+                report.certifyCampaign(year, signature, certifier, null, generator, hashService, CERTIFICATION_CLOCK));
         assertTrue(report.snapshot().certifications().isEmpty());
     }
 

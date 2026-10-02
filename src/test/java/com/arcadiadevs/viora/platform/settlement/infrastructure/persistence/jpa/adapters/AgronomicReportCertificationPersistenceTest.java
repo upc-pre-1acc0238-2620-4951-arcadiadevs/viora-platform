@@ -63,8 +63,7 @@ class AgronomicReportCertificationPersistenceTest {
 
     private CertifiedDossier certify(AgronomicReport report, int year, Clock clock) {
         return report.certifyCampaign(new CampaignYear(year), new AuditorSignature("CIP-49120-SÁNCHEZ"),
-                new CertifierIdentity("Ing. Sánchez", "49120"), "Verificación de campaña – Sánchez", pdf, hashService,
-                clock);
+                new CertifierIdentity("Ing. Sánchez", "49120"), new CertificationNotes("Verificación de campaña – Sánchez"), pdf, hashService, clock);
     }
 
     /** Saves the report and the document of a certification the way the command service does. */

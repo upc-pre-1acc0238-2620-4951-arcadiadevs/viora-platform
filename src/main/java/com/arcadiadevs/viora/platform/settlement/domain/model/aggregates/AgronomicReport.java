@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.settlement.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierAlreadyCertifiedException;
 import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierRenderingException;
+import com.arcadiadevs.viora.platform.settlement.domain.exceptions.InsufficientSettlementHistoryException;
 import com.arcadiadevs.viora.platform.settlement.domain.model.entities.DossierCertification;
 import com.arcadiadevs.viora.platform.settlement.domain.model.entities.HarvestSettlement;
 import com.arcadiadevs.viora.platform.settlement.domain.model.events.AgronomicDossierGeneratedEvent;
@@ -132,46 +134,52 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      * @param campaignYear campaign to certify
      * @param signature    declared collegiate signature
      * @param certifier    declared certifying professional
-     * @param notes        optional notes, at most {@value DossierCertification#MAX_NOTES_LENGTH} characters
+     * @param notes        validated optional notes
      * @param pdfGenerator output port rendering the frozen content
      * @param hashService  service computing the SHA-256 of the rendered bytes
      * @param clock        clock stamping the certification
      * @return the new certification metadata together with the rendered document, which the caller must store
      *         through {@link com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository}
-     * @throws IllegalArgumentException    if an argument is missing or invalid
-     * @throws BusinessRuleException       if the campaign has no settlement
-     * @throws IllegalStateException       if the campaign is already certified or its frozen curve lacks the
-     *                                     consecutive settled campaigns needed for a managed alternation index,
-     *                                     whatever the baseline
-     * @throws DossierRenderingException   if the PDF cannot be rendered; nothing is certified
+     * @throws IllegalArgumentException            if an argument is missing
+     * @throws BusinessRuleException               if the campaign has no settlement
+     * @throws DossierAlreadyCertifiedException    if the campaign is already certified
+     * @throws InsufficientSettlementHistoryException if its frozen curve lacks the consecutive settled campaigns
+     *                                             needed for a managed alternation index, whatever the baseline
+     * @throws DossierRenderingException           if the PDF cannot be rendered; nothing is certified
      */
     public CertifiedDossier certifyCampaign(CampaignYear campaignYear, AuditorSignature signature,
-            CertifierIdentity certifier, String notes, AgronomicDossierPdfGenerator pdfGenerator,
+            CertifierIdentity certifier, CertificationNotes notes, AgronomicDossierPdfGenerator pdfGenerator,
             CryptographicHashService hashService, Clock clock) {
         if (campaignYear == null) {
             throw new IllegalArgumentException("settlement.campaign_year.null");
         }
-        if (signature == null || certifier == null || pdfGenerator == null || hashService == null || clock == null) {
+        if (signature == null || certifier == null || notes == null || pdfGenerator == null || hashService == null || clock == null) {
             throw new IllegalArgumentException("settlement.certification.reference.null");
-        }
-        if (notes != null && notes.length() > DossierCertification.MAX_NOTES_LENGTH) {
-            throw new IllegalArgumentException("settlement.certification.notes.too_long");
         }
         var settlement = settlementOf(campaignYear).orElseThrow(
                 () -> new BusinessRuleException("settlement.certification.campaign_not_settled"));
         if (certificationOf(campaignYear).isPresent()) {
-            throw new IllegalStateException("settlement.certification.already_certified");
+            // Pending decision (ADR-002 section 8): this conflict and the insufficient-history one below end up
+            // with the same ProblemDetail code (DOSSIERCERTIFICATION_CONFLICT), so clients can only tell them
+            // apart by the localized detail. To be decided with the Settlement owner (Victor): whether
+            // insufficient settlement history gets its own code so clients can react programmatically.
+            throw new DossierAlreadyCertifiedException("settlement.certification.already_certified");
         }
         // Judged on the settled history itself: the curve status reports a missing baseline first and would
         // hide insufficient settlements on plots without Phenology history.
         if (settlement.trendCurve().managedAlternationIndex() == null) {
-            throw new IllegalStateException("settlement.certification.insufficient_settlements");
+            // Pending decision (ADR-002 section 8), to be taken with the Settlement owner (Victor):
+            // (a) give this failure its own ProblemDetail code instead of the shared conflict code;
+            // (b) decide whether it stays 409 (ZIP/audit 21 policy) or moves to 422 like the other unmet
+            //     campaign precondition ("no settlement" is 422 in TS40), since it is a precondition rather
+            //     than a state conflict.
+            throw new InsufficientSettlementHistoryException("settlement.certification.insufficient_settlements");
         }
 
         // One instant for the whole operation; microseconds are what the database keeps on reload.
         Instant certifiedAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         var content = new AgronomicDossierContent(id, plotId, producerId, campaignYear, settlement, certifier,
-                signature, notes, certifiedAt);
+                signature, notes.value(), certifiedAt);
         DossierDocument document;
         try {
             document = new DossierDocument(pdfGenerator.renderPdf(content));

@@ -47,6 +47,26 @@ class DossierValueObjectsTest {
                 () -> new AuditorSignature("x".repeat(AuditorSignature.MAX_LENGTH + 1)));
     }
 
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "\n\t"})
+    void blankNotesAreAbsent(String value) {
+        var notes = new CertificationNotes(value);
+        assertNull(notes.value());
+        assertFalse(notes.isPresent());
+        assertEquals(CertificationNotes.none(), notes);
+    }
+
+    @Test
+    void trimsNotesAndRejectsOverlongOnes() {
+        assertEquals("Verified", new CertificationNotes("  Verified ").value());
+        assertTrue(new CertificationNotes("x").isPresent());
+        assertDoesNotThrow(() -> new CertificationNotes("x".repeat(CertificationNotes.MAX_LENGTH)));
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> new CertificationNotes("x".repeat(CertificationNotes.MAX_LENGTH + 1)));
+        assertEquals("settlement.certification.notes.too_long", error.getMessage());
+    }
+
     @Test
     void validatesTheCertifierIdentity() {
         var identity = new CertifierIdentity(" Ing. Sanchez ", " 49120 ");

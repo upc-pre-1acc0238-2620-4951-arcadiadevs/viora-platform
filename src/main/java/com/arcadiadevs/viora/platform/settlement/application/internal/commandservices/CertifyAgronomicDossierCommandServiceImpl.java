@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.model.commands.CertifyAg
 import com.arcadiadevs.viora.platform.settlement.domain.model.ports.AgronomicDossierPdfGenerator;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.AuditorSignature;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CampaignYear;
+import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CertificationNotes;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CertifierIdentity;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
@@ -17,6 +18,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.services.CryptographicHa
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
+import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +30,13 @@ import java.time.Clock;
  * append the certification, then persists the report and the immutable document in the same transaction and
  * publishes {@code AgronomicDossierGeneratedEvent}.
  *
- * <p>Error mapping: missing or inactive plot is a not-found; a campaign without settlement (including a plot
+ * <p>Error mapping: all user input is validated by value objects before the domain is called (invalid input is a
+ * 400, anything the domain then throws as {@link IllegalArgumentException} or {@link IllegalStateException} is a
+ * programming or infrastructure fault and propagates to the global handler as a 500); missing or inactive plot is
+ * a not-found; a campaign without settlement (including a plot
  * without report) is a business-rule violation (422); an already certified campaign or a campaign whose frozen
  * curve lacks at least three consecutive settled campaigns (two consecutive pairs, whatever the baseline) is a
- * conflict (409); a rendering failure is an unexpected error (500) and
+ * {@link ResourceConflictException} (409); a rendering failure is an unexpected error (500) and
  * leaves nothing stored and nothing published. Concurrent certifications are serialized by the report lock and
  * guarded by the unique constraint on report and campaign.</p>
  */
@@ -69,11 +74,13 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
         CampaignYear campaignYear;
         AuditorSignature signature;
         CertifierIdentity certifier;
+        CertificationNotes notes;
         try {
             plotId = new PlotId(command.plotId());
             campaignYear = new CampaignYear(command.campaignYear());
             signature = new AuditorSignature(command.auditorSignature());
             certifier = new CertifierIdentity(command.certifiedBy(), command.cipNumber());
+            notes = new CertificationNotes(command.notes());
         } catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.validationError("certification", exception.getMessage()));
         }
@@ -88,13 +95,17 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
 
         CertifiedDossier certified;
         try {
-            certified = report.certifyCampaign(campaignYear, signature, certifier, command.notes(), pdfGenerator,
+            certified = report.certifyCampaign(campaignYear, signature, certifier, notes, pdfGenerator,
                     hashService, clock);
         } catch (BusinessRuleException exception) {
             return Result.failure(ApplicationError.businessRuleViolation(RESOURCE, exception.getMessage()));
-        } catch (IllegalArgumentException exception) {
-            return Result.failure(ApplicationError.validationError("certification", exception.getMessage()));
-        } catch (IllegalStateException exception) {
+        } catch (ResourceConflictException exception) {
+            // Pending decision (ADR-002 section 8), to be taken with the Settlement owner (Victor): both
+            // conflicts (already certified, insufficient settlement history) map to the same ProblemDetail code,
+            // DOSSIERCERTIFICATION_CONFLICT, so clients only tell them apart by the localized detail. Decide
+            // (a) whether insufficient history gets its own conflict code so clients can react programmatically,
+            // and (b) whether it stays 409 (ZIP/audit 21 policy) or moves to 422 like the other unmet campaign
+            // precondition (TS40 uses 422 for "no settlement"), since it is a precondition, not a state conflict.
             return Result.failure(ApplicationError.conflict(RESOURCE, exception.getMessage()));
         } catch (DossierRenderingException exception) {
             return Result.failure(ApplicationError.unexpected(RESOURCE, "settlement.certification.render.failed"));

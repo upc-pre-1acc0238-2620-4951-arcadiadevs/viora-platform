@@ -222,17 +222,46 @@ class CertifyAgronomicDossierCommandServiceImplTest {
     }
 
     @Test
+    void blankMandatoryTextIsAValidationErrorRaisedByTheValueObjectsNotByTheCommand() {
+        var blankSignature = new CertifyAgronomicDossierCommand(plotId, 2026, " ", "n", "1", null);
+        var error = service.handle(blankSignature).failure().orElseThrow();
+        assertEquals("VALIDATION_ERROR", error.code());
+        assertEquals("settlement.certification.signature.invalid", error.details());
+        var blankCip = new CertifyAgronomicDossierCommand(plotId, 2026, "s", "n", "", null);
+        assertEquals("settlement.certification.cip.invalid",
+                service.handle(blankCip).failure().orElseThrow().details());
+        verifyNoInteractions(reports, documents, publisher, pdf);
+    }
+
+    @Test
+    void aHashServiceFailureIsNotReportedAsAConflictAndNothingIsSavedOrPublished() {
+        var failingHash = mock(CryptographicHashService.class);
+        when(failingHash.sha256(any())).thenThrow(
+                new IllegalStateException("settlement.certification.hash.algorithm.unavailable"));
+        var failing = new CertifyAgronomicDossierCommandServiceImpl(reports, documents, orchard, pdf, failingHash,
+                publisher, CERTIFICATION_CLOCK);
+        when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(reportWithThreeConsecutiveSettlements()));
+
+        var thrown = assertThrows(IllegalStateException.class, () -> failing.handle(command));
+
+        assertEquals("settlement.certification.hash.algorithm.unavailable", thrown.getMessage());
+        verify(reports, never()).save(any());
+        verify(documents, never()).save(any(), any());
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
     void theCommandRequiresItsMandatoryFields() {
         assertThrows(IllegalArgumentException.class,
                 () -> new CertifyAgronomicDossierCommand(null, 2026, "s", "n", "1", null));
         assertThrows(IllegalArgumentException.class,
                 () -> new CertifyAgronomicDossierCommand(plotId, null, "s", "n", "1", null));
         assertThrows(IllegalArgumentException.class,
-                () -> new CertifyAgronomicDossierCommand(plotId, 2026, " ", "n", "1", null));
+                () -> new CertifyAgronomicDossierCommand(plotId, 2026, null, "n", "1", null));
         assertThrows(IllegalArgumentException.class,
                 () -> new CertifyAgronomicDossierCommand(plotId, 2026, "s", null, "1", null));
         assertThrows(IllegalArgumentException.class,
-                () -> new CertifyAgronomicDossierCommand(plotId, 2026, "s", "n", "", null));
+                () -> new CertifyAgronomicDossierCommand(plotId, 2026, "s", "n", null, null));
         assertDoesNotThrow(() -> new CertifyAgronomicDossierCommand(plotId, 2026, "s", "n", "1", null));
     }
 }

@@ -36,6 +36,13 @@ public class AgronomicReportCertificationController {
     /**
      * Certifies the dossier of a settled campaign.
      *
+     * <p>Pending decision (ADR-002 section 8), to be taken with the Settlement owner (Victor): the two 409
+     * conflicts (campaign already certified, insufficient settlement history) share the ProblemDetail code
+     * {@code DOSSIERCERTIFICATION_CONFLICT}, so clients can only tell them apart by the localized {@code detail};
+     * decide whether insufficient history gets its own code. Decide also whether insufficient history stays 409
+     * (ZIP/audit 21 policy) or moves to 422 like the other unmet campaign precondition (TS40 uses 422 for "no
+     * settlement"), since it is a precondition rather than a state conflict.</p>
+     *
      * @param plotId   plot of the campaign
      * @param resource certification declaration
      * @return 201 with the stored certification, or the problem detail of the failure
