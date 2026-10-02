@@ -122,9 +122,11 @@ class AgronomicReportCertificationPersistenceTest {
         certify(report, 2028, FIRST_CLOCK);
         transactions.executeWithoutResult(tx -> repository.save(report));
 
-        var length = jdbc.queryForObject("select length(document_content) from dossier_certifications "
-                + "where report_id = ?", Integer.class, UUID.fromString(report.snapshot().id().reportId()));
-        assertEquals(report.certificationOf(new CampaignYear(2028)).orElseThrow().document().size(), length);
+        var certified = report.certificationOf(new CampaignYear(2028)).orElseThrow();
+        byte[] stored = jdbc.queryForObject("select document_content from dossier_certifications "
+                + "where report_id = ?", byte[].class, UUID.fromString(report.snapshot().id().reportId()));
+        assertArrayEquals(certified.document().content(), stored);
+        assertEquals(certified.metadata().verificationHash(), hashService.sha256(stored));
         assertEquals(1, jdbc.queryForObject("select count(*) from information_schema.table_constraints "
                 + "where lower(constraint_name) = 'uq_certification_report_campaign'", Integer.class));
     }
