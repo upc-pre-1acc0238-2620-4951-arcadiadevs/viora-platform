@@ -54,7 +54,8 @@ public class CertifyAgronomicDossierCommandServiceImpl implements CertifyAgronom
     private final Clock clock;
 
     public CertifyAgronomicDossierCommandServiceImpl(AgronomicReportRepository reportRepository,
-            CertifiedDossierDocumentRepository documentRepository, ExternalOrchardService externalOrchardService, AgronomicDossierPdfGenerator pdfGenerator,
+            CertifiedDossierDocumentRepository documentRepository, ExternalOrchardService externalOrchardService,
+            AgronomicDossierPdfGenerator pdfGenerator,
             CryptographicHashService hashService, ApplicationEventPublisher publisher, Clock clock) {
         this.reportRepository = reportRepository;
         this.documentRepository = documentRepository;

@@ -183,10 +183,9 @@ class AgronomicReportCertificationPersistenceTest {
         persist(report, certified);
         var other = new DossierDocument("%PDF-1.7 other".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
 
-        // The @Repository proxy translates the adapter's IllegalStateException into a Spring data-access exception.
-        var error = assertThrows(org.springframework.dao.DataAccessException.class,
+        // The primary key on certification_id rejects a second document; the stored bytes stay untouched.
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> documents.save(certified.certification().id(), other));
-        assertTrue(error.getMessage().contains("settlement.certification.document.already_stored"));
         assertArrayEquals(certified.document().content(), storedBytes(certified));
     }
 }

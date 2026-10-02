@@ -10,7 +10,10 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.UUID;
 
-/** JPA adapter of the certified dossier document port. It only persists: it is insert-only and publishes nothing. */
+/**
+ * JPA adapter of the certified dossier document port. It only persists: it is insert-only and publishes nothing.
+ * Storing a second document for the same certification violates the primary key and fails.
+ */
 @Repository
 public class CertifiedDossierDocumentRepositoryImpl implements CertifiedDossierDocumentRepository {
 
@@ -22,9 +25,6 @@ public class CertifiedDossierDocumentRepositoryImpl implements CertifiedDossierD
 
     @Override
     public void save(CertificationId certificationId, DossierDocument document) {
-        if (persistenceRepository.existsById(UUID.fromString(certificationId.certificationId()))) {
-            throw new IllegalStateException("settlement.certification.document.already_stored");
-        }
         persistenceRepository.saveAndFlush(DossierDocumentPersistenceAssembler.toEntity(certificationId, document));
     }
 

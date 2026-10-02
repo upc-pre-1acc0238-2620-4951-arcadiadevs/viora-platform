@@ -139,7 +139,7 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      * @param hashService  service computing the SHA-256 of the rendered bytes
      * @param clock        clock stamping the certification
      * @return the new certification metadata together with the rendered document, which the caller must store
-     *         through {@link com.arcadiadevs.viora.platform.settlement.domain.repositories.CertifiedDossierDocumentRepository}
+     *         through {@code CertifiedDossierDocumentRepository}
      * @throws IllegalArgumentException            if an argument is missing
      * @throws BusinessRuleException               if the campaign has no settlement
      * @throws DossierAlreadyCertifiedException    if the campaign is already certified
@@ -153,7 +153,8 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         if (campaignYear == null) {
             throw new IllegalArgumentException("settlement.campaign_year.null");
         }
-        if (signature == null || certifier == null || notes == null || pdfGenerator == null || hashService == null || clock == null) {
+        if (signature == null || certifier == null || notes == null || pdfGenerator == null || hashService == null
+                || clock == null) {
             throw new IllegalArgumentException("settlement.certification.reference.null");
         }
         var settlement = settlementOf(campaignYear).orElseThrow(

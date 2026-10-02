@@ -9,8 +9,8 @@ import java.util.UUID;
 
 /**
  * Immutable certification of one settled campaign: the SHA-256 of its PDF and the declared signature. The PDF
- * bytes live in {@link DossierDocumentPersistenceEntity}. Every column is non-updatable; the unique {@code (report_id, campaign_year)} pair turns a certification race
- * into a conflict.
+ * bytes live in {@link DossierDocumentPersistenceEntity}. Every column is non-updatable; the unique
+ * {@code (report_id, campaign_year)} pair turns a certification race into a conflict.
  */
 @Entity
 @Table(name = "dossier_certifications",
