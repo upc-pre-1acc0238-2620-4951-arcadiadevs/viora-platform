@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.Prescri
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SustainableCropLoad;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -13,10 +14,11 @@ import java.util.List;
  *
  * @param id                    aggregate root identifier
  * @param plotId                referenced plot identifier
- * @param campaignYear          monitored campaign year
- * @param observedPlotRevision  plot revision observed when aggregate was initiated
+ * @param campaignYear         monitored campaign year
+ * @param observedPlotRevision plot revision observed when aggregate was initiated
  * @param status                lifecycle status of prescription
  * @param sustainableLoad       calculated sustainable crop load parameters
+ * @param issuedAt              timestamp when the technical prescription was issued
  * @param samplingRounds        list of conducted sampling rounds
  * @param executionConfirmation optional execution confirmation record
  * @param revision              optimistic concurrency version counter
@@ -28,6 +30,7 @@ public record FruitThinningPrescriptionSnapshot(
         Long observedPlotRevision,
         PrescriptionStatus status,
         SustainableCropLoad sustainableLoad,
+        Instant issuedAt,
         List<SamplingRoundSnapshot> samplingRounds,
         ExecutionConfirmationSnapshot executionConfirmation,
         Long revision
@@ -37,5 +40,23 @@ public record FruitThinningPrescriptionSnapshot(
      */
     public FruitThinningPrescriptionSnapshot {
         samplingRounds = (samplingRounds == null) ? List.of() : List.copyOf(samplingRounds);
+    }
+
+    /**
+     * Backward-compatible constructor for existing persistence/test call sites.
+     */
+    public FruitThinningPrescriptionSnapshot(
+            PrescriptionId id,
+            PlotId plotId,
+            CampaignYear campaignYear,
+            Long observedPlotRevision,
+            PrescriptionStatus status,
+            SustainableCropLoad sustainableLoad,
+            List<SamplingRoundSnapshot> samplingRounds,
+            ExecutionConfirmationSnapshot executionConfirmation,
+            Long revision
+    ) {
+        this(id, plotId, campaignYear, observedPlotRevision, status, sustainableLoad,
+                null, samplingRounds, executionConfirmation, revision);
     }
 }
