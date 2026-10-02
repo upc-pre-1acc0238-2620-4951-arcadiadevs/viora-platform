@@ -244,7 +244,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         registerDomainEvent(new ThinningExecutionConfirmedEvent(UUID.randomUUID().toString(),
                 executionConfirmation.id().confirmationId(), id.prescriptionId(), plotId.plotId(),
                 campaignYear.value(), executionDate, actualRemovalPercentage, removedKg, laborCrewSize,
-                executionConfirmation.timeliness().name(), executionConfirmation.recordedAt()));
+                executionConfirmation.timeliness().name(), executionConfirmation.recordedAt(),
+                sustainableLoad.percentageToRemove()));
     }
 
     /** Returns the immutable state for persistence and queries. */
