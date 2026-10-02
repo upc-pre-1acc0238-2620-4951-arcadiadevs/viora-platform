@@ -102,4 +102,41 @@ class OrchardContextFacadeImplTest {
         assertThat(facade.existsActivePlot("   ")).isFalse();
         assertThat(facade.existsActivePlot("not-a-valid-uuid")).isFalse();
     }
+
+    @Test
+    @DisplayName("Should expose the variety name of an active plot only")
+    void shouldExposeVarietyOfActivePlotOnly() {
+        var activePlot = mock(Plot.class);
+        when(activePlot.snapshot()).thenReturn(snapshot(OliveVariety.SEVILLANA, PlotStatus.ACTIVE));
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(activePlot));
+        assertThat(facade.findPlotVariety(plotId.toString())).contains("SEVILLANA");
+
+        var removedPlot = mock(Plot.class);
+        when(removedPlot.snapshot()).thenReturn(snapshot(OliveVariety.SEVILLANA, PlotStatus.REMOVED_SOFT_DELETE));
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(removedPlot));
+        assertThat(facade.findPlotVariety(plotId.toString())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return no variety when plotId is null, blank, or malformed UUID")
+    void shouldReturnNoVarietyWhenPlotIdInvalid() {
+        assertThat(facade.findPlotVariety(null)).isEmpty();
+        assertThat(facade.findPlotVariety(" ")).isEmpty();
+        assertThat(facade.findPlotVariety("not-a-valid-uuid")).isEmpty();
+    }
+
+    private PlotSnapshot snapshot(OliveVariety variety, PlotStatus status) {
+        return new PlotSnapshot(
+                new PlotId(plotId.toString()),
+                new ProducerId(UUID.randomUUID().toString()),
+                new PlotName("Cuartel Variedad"),
+                variety,
+                new PlotGeometry("{\"type\":\"Polygon\",\"coordinates\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}", 1.0),
+                new PlantationFrame(7.0, 5.0),
+                new TreeDensity(286),
+                null,
+                status,
+                0L
+        );
+    }
 }
