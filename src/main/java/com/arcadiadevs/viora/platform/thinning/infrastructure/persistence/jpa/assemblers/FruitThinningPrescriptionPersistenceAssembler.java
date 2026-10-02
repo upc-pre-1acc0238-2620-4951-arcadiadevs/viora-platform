@@ -44,6 +44,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             entity.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
             entity.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
         }
+        entity.setIssuedAt(snap.issuedAt());
 
         var roundEntities = new ArrayList<SamplingRoundPersistenceEntity>();
         for (var roundSnap : snap.samplingRounds()) {
@@ -92,6 +93,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             target.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
             target.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
         }
+        target.setIssuedAt(snap.issuedAt());
 
         // Synchronize sampling rounds (add newly appended rounds)
         for (var roundSnap : snap.samplingRounds()) {
@@ -172,6 +174,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 entity.getObservedPlotRevision(),
                 PrescriptionStatus.valueOf(entity.getStatus()),
                 load,
+                entity.getIssuedAt(),
                 roundSnapshots,
                 null,
                 entity.getRevision()
