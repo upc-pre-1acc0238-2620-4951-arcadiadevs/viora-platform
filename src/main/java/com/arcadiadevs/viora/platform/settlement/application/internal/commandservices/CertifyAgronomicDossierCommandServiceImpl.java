@@ -27,7 +27,8 @@ import java.time.Clock;
  *
  * <p>Error mapping: missing or inactive plot is a not-found; a campaign without settlement (including a plot
  * without report) is a business-rule violation (422); an already certified campaign or a campaign whose frozen
- * curve has insufficient settlements is a conflict (409); a rendering failure is an unexpected error (500) and
+ * curve lacks at least three consecutive settled campaigns (two consecutive pairs, whatever the baseline) is a
+ * conflict (409); a rendering failure is an unexpected error (500) and
  * leaves nothing stored and nothing published. Concurrent certifications are serialized by the report lock and
  * guarded by the unique constraint on report and campaign.</p>
  */

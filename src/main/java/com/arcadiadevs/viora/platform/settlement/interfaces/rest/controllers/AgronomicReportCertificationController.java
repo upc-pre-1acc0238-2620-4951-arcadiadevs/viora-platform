@@ -44,8 +44,9 @@ public class AgronomicReportCertificationController {
     @Operation(summary = "Certify agronomic dossier",
             description = "Certifies one settled campaign of the plot: renders its PDF dossier, stores the exact bytes "
                     + "with their SHA-256 verification hash and the declared collegiate signature, and publishes "
-                    + "AgronomicDossierGeneratedEvent. A campaign can be certified once; campaigns whose frozen "
-                    + "stabilization curve has insufficient settlements cannot be certified yet.")
+                    + "AgronomicDossierGeneratedEvent. A campaign can be certified once, and only when its frozen "
+                    + "curve has at least three consecutive settled campaigns (two consecutive pairs), whatever the "
+                    + "baseline; earlier campaigns cannot be certified yet.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Campaign certified",
                     content = @Content(schema = @Schema(implementation = DossierCertificationResource.class))),
@@ -54,7 +55,7 @@ public class AgronomicReportCertificationController {
             @ApiResponse(responseCode = "404", description = "Plot not found or not active",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "409", description = "Campaign already certified, certification race, or "
-                    + "insufficient settlement history for its stabilization curve",
+                    + "fewer than three consecutive settled campaigns in its frozen curve",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "422", description = "The campaign has no official settlement",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),

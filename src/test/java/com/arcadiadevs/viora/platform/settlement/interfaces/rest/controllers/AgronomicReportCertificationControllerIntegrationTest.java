@@ -80,16 +80,16 @@ class AgronomicReportCertificationControllerIntegrationTest {
     @Test
     void certifiesASettledCampaignWithTheRealHashOfTheStoredPdf() throws Exception {
         var plotId = createPlot("CRIOLLA");
-        settle(plotId, 2026, 8200, 6050).andExpect(status().isCreated());
+        settleThreeConsecutive(plotId);
         var before = Instant.now();
 
-        var response = certify(plotId, 2026, "CIP-49120-ING-AGRONOMO-SANCHEZ", "Agronomist Sanchez", "49120",
+        var response = certify(plotId, 2028, "CIP-49120-ING-AGRONOMO-SANCHEZ", "Agronomist Sanchez", "49120",
                 "Verificación de campaña – Sánchez")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.certificationId").isNotEmpty())
                 .andExpect(jsonPath("$.reportId").isNotEmpty())
                 .andExpect(jsonPath("$.plotId").value(plotId))
-                .andExpect(jsonPath("$.campaignYear").value(2026))
+                .andExpect(jsonPath("$.campaignYear").value(2028))
                 .andExpect(jsonPath("$.auditorSignature").value("CIP-49120-ING-AGRONOMO-SANCHEZ"))
                 .andExpect(jsonPath("$.certifiedBy").value("Agronomist Sanchez"))
                 .andExpect(jsonPath("$.cipNumber").value("49120"))
@@ -98,7 +98,7 @@ class AgronomicReportCertificationControllerIntegrationTest {
 
         String hash = JsonPath.read(response, "$.verificationHash");
         assertTrue(hash.matches("[0-9a-f]{64}"));
-        var stored = stored(plotId, 2026);
+        var stored = stored(plotId, 2028);
         assertEquals(hash, hashService.sha256(stored.document().content()).value());
         assertEquals(hash, stored.metadata().verificationHash().value());
         assertEquals(JsonPath.read(response, "$.certificationId"), stored.id().certificationId());
@@ -106,15 +106,15 @@ class AgronomicReportCertificationControllerIntegrationTest {
         assertFalse(stored.metadata().certifiedAt().isBefore(before.minusSeconds(1)));
         assertEquals("Verificación de campaña – Sánchez", stored.notes());
         var text = pdfText(stored.document().content());
-        assertTrue(text.contains("Campaign 2026"));
+        assertTrue(text.contains("Campaign 2028"));
         assertTrue(text.contains("CIP-49120-ING-AGRONOMO-SANCHEZ"));
         assertTrue(text.contains("Verificación de campaña – Sánchez"));
-        assertTrue(text.contains("Total harvest (kg) 14250.00"));
+        assertTrue(text.contains("Total harvest (kg) 250.00"));
         assertFalse(text.contains(hash));
         assertEquals(1, eventsOf(plotId).size());
         var event = eventsOf(plotId).getFirst();
         assertEquals(hash, event.verificationHash());
-        assertEquals(2026, event.campaignYear());
+        assertEquals(2028, event.campaignYear());
         assertEquals(stored.id().certificationId(), event.certificationId());
         assertEquals(stored.metadata().certifiedAt(), event.certifiedAt());
     }
@@ -122,20 +122,20 @@ class AgronomicReportCertificationControllerIntegrationTest {
     @Test
     void acceptsCertificationNotesAsAnAliasOfNotes() throws Exception {
         var plotId = createPlot("CRIOLLA");
-        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
+        settleThreeConsecutive(plotId);
         mvc.perform(post(route(plotId)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"campaignYear\":2026,\"auditorSignature\":\"sig\",\"certifiedBy\":\"Ing\","
+                        .content("{\"campaignYear\":2028,\"auditorSignature\":\"sig\",\"certifiedBy\":\"Ing\","
                                 + "\"cipNumber\":\"1\",\"certificationNotes\":\"Alias notes\"}"))
                 .andExpect(status().isCreated());
-        assertEquals("Alias notes", stored(plotId, 2026).notes());
+        assertEquals("Alias notes", stored(plotId, 2028).notes());
     }
 
     @Test
     void certifiesWithoutNotesAndStatesWhyStabilizationIsNotDeterminable() throws Exception {
         var plotId = createPlot("CRIOLLA");
-        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
-        certify(plotId, 2026, "sig", "Ing", "1", null).andExpect(status().isCreated());
-        var text = pdfText(stored(plotId, 2026).document().content());
+        settleThreeConsecutive(plotId);
+        certify(plotId, 2028, "sig", "Ing", "1", null).andExpect(status().isCreated());
+        var text = pdfText(stored(plotId, 2028).document().content());
         assertTrue(text.contains("Notes None"));
         assertTrue(text.contains("baseline missing"));
         assertFalse(text.contains("ARR"));
@@ -206,16 +206,16 @@ class AgronomicReportCertificationControllerIntegrationTest {
     @Test
     void certifyingTheSameCampaignAgainIsAConflictThatKeepsTheFirstUntouched() throws Exception {
         var plotId = createPlot("CRIOLLA");
-        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
-        certify(plotId, 2026, "first signature", "Ing One", "1", "first").andExpect(status().isCreated());
-        var first = stored(plotId, 2026);
+        settleThreeConsecutive(plotId);
+        certify(plotId, 2028, "first signature", "Ing One", "1", "first").andExpect(status().isCreated());
+        var first = stored(plotId, 2028);
 
-        certify(plotId, 2026, "second signature", "Ing Two", "2", "second")
+        certify(plotId, 2028, "second signature", "Ing Two", "2", "second")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.code").value("DOSSIERCERTIFICATION_CONFLICT"));
 
-        var after = stored(plotId, 2026);
+        var after = stored(plotId, 2028);
         assertEquals(first, after);
         assertArrayEquals(first.document().content(), after.document().content());
         assertEquals(1, certificationCount(plotId));
@@ -237,6 +237,29 @@ class AgronomicReportCertificationControllerIntegrationTest {
         certify(plotId, 2027, "sig", "Ing", "1", null).andExpect(status().isConflict());
         assertEquals(0, certificationCount(plotId));
         assertTrue(eventsOf(plotId).isEmpty());
+    }
+
+    @Test
+    void aPlotWithoutPhenologyHistoryAndFewerThanThreeConsecutiveSettlementsIsAConflict() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
+
+        certify(plotId, 2026, "sig", "Ing", "1", null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOSSIERCERTIFICATION_CONFLICT"))
+                .andExpect(jsonPath("$.detail").value("The stabilization curve of this campaign has insufficient "
+                        + "settlement history; it cannot be certified yet."));
+        settle(plotId, 2027, 300, 100).andExpect(status().isCreated());
+        certify(plotId, 2027, "sig", "Ing", "1", null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOSSIERCERTIFICATION_CONFLICT"));
+        assertEquals(0, certificationCount(plotId));
+        assertTrue(eventsOf(plotId).isEmpty());
+
+        settle(plotId, 2028, 150, 100).andExpect(status().isCreated());
+        certify(plotId, 2028, "sig", "Ing", "1", null).andExpect(status().isCreated());
+        assertTrue(pdfText(stored(plotId, 2028).document().content()).contains("baseline missing"));
+        assertEquals(1, certificationCount(plotId));
     }
 
     @Test
@@ -276,13 +299,13 @@ class AgronomicReportCertificationControllerIntegrationTest {
     @Test
     void concurrentCertificationsOfTheSameCampaignStoreExactlyOne() throws Exception {
         var plotId = createPlot("CRIOLLA");
-        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
+        settleThreeConsecutive(plotId);
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         Callable<Integer> request = () -> {
             ready.countDown();
             assertTrue(start.await(10, TimeUnit.SECONDS));
-            return certify(plotId, 2026, "sig", "Ing", "1", null).andReturn().getResponse().getStatus();
+            return certify(plotId, 2028, "sig", "Ing", "1", null).andReturn().getResponse().getStatus();
         };
         try (var executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(request);
@@ -331,6 +354,12 @@ class AgronomicReportCertificationControllerIntegrationTest {
 
     private static String route(String plotId) {
         return "/api/v1/plots/" + plotId + "/certifications";
+    }
+
+    private void settleThreeConsecutive(String plotId) throws Exception {
+        settle(plotId, 2026, 100, 100).andExpect(status().isCreated());
+        settle(plotId, 2027, 300, 100).andExpect(status().isCreated());
+        settle(plotId, 2028, 150, 100).andExpect(status().isCreated());
     }
 
     private ResultActions settle(String plotId, int year, double green, double black) throws Exception {

@@ -40,7 +40,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        command = new CertifyAgronomicDossierCommand(plotId, 2026, "CIP-49120-SANCHEZ", "Ing. Sanchez", "49120",
+        command = new CertifyAgronomicDossierCommand(plotId, 2028, "CIP-49120-SANCHEZ", "Ing. Sanchez", "49120",
                 "Verified");
         when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
         when(reports.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -51,6 +51,17 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         var report = AgronomicReport.createForPlot(new PlotId(plotId), new UserId(owner));
         report.settleCampaign(new CampaignYear(year), new OliveWeight(1000.0), new OliveWeight(0.0), null, null,
                 ThinningBalance.notRecorded(), history, SETTLEMENT_CLOCK);
+        report.clearDomainEvents();
+        return report;
+    }
+
+    private AgronomicReport reportWithThreeConsecutiveSettlements() {
+        var report = AgronomicReport.createForPlot(new PlotId(plotId), new UserId(owner));
+        double[] kilograms = {1000.0, 3000.0, 1500.0};
+        for (int i = 0; i < kilograms.length; i++) {
+            report.settleCampaign(new CampaignYear(2026 + i), new OliveWeight(kilograms[i]), new OliveWeight(0.0), null,
+                    null, ThinningBalance.notRecorded(), new TreeMap<>(), SETTLEMENT_CLOCK);
+        }
         report.clearDomainEvents();
         return report;
     }
@@ -95,7 +106,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
     @Test
     void returnsConflictWhenTheFrozenCurveHasInsufficientSettlements() {
         when(reports.findByPlotIdForUpdate(any())).thenReturn(
-                Optional.of(reportWithSettlement(2026, alternatingHistory())));
+                Optional.of(reportWithSettlement(2028, alternatingHistory())));
         var error = service.handle(command).failure().orElseThrow();
         assertEquals("DOSSIERCERTIFICATION_CONFLICT", error.code());
         assertEquals("settlement.certification.insufficient_settlements", error.details());
@@ -105,7 +116,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
 
     @Test
     void returnsConflictWhenTheCampaignIsAlreadyCertified() {
-        var report = reportWithSettlement(2026, new TreeMap<>());
+        var report = reportWithThreeConsecutiveSettlements();
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(report));
         assertTrue(service.handle(command).isSuccess());
         clearInvocations(reports, publisher, pdf);
@@ -120,7 +131,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
 
     @Test
     void aRenderingFailureIsAnUnexpectedErrorThatStoresAndPublishesNothing() {
-        when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(reportWithSettlement(2026, new TreeMap<>())));
+        when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(reportWithThreeConsecutiveSettlements()));
         when(pdf.renderPdf(any())).thenThrow(new DossierRenderingException("settlement.certification.render.failed"));
 
         var error = service.handle(command).failure().orElseThrow();
@@ -133,7 +144,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
 
     @Test
     void savesThenPublishesExactlyOneEventAndUsesTheInjectedClock() {
-        var report = reportWithSettlement(2026, new TreeMap<>());
+        var report = reportWithThreeConsecutiveSettlements();
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(report));
 
         var certification = service.handle(command).success().orElseThrow();
@@ -152,7 +163,7 @@ class CertifyAgronomicDossierCommandServiceImplTest {
 
     @Test
     void publishesTheHashOfTheStoredBytes() {
-        var report = reportWithSettlement(2026, new TreeMap<>());
+        var report = reportWithThreeConsecutiveSettlements();
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.of(report));
         var captured = org.mockito.ArgumentCaptor.forClass(Object.class);
 

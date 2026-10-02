@@ -159,6 +159,13 @@ class AgronomicReportTest {
                 ThinningBalance.notRecorded(), history(), CLOCK);
     }
 
+    /** Settles three consecutive campaigns (2026-2028) so that 2028 has a managed alternation index. */
+    private void settleThreeConsecutive(AgronomicReport report) {
+        settle(report, 2026, 100, 100);
+        settle(report, 2027, 300, 100);
+        settle(report, 2028, 150, 100);
+    }
+
     private DossierCertificationSnapshot certify(AgronomicReport report, int year) {
         return report.certifyCampaign(new CampaignYear(year), signature, certifier, "Verified", generator,
                 hashService, CERTIFICATION_CLOCK);
@@ -167,25 +174,25 @@ class AgronomicReportTest {
     @Test
     void certifiesASettledCampaignAndPublishesTheEvent() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 8200, 6050);
+        settleThreeConsecutive(report);
         report.clearDomainEvents();
 
-        var certification = certify(report, 2026);
+        var certification = certify(report, 2028);
 
         assertEquals(report.snapshot().id(), certification.reportId());
         assertEquals(plotId, certification.plotId());
-        assertEquals(new CampaignYear(2026), certification.campaignYear());
+        assertEquals(new CampaignYear(2028), certification.campaignYear());
         assertEquals(signature, certification.metadata().auditorSignature());
         assertEquals(certifier, certification.certifier());
         assertEquals("Verified", certification.notes());
-        assertEquals(certification, report.certificationOf(new CampaignYear(2026)).orElseThrow());
+        assertEquals(certification, report.certificationOf(new CampaignYear(2028)).orElseThrow());
         assertEquals(1, report.snapshot().certifications().size());
         assertEquals(1, report.domainEvents().size());
         var event = (AgronomicDossierGeneratedEvent) report.domainEvents().iterator().next();
         assertEquals(certification.id().certificationId(), event.certificationId());
         assertEquals(report.snapshot().id().reportId(), event.reportId());
         assertEquals(plotId.plotId(), event.plotId());
-        assertEquals(2026, event.campaignYear());
+        assertEquals(2028, event.campaignYear());
         assertEquals(certification.metadata().verificationHash().value(), event.verificationHash());
         assertEquals(signature.value(), event.auditorSignature());
         assertEquals(certification.metadata().certifiedAt(), event.certifiedAt());
@@ -195,9 +202,9 @@ class AgronomicReportTest {
     @Test
     void hashesTheExactStoredBytesAndStampsOneClockInstant() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 8200, 6050);
+        settleThreeConsecutive(report);
 
-        var certification = certify(report, 2026);
+        var certification = certify(report, 2028);
 
         var bytes = certification.document().content();
         assertEquals(hashService.sha256(bytes), certification.metadata().verificationHash());
@@ -209,14 +216,15 @@ class AgronomicReportTest {
     @Test
     void rendersTheFrozenSettlementOfThatCampaignOnly() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        var first = settle(report, 2026, 7000, 0);
-        settle(report, 2027, 0, 5000);
+        settleThreeConsecutive(report);
+        var first = report.settlementOf(new CampaignYear(2028)).orElseThrow();
+        settle(report, 2029, 0, 5000);
 
-        certify(report, 2026);
+        certify(report, 2028);
 
         var content = rendered.getFirst();
         assertEquals(first, content.settlement());
-        assertEquals(new CampaignYear(2026), content.campaignYear());
+        assertEquals(new CampaignYear(2028), content.campaignYear());
         assertEquals(producer, content.producerId());
         assertEquals(signature, content.signature());
         assertEquals(certifier, content.certifier());
@@ -242,11 +250,11 @@ class AgronomicReportTest {
     @Test
     void rejectsCertifyingTheSameCampaignTwiceWithoutChangingTheFirst() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
-        var first = certify(report, 2026);
+        settleThreeConsecutive(report);
+        var first = certify(report, 2028);
         report.clearDomainEvents();
 
-        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2026));
+        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2028));
 
         assertEquals("settlement.certification.already_certified", error.getMessage());
         assertEquals(List.of(first), report.snapshot().certifications());
@@ -271,12 +279,31 @@ class AgronomicReportTest {
     }
 
     @Test
+    void rejectsInsufficientSettlementsEvenWhenTheBaselineIsMissing() {
+        var report = AgronomicReport.createForPlot(plotId, producer);
+        settle(report, 2026, 100, 100);
+        settle(report, 2027, 300, 100);
+        // the status reports the missing baseline first, yet two settlements are still not enough
+        assertEquals(StabilizationStatus.INSUFFICIENT_BASELINE,
+                report.settlementOf(new CampaignYear(2027)).orElseThrow().trendCurve().status());
+        report.clearDomainEvents();
+
+        var error = assertThrows(IllegalStateException.class, () -> certify(report, 2027));
+
+        assertEquals("settlement.certification.insufficient_settlements", error.getMessage());
+        assertTrue(report.snapshot().certifications().isEmpty());
+        assertEquals(0, renderCount);
+    }
+
+    @Test
     void certifiesWhenTheBaselineIsMissingOrTheCurveIsEvaluated() {
         var withoutBaseline = AgronomicReport.createForPlot(plotId, producer);
         settle(withoutBaseline, 2026, 100, 100);
+        settle(withoutBaseline, 2027, 300, 100);
+        settle(withoutBaseline, 2028, 150, 100);
         assertEquals(StabilizationStatus.INSUFFICIENT_BASELINE,
-                withoutBaseline.settlementOf(new CampaignYear(2026)).orElseThrow().trendCurve().status());
-        assertDoesNotThrow(() -> certify(withoutBaseline, 2026));
+                withoutBaseline.settlementOf(new CampaignYear(2028)).orElseThrow().trendCurve().status());
+        assertDoesNotThrow(() -> certify(withoutBaseline, 2028));
 
         var evaluated = AgronomicReport.createForPlot(plotId, producer);
         settleWithHistory(evaluated, 2026, 7000);
@@ -292,38 +319,39 @@ class AgronomicReportTest {
     @Test
     void certifyingALaterCampaignKeepsTheEarlierCertificationIdentical() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
-        var first = certify(report, 2026);
+        settleThreeConsecutive(report);
+        var first = certify(report, 2028);
         var firstBytes = first.document().content();
         var firstHash = first.metadata().verificationHash();
 
-        settle(report, 2027, 300, 100);
-        var second = certify(report, 2027);
+        settle(report, 2029, 300, 100);
+        var second = certify(report, 2029);
 
-        var reloaded = report.certificationOf(new CampaignYear(2026)).orElseThrow();
+        var reloaded = report.certificationOf(new CampaignYear(2028)).orElseThrow();
         assertEquals(first, reloaded);
         assertArrayEquals(firstBytes, reloaded.document().content());
         assertEquals(firstHash, reloaded.metadata().verificationHash());
         assertEquals(first.metadata(), reloaded.metadata());
         assertEquals(2, report.snapshot().certifications().size());
         assertNotEquals(firstHash, second.metadata().verificationHash());
-        assertEquals(second, report.certificationOf(new CampaignYear(2027)).orElseThrow());
+        assertEquals(second, report.certificationOf(new CampaignYear(2029)).orElseThrow());
     }
 
     @Test
     void settlementsAreUntouchedByCertification() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        var settlement = settle(report, 2026, 100, 100);
-        certify(report, 2026);
-        assertEquals(settlement, report.settlementOf(new CampaignYear(2026)).orElseThrow());
-        assertEquals(1, report.snapshot().settlements().size());
+        settleThreeConsecutive(report);
+        var settlement = report.settlementOf(new CampaignYear(2028)).orElseThrow();
+        certify(report, 2028);
+        assertEquals(settlement, report.settlementOf(new CampaignYear(2028)).orElseThrow());
+        assertEquals(3, report.snapshot().settlements().size());
     }
 
     @Test
     void theSnapshotExposesDefensiveCopiesOfTheDocument() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
-        var certification = certify(report, 2026);
+        settleThreeConsecutive(report);
+        var certification = certify(report, 2028);
         var original = certification.document().content();
 
         var tampered = certification.document().content();
@@ -338,12 +366,12 @@ class AgronomicReportTest {
     @Test
     void aFailingRendererCertifiesNothing() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
+        settleThreeConsecutive(report);
         report.clearDomainEvents();
         AgronomicDossierPdfGenerator failing = content -> {
             throw new DossierRenderingException("settlement.certification.render.failed");
         };
-        assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2026), signature,
+        assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2028), signature,
                 certifier, null, failing, hashService, CERTIFICATION_CLOCK));
         assertTrue(report.snapshot().certifications().isEmpty());
         assertTrue(report.domainEvents().isEmpty());
@@ -352,9 +380,9 @@ class AgronomicReportTest {
     @Test
     void aRendererReturningNonPdfBytesIsATechnicalFailure() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
+        settleThreeConsecutive(report);
         AgronomicDossierPdfGenerator notPdf = content -> "{\"json\":true}".getBytes(StandardCharsets.UTF_8);
-        assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2026), signature,
+        assertThrows(DossierRenderingException.class, () -> report.certifyCampaign(new CampaignYear(2028), signature,
                 certifier, null, notPdf, hashService, CERTIFICATION_CLOCK));
         assertTrue(report.snapshot().certifications().isEmpty());
     }
@@ -379,10 +407,10 @@ class AgronomicReportTest {
     @Test
     void reconstitutionKeepsTheCertifications() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026, 100, 100);
-        var certification = certify(report, 2026);
+        settleThreeConsecutive(report);
+        var certification = certify(report, 2028);
         var restored = AgronomicReport.reconstitute(report.snapshot());
-        assertEquals(certification, restored.certificationOf(new CampaignYear(2026)).orElseThrow());
+        assertEquals(certification, restored.certificationOf(new CampaignYear(2028)).orElseThrow());
         assertTrue(restored.domainEvents().isEmpty());
     }
 }

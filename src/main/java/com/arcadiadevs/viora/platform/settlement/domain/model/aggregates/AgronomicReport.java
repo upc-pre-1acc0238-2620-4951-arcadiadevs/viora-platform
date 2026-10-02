@@ -139,8 +139,9 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      * @return the new certification
      * @throws IllegalArgumentException    if an argument is missing or invalid
      * @throws BusinessRuleException       if the campaign has no settlement
-     * @throws IllegalStateException       if the campaign is already certified or its frozen curve is
-     *                                     {@code INSUFFICIENT_SETTLEMENTS}
+     * @throws IllegalStateException       if the campaign is already certified or its frozen curve lacks the
+     *                                     consecutive settled campaigns needed for a managed alternation index,
+     *                                     whatever the baseline
      * @throws DossierRenderingException   if the PDF cannot be rendered; nothing is certified
      */
     public DossierCertificationSnapshot certifyCampaign(CampaignYear campaignYear, AuditorSignature signature,
@@ -160,7 +161,9 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         if (certificationOf(campaignYear).isPresent()) {
             throw new IllegalStateException("settlement.certification.already_certified");
         }
-        if (settlement.trendCurve().status() == StabilizationStatus.INSUFFICIENT_SETTLEMENTS) {
+        // Judged on the settled history itself: the curve status reports a missing baseline first and would
+        // hide insufficient settlements on plots without Phenology history.
+        if (settlement.trendCurve().managedAlternationIndex() == null) {
             throw new IllegalStateException("settlement.certification.insufficient_settlements");
         }
 

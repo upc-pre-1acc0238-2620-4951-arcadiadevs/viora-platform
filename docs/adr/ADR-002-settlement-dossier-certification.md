@@ -48,18 +48,19 @@ El capítulo 24 usa `/api/v1/plots/{plotId}/agronomic-reports/certifications`. S
 | Parcela inexistente o inactiva (ACL de Orchard) | 404 | `PLOT_NOT_FOUND` |
 | La campaña no tiene liquidación (incluye parcela sin reporte) | 422 | `BUSINESS_RULE_VIOLATION` |
 | Campaña ya certificada o carrera de certificaciones | 409 | `DOSSIERCERTIFICATION_CONFLICT` / integridad de datos |
-| La curva congelada de esa campaña es `INSUFFICIENT_SETTLEMENTS` | 409 | `DOSSIERCERTIFICATION_CONFLICT` |
+| La curva congelada de esa campaña no tiene índice de alternancia gestionada (`managedAlternationIndex == null`: menos de 3 campañas liquidadas consecutivas), con o sin línea base | 409 | `DOSSIERCERTIFICATION_CONFLICT` |
 | Fallo al generar el PDF | 500 | `UNEXPECTED_ERROR`, sin persistir ni publicar |
 
 **Cambio respecto de la auditoría 21.** La auditoría proponía 404 cuando no existe el reporte. Se separa la identidad de la parcela (404) de la precondición de campaña (422, solicitado por TS40): una parcela activa sin liquidación de esa campaña responde 422, exista o no el reporte. No se comprueba la titularidad (no hay 403): el contrato de la rama 21 no la define y el actor depende de IAM, diferido.
 
 ## 3. Regla de suficiencia
 
-Solo se rechaza con 409 la campaña cuya curva **congelada** en su liquidación es `INSUFFICIENT_SETTLEMENTS`. Se certifican `EVALUATED`, `INSUFFICIENT_BASELINE` y `NO_BASELINE_ALTERNATION`.
+Se rechaza con 409 la campaña cuya curva **congelada** en su liquidación no tiene índice de alternancia gestionada (`managedAlternationIndex == null`: menos de 3 campañas liquidadas consecutivas, es decir, menos de dos pares consecutivos), cualquiera que sea la línea base.
 
-- Consecuencia aceptada: en una parcela con historial previo suficiente, las dos primeras campañas liquidadas no se pueden certificar (la curva de ADR-001 exige 3 campañas seguidas). Se certifican a partir de la tercera.
-- Una parcela sin línea base suficiente sí se certifica, y el PDF declara explícitamente que la estabilización y el ARR no son determinables, y por qué (línea base ausente, sin alternancia o liquidaciones insuficientes). El ARR y la meta solo se imprimen con `EVALUATED`.
-- Esta regla fue aprobada por el responsable el 2026-10-02.
+- Por qué no se usa el estado de la curva: el calculador informa `INSUFFICIENT_BASELINE` antes que `INSUFFICIENT_SETTLEMENTS`. Con el estado como criterio, una parcela sin historial Phenology certificaría con una sola campaña, mientras que una parcela con historial necesitaría tres. El criterio se evalúa sobre el historial liquidado mismo.
+- Consecuencia aceptada: en toda parcela las dos primeras campañas liquidadas no se pueden certificar (la curva de ADR-001 exige 3 campañas seguidas). Se certifican a partir de la tercera consecutiva.
+- `EVALUATED`, `INSUFFICIENT_BASELINE` y `NO_BASELINE_ALTERNATION` se certifican cuando existe el índice gestionado, y el PDF declara explícitamente que la estabilización y el ARR no son determinables, y por qué (línea base ausente o sin alternancia). El ARR y la meta solo se imprimen con `EVALUATED`.
+- Esta regla fue aprobada por el responsable el 2026-10-02 y corregida el mismo día.
 
 ## 4. Modelo inmutable por campaña
 

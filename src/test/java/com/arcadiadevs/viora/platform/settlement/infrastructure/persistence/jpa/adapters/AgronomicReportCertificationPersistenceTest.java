@@ -49,6 +49,12 @@ class AgronomicReportCertificationPersistenceTest {
                 null, ThinningBalance.notRecorded(), new TreeMap<>(), SETTLEMENT_CLOCK);
     }
 
+    private void settleThreeConsecutive(AgronomicReport report) {
+        settle(report, 2026);
+        settle(report, 2027);
+        settle(report, 2028);
+    }
+
     private void certify(AgronomicReport report, int year, Clock clock) {
         report.certifyCampaign(new CampaignYear(year), new AuditorSignature("CIP-49120-SÁNCHEZ"),
                 new CertifierIdentity("Ing. Sánchez", "49120"), "Verificación de campaña – Sánchez", pdf, hashService,
@@ -58,18 +64,18 @@ class AgronomicReportCertificationPersistenceTest {
     @Test
     void certifiedDossiersSurviveAReloadWithTheirExactBytesAndHash() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026);
-        certify(report, 2026, FIRST_CLOCK);
-        var expected = report.certificationOf(new CampaignYear(2026)).orElseThrow();
+        settleThreeConsecutive(report);
+        certify(report, 2028, FIRST_CLOCK);
+        var expected = report.certificationOf(new CampaignYear(2028)).orElseThrow();
         transactions.executeWithoutResult(tx -> repository.save(report));
 
         var reloaded = transactions.execute(tx -> repository.findByPlotId(plotId).orElseThrow());
 
-        var stored = reloaded.certificationOf(new CampaignYear(2026)).orElseThrow();
+        var stored = reloaded.certificationOf(new CampaignYear(2028)).orElseThrow();
         assertEquals(expected.id(), stored.id());
         assertEquals(report.snapshot().id(), stored.reportId());
         assertEquals(plotId, stored.plotId());
-        assertEquals(new CampaignYear(2026), stored.campaignYear());
+        assertEquals(new CampaignYear(2028), stored.campaignYear());
         assertEquals("CIP-49120-SÁNCHEZ", stored.metadata().auditorSignature().value());
         assertEquals(Instant.parse("2026-10-03T09:30:00.123456Z"), stored.metadata().certifiedAt());
         assertEquals("Ing. Sánchez", stored.certifier().name());
@@ -79,32 +85,32 @@ class AgronomicReportCertificationPersistenceTest {
         assertEquals(expected.metadata().verificationHash(), stored.metadata().verificationHash());
         assertEquals(stored.metadata().verificationHash(), hashService.sha256(stored.document().content()));
         assertEquals(1, reloaded.snapshot().certifications().size());
-        assertEquals(1, reloaded.snapshot().settlements().size());
+        assertEquals(3, reloaded.snapshot().settlements().size());
     }
 
     @Test
     void appendingASecondCertificationKeepsTheFirstOneByteIdentical() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026);
-        certify(report, 2026, FIRST_CLOCK);
+        settleThreeConsecutive(report);
+        certify(report, 2028, FIRST_CLOCK);
         transactions.executeWithoutResult(tx -> repository.save(report));
         var firstBefore = transactions.execute(tx -> repository.findByPlotId(plotId).orElseThrow())
-                .certificationOf(new CampaignYear(2026)).orElseThrow();
+                .certificationOf(new CampaignYear(2028)).orElseThrow();
 
         transactions.executeWithoutResult(tx -> {
             var loaded = repository.findByPlotIdForUpdate(plotId).orElseThrow();
-            settle(loaded, 2027);
-            certify(loaded, 2027, SECOND_CLOCK);
+            settle(loaded, 2029);
+            certify(loaded, 2029, SECOND_CLOCK);
             repository.save(loaded);
         });
 
         var reloaded = transactions.execute(tx -> repository.findByPlotId(plotId).orElseThrow());
         assertEquals(2, reloaded.snapshot().certifications().size());
-        var firstAfter = reloaded.certificationOf(new CampaignYear(2026)).orElseThrow();
+        var firstAfter = reloaded.certificationOf(new CampaignYear(2028)).orElseThrow();
         assertEquals(firstBefore, firstAfter);
         assertArrayEquals(firstBefore.document().content(), firstAfter.document().content());
         assertEquals(firstBefore.metadata(), firstAfter.metadata());
-        var second = reloaded.certificationOf(new CampaignYear(2027)).orElseThrow();
+        var second = reloaded.certificationOf(new CampaignYear(2029)).orElseThrow();
         assertEquals(second.metadata().verificationHash(), hashService.sha256(second.document().content()));
         assertNotEquals(firstAfter.metadata().verificationHash(), second.metadata().verificationHash());
     }
@@ -112,13 +118,13 @@ class AgronomicReportCertificationPersistenceTest {
     @Test
     void storesTheDocumentAsABinaryColumnWithAUniqueReportCampaignConstraint() {
         var report = AgronomicReport.createForPlot(plotId, producer);
-        settle(report, 2026);
-        certify(report, 2026, FIRST_CLOCK);
+        settleThreeConsecutive(report);
+        certify(report, 2028, FIRST_CLOCK);
         transactions.executeWithoutResult(tx -> repository.save(report));
 
         var length = jdbc.queryForObject("select length(document_content) from dossier_certifications "
                 + "where report_id = ?", Integer.class, UUID.fromString(report.snapshot().id().reportId()));
-        assertEquals(report.certificationOf(new CampaignYear(2026)).orElseThrow().document().size(), length);
+        assertEquals(report.certificationOf(new CampaignYear(2028)).orElseThrow().document().size(), length);
         assertEquals(1, jdbc.queryForObject("select count(*) from information_schema.table_constraints "
                 + "where lower(constraint_name) = 'uq_certification_report_campaign'", Integer.class));
     }
