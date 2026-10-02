@@ -118,6 +118,22 @@ class OrchardContextFacadeImplTest {
     }
 
     @Test
+    @DisplayName("Should expose the owner producer of an active plot only")
+    void shouldExposeOwnerOfActivePlotOnly() {
+        var activePlot = mock(Plot.class);
+        var snapshot = snapshot(OliveVariety.CRIOLLA, PlotStatus.ACTIVE);
+        when(activePlot.snapshot()).thenReturn(snapshot);
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(activePlot));
+        assertThat(facade.findPlotProducerId(plotId.toString())).contains(snapshot.producerId().producerId());
+
+        var removedPlot = mock(Plot.class);
+        when(removedPlot.snapshot()).thenReturn(snapshot(OliveVariety.CRIOLLA, PlotStatus.REMOVED_SOFT_DELETE));
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(removedPlot));
+        assertThat(facade.findPlotProducerId(plotId.toString())).isEmpty();
+        assertThat(facade.findPlotProducerId("not-a-valid-uuid")).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should return no variety when plotId is null, blank, or malformed UUID")
     void shouldReturnNoVarietyWhenPlotIdInvalid() {
         assertThat(facade.findPlotVariety(null)).isEmpty();
