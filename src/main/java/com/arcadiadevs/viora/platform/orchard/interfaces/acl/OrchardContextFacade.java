@@ -25,4 +25,12 @@ public interface OrchardContextFacade {
      * @return Optional containing double array [latitude, longitude], or empty if plot is not found or not active
      */
     Optional<double[]> findPlotCentroid(String plotId);
+
+    /**
+     * Retrieves the olive variety name of an active plot (for example {@code SEVILLANA}).
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @return Optional containing the variety name, or empty if plot is not found or not active
+     */
+    Optional<String> findPlotVariety(String plotId);
 }

@@ -20,6 +20,9 @@ public interface FruitThinningPrescriptionRepository {
      */
     Optional<FruitThinningPrescription> findById(PrescriptionId id);
 
+    /** Loads and locks a prescription until the caller's transaction completes. */
+    Optional<FruitThinningPrescription> findByIdForUpdate(PrescriptionId id);
+
     /**
      * Finds a thinning prescription aggregate associated with a plot and campaign year.
      *

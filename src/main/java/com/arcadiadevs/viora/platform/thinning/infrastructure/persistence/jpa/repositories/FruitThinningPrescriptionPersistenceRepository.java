@@ -2,6 +2,10 @@ package com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.r
 
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.FruitThinningPrescriptionPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -22,4 +26,10 @@ public interface FruitThinningPrescriptionPersistenceRepository
      * @return optional containing the entity if found
      */
     Optional<FruitThinningPrescriptionPersistenceEntity> findByPlotIdAndCampaignYear(UUID plotId, Integer campaignYear);
+
+    /** Locks the parent row before reading its execution evidence. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from FruitThinningPrescriptionPersistenceEntity p where p.id = :id")
+    Optional<FruitThinningPrescriptionPersistenceEntity> findByIdForUpdate(
+            @Param("id") UUID id);
 }
