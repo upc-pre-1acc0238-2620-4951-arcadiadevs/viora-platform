@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | **US09** Delimitar lote | Victor | P20–P26 | ✅ `POST /plots`, `GET /plots`, `GET /plots/{id}` | Opcional: fecha de registro y método de marcado (el diseño dice "registrado hoy con GPS"). El cupo del plan (P25) depende de suscripción (US06–US08, Sprint 3) | S | Victor |
 | **US10** Editar lote | Victor | P27–P29 | ✅ `PUT /plots/{id}` con `If-Match` (nombre, marco, poda, polígono) | ✅ `PUT /plots/{id}` acepta `variety` opcional (si se omite, se conserva). Sin restricción por muestreos o cosechas: el modelo de calibre se autocalibra con los datos del productor | — | Resuelto en `feature/plot-variety-edit` |
-| **US11** Baja de lote | Victor | P28, archivados | ✅ `DELETE /plots/{id}` (baja suave). ✅ **Listar archivados** (esta rama): `GET /plots?status=REMOVED_SOFT_DELETE` | Un lote archivado no se puede abrir por id (404), alcanza con los datos de la lista. No existe "restaurar" y el diseño no lo pide | — | — |
+| **US11** Baja de lote | Victor | P28, archivados | ✅ `DELETE /plots/{id}` (baja suave). ✅ **Listar archivados** (esta rama): `GET /plots?status=REMOVED_SOFT_DELETE` | Un lote archivado no se puede abrir por id (404), alcanza con los datos de la lista. ✅ **Restaurar** (`POST /plots/{id}/restore`, rama `feature/plot-restore`): vuelve a ACTIVE con su historial; 409 si el lote no está archivado | — | — |
 | **US13** Alta de nodo virtual | Diana | P85–P88 | ✅ `POST /plots/{id}/iot-devices` | — | — | — |
 | **US14** Inventario de nodos | Diana | P85 | ✅ `GET /plots/{id}/iot-devices` (estado y última lectura) | — | — | — |
 | **US15** Calibrar nodo | Diana | P87 | ✅ `PUT .../iot-devices/{id}` (multiplicador, textura, profundidad) | 🟡 No se puede **renombrar** el nodo (el reporte lo menciona) | S | Diana |
@@ -46,6 +46,7 @@
 1. **`DELETE /api/v1/plots/{plotId}/harvest-records/{recordId}`** (US21, escenario 2): quita el registro, recalcula el BBI sobre las campañas válidas que quedan y deja volver a registrar esa campaña. `If-Match` opcional. Respuestas: 200, 400 (`If-Match` malformado), 404 y 412.
 2. **`GET /api/v1/plots?status=`** (US11): `ACTIVE` (por defecto) o `REMOVED_SOFT_DELETE` para listar los archivados. Con `updatedSince` el delta sigue devolviendo todos los estados, y `status` lo acota.
 3. **Documentación corregida:** el estado público de un lote archivado es `REMOVED_SOFT_DELETE`; el OpenAPI decía `INACTIVE`, que no existe.
+4. **`POST /api/v1/plots/{id}/restore`** (US11): trae de vuelta un lote archivado, con su historial y su nombre (un lote archivado sigue reservando su nombre, así que restaurarlo nunca choca con otro). 200 con el lote (`status` ACTIVE y `revision` +1), 404 si no existe o es de otro productor, 409 si el lote no está archivado.
 
 ## 4. Orden sugerido en el backend
 
