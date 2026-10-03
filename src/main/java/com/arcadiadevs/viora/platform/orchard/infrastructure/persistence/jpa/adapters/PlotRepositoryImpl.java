@@ -51,7 +51,8 @@ public class PlotRepositoryImpl implements PlotRepository {
             entityToSave = PlotPersistenceAssembler.toPersistenceFromDomain(plot);
         }
 
-        var savedEntity = plotPersistenceRepository.save(entityToSave);
+        // Flushed so the @Version bump is already in the entity: the caller gets the revision that is stored.
+        var savedEntity = plotPersistenceRepository.saveAndFlush(entityToSave);
         return PlotPersistenceAssembler.toDomainFromPersistence(savedEntity);
     }
 
