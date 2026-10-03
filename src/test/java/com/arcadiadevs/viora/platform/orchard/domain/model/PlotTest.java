@@ -294,4 +294,47 @@ class PlotTest {
 
         assertThat(plot.snapshot().variety()).isEqualTo(OliveVariety.ARBEQUINA);
     }
+
+    @Test
+    @DisplayName("Should restore an archived plot, increment revision and register PlotRestoredEvent")
+    void shouldRestoreArchivedPlot() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Archivado"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.remove("No longer farmed");
+        plot.clearDomainEvents();
+
+        plot.restore();
+
+        var snap = plot.snapshot();
+        assertThat(snap.status()).isEqualTo(com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus.ACTIVE);
+        assertThat(snap.revision()).isEqualTo(2L);
+        assertThat(plot.domainEvents()).singleElement().isInstanceOfSatisfying(
+                com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotRestoredEvent.class,
+                event -> {
+                    assertThat(event.plotId()).isEqualTo(snap.id().plotId());
+                    assertThat(event.producerId()).isEqualTo(producerId.producerId());
+                    assertThat(event.revision()).isEqualTo(2L);
+                });
+    }
+
+    @Test
+    @DisplayName("Should throw PlotNotRemovedException when restoring a plot that is still active")
+    void shouldRejectRestoringActivePlot() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Activo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+
+        assertThatThrownBy(plot::restore)
+                .isInstanceOf(com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotNotRemovedException.class)
+                .hasMessage("plot.not_removed");
+    }
 }

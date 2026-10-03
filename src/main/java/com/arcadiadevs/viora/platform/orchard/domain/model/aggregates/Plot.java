@@ -1,9 +1,11 @@
 package com.arcadiadevs.viora.platform.orchard.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotAlreadyRemovedException;
+import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotNotRemovedException;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotDelimitedEvent;
 import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotRemovedEvent;
+import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotRestoredEvent;
 import com.arcadiadevs.viora.platform.orchard.domain.model.events.PlotUpdatedEvent;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
@@ -206,6 +208,26 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 this.id.plotId(),
                 this.producerId.producerId(),
                 effectiveReason,
+                Instant.now()
+        ));
+    }
+
+    /**
+     * Brings an archived plot back to the active inventory and dispatches a {@link PlotRestoredEvent}.
+     *
+     * @throws PlotNotRemovedException if the plot is not archived
+     */
+    public void restore() {
+        if (this.status != PlotStatus.REMOVED_SOFT_DELETE) {
+            throw new PlotNotRemovedException(this.id);
+        }
+        this.status = PlotStatus.ACTIVE;
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        registerDomainEvent(new PlotRestoredEvent(
+                this.id.plotId(),
+                this.producerId.producerId(),
+                this.revision,
                 Instant.now()
         ));
     }
