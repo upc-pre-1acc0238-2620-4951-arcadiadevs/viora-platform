@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.phenology.domain.model;
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.BiennialBearingIndexAssessedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.HarvestYieldRecordedEvent;
+import com.arcadiadevs.viora.platform.phenology.domain.model.events.HistoricalHarvestRemovedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
@@ -113,5 +114,85 @@ class ChillAccumulationTrackerTest {
                 1L
         )).isInstanceOf(com.arcadiadevs.viora.platform.phenology.domain.exceptions.HarvestRecordNotFoundException.class)
           .hasMessage("phenology.harvest_entry.not_found");
+    }
+
+    @Test
+    @DisplayName("Should remove a harvest record, recalculate BBI over the remaining campaigns, and increment revision")
+    void shouldRemoveHarvestRecordAndRecalculateBbi() {
+        var tracker = ChillAccumulationTracker.create(plotId, new CampaignYear(2022));
+        tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(10000.0));
+        var wrong = tracker.recordHarvest(new CampaignYear(2023), HarvestYield.ofTotal(5000.0));
+        tracker.recordHarvest(new CampaignYear(2024), HarvestYield.ofTotal(10000.0));
+        tracker.clearDomainEvents();
+
+        assertThat(tracker.snapshot().calculatedBbi().value()).isEqualTo(0.333);
+        assertThat(tracker.snapshot().revision()).isEqualTo(3L);
+
+        var removed = tracker.removeHarvestRecord(wrong.snapshot().id(), 3L);
+
+        assertThat(removed.snapshot().campaignYear().value()).isEqualTo(2023);
+        assertThat(tracker.snapshot().harvestHistory()).hasSize(2);
+        assertThat(tracker.snapshot().harvestHistory())
+                .noneMatch(e -> e.id().equals(wrong.snapshot().id()));
+        // Only 2022 and 2024 remain, both 10,000 kg: no alternation.
+        assertThat(tracker.snapshot().calculatedBbi().value()).isEqualTo(0.0);
+        assertThat(tracker.snapshot().revision()).isEqualTo(4L);
+        assertThat(tracker.domainEvents()).singleElement().isInstanceOfSatisfying(
+                HistoricalHarvestRemovedEvent.class,
+                event -> {
+                    assertThat(event.campaignYear()).isEqualTo(2023);
+                    assertThat(event.remainingCampaigns()).isEqualTo(2);
+                    assertThat(event.recalculatedBbi()).isEqualTo(0.0);
+                    assertThat(event.revision()).isEqualTo(4L);
+                });
+    }
+
+    @Test
+    @DisplayName("Should leave an empty history with a zero BBI when the only record is removed")
+    void shouldLeaveEmptyHistoryWhenOnlyRecordIsRemoved() {
+        var tracker = ChillAccumulationTracker.create(plotId, new CampaignYear(2022));
+        var only = tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(10000.0));
+
+        tracker.removeHarvestRecord(only.snapshot().id(), null);
+
+        assertThat(tracker.snapshot().harvestHistory()).isEmpty();
+        assertThat(tracker.snapshot().calculatedBbi().value()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("Should allow registering again a campaign whose record was removed")
+    void shouldAllowRecordingAgainARemovedCampaign() {
+        var tracker = ChillAccumulationTracker.create(plotId, new CampaignYear(2022));
+        var wrong = tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(1000.0));
+        tracker.removeHarvestRecord(wrong.snapshot().id(), null);
+
+        tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(10000.0));
+
+        assertThat(tracker.snapshot().harvestHistory()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should throw TrackerRevisionMismatchException when removing with an outdated revision")
+    void shouldThrowWhenRemovingWithRevisionMismatch() {
+        var tracker = ChillAccumulationTracker.create(plotId, new CampaignYear(2022));
+        var entry = tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(10000.0));
+
+        assertThatThrownBy(() -> tracker.removeHarvestRecord(entry.snapshot().id(), 99L))
+                .isInstanceOf(com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException.class)
+                .hasMessage("phenology.tracker.revision.mismatch");
+        assertThat(tracker.snapshot().harvestHistory()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should throw HarvestRecordNotFoundException when removing an unknown record")
+    void shouldThrowWhenRemovingUnknownRecord() {
+        var tracker = ChillAccumulationTracker.create(plotId, new CampaignYear(2022));
+        tracker.recordHarvest(new CampaignYear(2022), HarvestYield.ofTotal(10000.0));
+
+        var unknownId = new com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestEntryId();
+
+        assertThatThrownBy(() -> tracker.removeHarvestRecord(unknownId, null))
+                .isInstanceOf(com.arcadiadevs.viora.platform.phenology.domain.exceptions.HarvestRecordNotFoundException.class)
+                .hasMessage("phenology.harvest_entry.not_found");
     }
 }

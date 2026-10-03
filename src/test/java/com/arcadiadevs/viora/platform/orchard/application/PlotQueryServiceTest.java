@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.orchard.application;
 import com.arcadiadevs.viora.platform.orchard.application.internal.queryservices.PlotQueryServiceImpl;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -18,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,5 +97,38 @@ class PlotQueryServiceTest {
 
         assertThat(result).isEmpty();
         verify(plotRepository, times(1)).findActiveByProducerId(producerId);
+    }
+
+    @Test
+    @DisplayName("Should retrieve the removed plots when executing GetPlotsByProducerIdAndStatusQuery")
+    void shouldRetrieveRemovedPlotsByStatus() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Archivado"),
+                OliveVariety.SEVILLANA,
+                new PlotGeometry(validGeoJson, 0.92),
+                new PlantationFrame(7.0, 7.0)
+        );
+        plot.remove("Manual plot removal");
+
+        when(plotRepository.findByProducerIdAndStatus(producerId, PlotStatus.REMOVED_SOFT_DELETE))
+                .thenReturn(List.of(plot));
+
+        var result = plotQueryService.handle(new GetPlotsByProducerIdAndStatusQuery(producerId, PlotStatus.REMOVED_SOFT_DELETE));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().snapshot().status()).isEqualTo(PlotStatus.REMOVED_SOFT_DELETE);
+        verify(plotRepository, never()).findActiveByProducerId(any());
+    }
+
+    @Test
+    @DisplayName("Should reject a status query without producer or status")
+    void shouldRejectStatusQueryWithoutProducerOrStatus() {
+        assertThatThrownBy(() -> new GetPlotsByProducerIdAndStatusQuery(null, PlotStatus.ACTIVE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("producer.id.null_or_empty");
+        assertThatThrownBy(() -> new GetPlotsByProducerIdAndStatusQuery(producerId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("plot.status.null");
     }
 }

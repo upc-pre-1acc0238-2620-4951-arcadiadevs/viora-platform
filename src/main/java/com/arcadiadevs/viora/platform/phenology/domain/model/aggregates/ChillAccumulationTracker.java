@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisio
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.BiennialBearingIndexAssessedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.HarvestYieldRecordedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.HistoricalHarvestRectifiedEvent;
+import com.arcadiadevs.viora.platform.phenology.domain.model.events.HistoricalHarvestRemovedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.phenology.domain.services.HoblynBbiCalculatorService;
 
@@ -200,6 +201,50 @@ public class ChillAccumulationTracker extends AbstractDomainAggregateRoot<ChillA
                 plotId.plotId(),
                 calculatedBbi.value(),
                 targetEntry.snapshot().classification().name(),
+                Instant.now()
+        ));
+
+        return targetEntry;
+    }
+
+    /**
+     * Removes an erroneous or duplicated harvest record from the plot's history (US21, scenario 2),
+     * validating optimistic revision concurrency and recalculating Hoblyn's BBI over the campaigns
+     * that remain valid.
+     *
+     * @param entryId          the identifier of the entry to remove
+     * @param expectedRevision optional optimistic revision
+     * @return the removed {@link HistoricalHarvestEntry}
+     * @throws com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException if revision mismatches
+     * @throws com.arcadiadevs.viora.platform.phenology.domain.exceptions.HarvestRecordNotFoundException   if entryId is not found
+     */
+    public HistoricalHarvestEntry removeHarvestRecord(HarvestEntryId entryId, Long expectedRevision) {
+        if (entryId == null) {
+            throw new IllegalArgumentException("phenology.harvest_entry.id.null_or_empty");
+        }
+        if (expectedRevision != null && (this.revision == null || !expectedRevision.equals(this.revision))) {
+            long current = this.revision == null ? 0L : this.revision;
+            throw new TrackerRevisionMismatchException(this.id, current, expectedRevision);
+        }
+
+        var targetEntry = harvestHistory.stream()
+                .filter(e -> e.snapshot().id().equals(entryId))
+                .findFirst()
+                .orElseThrow(() -> new HarvestRecordNotFoundException(entryId));
+
+        harvestHistory.remove(targetEntry);
+
+        recalculateBearingMetrics();
+
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+
+        registerDomainEvent(new HistoricalHarvestRemovedEvent(
+                targetEntry.snapshot().id().harvestEntryId(),
+                plotId.plotId(),
+                targetEntry.snapshot().campaignYear().value(),
+                calculatedBbi.value(),
+                harvestHistory.size(),
+                this.revision,
                 Instant.now()
         ));
 

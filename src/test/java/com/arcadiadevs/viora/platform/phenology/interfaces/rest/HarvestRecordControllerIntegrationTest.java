@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHand
 import com.arcadiadevs.viora.platform.phenology.application.commandservices.HarvestRecordCommandService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
+import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -28,10 +30,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -307,6 +313,79 @@ class HarvestRecordControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/harvest-records/{recordId} should return 200 OK with a confirmation message")
+    void shouldReturnOkWhenRemovingHarvestRecord() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(RemoveHarvestRecordCommand.class)))
+                .thenReturn(Result.success(recordId));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "\"2\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("Harvest record deleted successfully")));
+
+        var captor = ArgumentCaptor.forClass(RemoveHarvestRecordCommand.class);
+        verify(harvestRecordCommandService).handle(captor.capture());
+        assertThat(captor.getValue().plotId()).isEqualTo(plotId.toString());
+        assertThat(captor.getValue().recordId()).isEqualTo(recordId);
+        assertThat(captor.getValue().expectedRevision()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/harvest-records/{recordId} should not require If-Match")
+    void shouldReturnOkWhenRemovingWithoutIfMatch() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(RemoveHarvestRecordCommand.class)))
+                .thenReturn(Result.success(recordId));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId))
+                .andExpect(status().isOk());
+
+        var captor = ArgumentCaptor.forClass(RemoveHarvestRecordCommand.class);
+        verify(harvestRecordCommandService).handle(captor.capture());
+        assertThat(captor.getValue().expectedRevision()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/harvest-records/{recordId} should return 404 Not Found when the record does not exist")
+    void shouldReturnNotFoundWhenRemovingUnknownHarvestRecord() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(RemoveHarvestRecordCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("HarvestRecord", recordId)));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/harvest-records/{recordId} should return 412 Precondition Failed when revision mismatches")
+    void shouldReturnPreconditionFailedWhenRemovingWithRevisionMismatch() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        when(harvestRecordCommandService.handle(any(RemoveHarvestRecordCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.preconditionFailed("tracker", "phenology.tracker.revision.mismatch")));
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "\"1\""))
+                .andExpect(status().isPreconditionFailed());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/plots/{plotId}/harvest-records/{recordId} should return 400 Bad Request on malformed If-Match")
+    void shouldReturnBadRequestWhenRemovingWithMalformedIfMatch() throws Exception {
+        var recordId = UUID.randomUUID().toString();
+
+        mockMvc.perform(delete("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
+                        .header("If-Match", "abc-invalid"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(harvestRecordCommandService);
     }
 }
 
