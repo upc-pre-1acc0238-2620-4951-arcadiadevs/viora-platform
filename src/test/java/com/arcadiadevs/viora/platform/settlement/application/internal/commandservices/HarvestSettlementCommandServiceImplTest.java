@@ -28,7 +28,8 @@ class HarvestSettlementCommandServiceImplTest {
     private final ExternalPhenologyService phenology = mock(ExternalPhenologyService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final HarvestSettlementCommandServiceImpl service =
-            new HarvestSettlementCommandServiceImpl(reports, thinningRecords, orchard, phenology, publisher);
+            new HarvestSettlementCommandServiceImpl(reports, thinningRecords, orchard, phenology, publisher,
+                    java.time.Clock.fixed(java.time.Instant.parse("2026-10-02T12:00:00Z"), java.time.ZoneOffset.UTC));
     private final String plotId = UUID.randomUUID().toString();
     private final String owner = UUID.randomUUID().toString();
     private SettleCampaignHarvestCommand command;
@@ -60,6 +61,7 @@ class HarvestSettlementCommandServiceImplTest {
         when(reports.findByPlotIdForUpdate(any())).thenReturn(Optional.empty());
         var settlement = service.handle(command).success().orElseThrow();
         assertEquals(14250.0, settlement.totalHarvestWeight().kilograms());
+        assertEquals(java.time.Instant.parse("2026-10-02T12:00:00Z"), settlement.settledAt());
         assertEquals(ThinningComplianceStatus.NOT_RECORDED, settlement.thinningBalance().status());
         var order = inOrder(reports, publisher);
         order.verify(reports).save(any());
