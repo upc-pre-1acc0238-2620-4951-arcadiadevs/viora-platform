@@ -2,9 +2,11 @@ package com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa
 
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.AgronomicReport;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.AgronomicReportSnapshot;
+import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.DossierCertificationSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.AgronomicReportPersistenceEntity;
+import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.DossierCertificationPersistenceEntity;
 import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.HarvestSettlementPersistenceEntity;
 
 import java.util.HashSet;
@@ -23,6 +25,7 @@ public final class AgronomicReportPersistenceAssembler {
         entity.setPlotId(UUID.fromString(snapshot.plotId().plotId()));
         entity.setProducerId(UUID.fromString(snapshot.producerId().userId()));
         appendNewSettlements(entity, snapshot);
+        appendNewCertifications(entity, snapshot);
         return entity;
     }
 
@@ -38,14 +41,30 @@ public final class AgronomicReportPersistenceAssembler {
         }
     }
 
+    /** Certifications are immutable: only the ones missing in the entity are appended. */
+    public static void appendNewCertifications(AgronomicReportPersistenceEntity entity,
+            AgronomicReportSnapshot snapshot) {
+        var known = new HashSet<UUID>();
+        entity.getCertifications().forEach(c -> known.add(c.getId()));
+        for (var certification : snapshot.certifications()) {
+            UUID id = UUID.fromString(certification.id().certificationId());
+            if (!known.contains(id)) {
+                entity.getCertifications().add(toEntity(entity, certification));
+            }
+        }
+    }
+
     public static AgronomicReport toDomain(AgronomicReportPersistenceEntity entity) {
         var reportId = new ReportId(entity.getId().toString());
         var plotId = new PlotId(entity.getPlotId().toString());
         var settlements = entity.getSettlements().stream()
                 .map(s -> toSnapshot(reportId, plotId, s))
                 .toList();
+        var certifications = entity.getCertifications().stream()
+                .map(c -> toSnapshot(reportId, plotId, c))
+                .toList();
         return AgronomicReport.reconstitute(new AgronomicReportSnapshot(reportId, plotId,
-                new UserId(entity.getProducerId().toString()), settlements, entity.getRevision()));
+                new UserId(entity.getProducerId().toString()), settlements, certifications, entity.getRevision()));
     }
 
     private static HarvestSettlementPersistenceEntity toEntity(AgronomicReportPersistenceEntity parent,
@@ -98,5 +117,29 @@ public final class AgronomicReportPersistenceAssembler {
                 new OliveWeight(entity.getBlackOlivesKg()), new OliveWeight(entity.getTotalYieldKg()),
                 entity.getCommercialFruitsPerKg(), entity.getNotes(), SettlementStatus.valueOf(entity.getStatus()),
                 entity.getSettledAt(), balance, curve);
+    }
+
+    private static DossierCertificationPersistenceEntity toEntity(AgronomicReportPersistenceEntity parent,
+            DossierCertificationSnapshot snapshot) {
+        var entity = new DossierCertificationPersistenceEntity();
+        entity.setId(UUID.fromString(snapshot.id().certificationId()));
+        entity.setReport(parent);
+        entity.setCampaignYear(snapshot.campaignYear().value());
+        entity.setVerificationHash(snapshot.metadata().verificationHash().value());
+        entity.setAuditorSignature(snapshot.metadata().auditorSignature().value());
+        entity.setCertifiedBy(snapshot.certifier().name());
+        entity.setCipNumber(snapshot.certifier().cipNumber());
+        entity.setNotes(snapshot.notes());
+        entity.setCertifiedAt(snapshot.metadata().certifiedAt());
+        return entity;
+    }
+
+    private static DossierCertificationSnapshot toSnapshot(ReportId reportId, PlotId plotId,
+            DossierCertificationPersistenceEntity entity) {
+        var metadata = new DossierMetadata(new VerificationHash(entity.getVerificationHash()),
+                new AuditorSignature(entity.getAuditorSignature()), entity.getCertifiedAt());
+        return new DossierCertificationSnapshot(new CertificationId(entity.getId().toString()), reportId, plotId,
+                new CampaignYear(entity.getCampaignYear()), metadata,
+                new CertifierIdentity(entity.getCertifiedBy(), entity.getCipNumber()), entity.getNotes());
     }
 }

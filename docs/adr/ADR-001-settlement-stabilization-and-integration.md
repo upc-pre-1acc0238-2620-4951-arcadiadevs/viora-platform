@@ -81,7 +81,7 @@ Phenology es un consumidor previsto de `CampaignHarvestSettledEvent`, pero **no 
 
 - La selección por campaña es `AgronomicReport.settlementOf(CampaignYear)`, que devuelve el snapshot congelado.
 - La certificación debe referenciar `reportId + campaignYear` y no sellar el reporte completo, para que las campañas futuras sigan siendo posibles.
-- `SettlementStatus.AUDITED` ya existe. La entidad de certificación, el PDF y el hash SHA-256 son de la rama 21.
+- `SettlementStatus.AUDITED` ya existe. La entidad de certificación, el PDF y el hash SHA-256 son de la rama 21 (decisiones en [ADR-002](ADR-002-settlement-dossier-certification.md)).
 
 ## 8. Pendientes explícitos (no cumplidos aquí)
 

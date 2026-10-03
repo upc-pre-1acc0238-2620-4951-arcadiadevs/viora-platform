@@ -58,7 +58,7 @@ Cualquier agente desarrollador o auditor ([backend-ddd-auditor](file:///home/san
 | Orden | Rama `feature/` | Endpoint Único | Propósito Táctico DDD |
 | :---: | :--- | :--- | :--- |
 | **20** | `feature/settlement-settle-campaign-harvest` | `POST /api/v1/plots/{plotId}/harvest-settlements` | Balance comercial definitivo de aceituna verde y negra. |
-| **21** | `feature/settlement-certify-agronomic-dossier` | `POST /api/v1/plots/{plotId}/agronomic-reports/certifications` | Certificación oficial colegiada con hash criptográfico SHA-256. |
+| **21** | `feature/settlement-certify-agronomic-dossier` | `POST /api/v1/plots/{plotId}/certifications` | Certificación oficial colegiada con hash criptográfico SHA-256. |
 
 ---
 
