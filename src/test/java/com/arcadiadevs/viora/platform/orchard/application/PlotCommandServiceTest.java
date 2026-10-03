@@ -339,4 +339,47 @@ class PlotCommandServiceTest {
         assertThat(result.isFailure()).isTrue();
         assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_CONFLICT");
     }
+
+    @Test
+    @DisplayName("Should correct the variety of a plot when the update command carries one")
+    void shouldCorrectVarietyWhenUpdatingPlot() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Antiguo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+        when(plotRepository.save(any(Plot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = plotCommandService.handle(new UpdatePlotCommand(
+                plotId.plotId(), prodId.producerId(), "Cuartel Antiguo", 7.0, 5.0, null, validGeoJson, "sevillana", 0L));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success().orElseThrow().snapshot().variety()).isEqualTo(OliveVariety.SEVILLANA);
+    }
+
+    @Test
+    @DisplayName("Should return a validation error when the corrected variety is unknown")
+    void shouldRejectUnknownVarietyWhenUpdatingPlot() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Antiguo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+
+        var result = plotCommandService.handle(new UpdatePlotCommand(
+                plotId.plotId(), prodId.producerId(), "Cuartel Antiguo", 7.0, 5.0, null, validGeoJson, "PICUAL", 0L));
+
+        assertThat(result.isFailure()).isTrue();
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
 }

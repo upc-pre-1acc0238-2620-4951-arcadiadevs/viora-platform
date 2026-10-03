@@ -118,11 +118,13 @@ public class PlotCommandServiceImpl implements PlotCommandService {
                 return Result.failure(ApplicationError.conflict("plot", "plot.name.duplicate"));
             }
 
+            var newVariety = command.variety() == null ? null : OliveVariety.from(command.variety());
             var newFrame = new PlantationFrame(command.rowSpacingM(), command.treeSpacingM());
             var newGeometry = cadastralGeometryService.computeGeometry(command.polygonGeoJson());
 
             plot.update(
                     newPlotName,
+                    newVariety,
                     newGeometry,
                     newFrame,
                     command.lastPruningDate(),

@@ -247,4 +247,51 @@ class PlotTest {
         assertThatThrownBy(() -> plot.remove("Segunda remocion"))
                 .isInstanceOf(PlotAlreadyRemovedException.class);
     }
+
+    @Test
+    @DisplayName("Should correct the variety when update receives a new one")
+    void shouldCorrectVarietyOnUpdate() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Variedad"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+
+        plot.update(
+                new PlotName("Cuartel Variedad"),
+                OliveVariety.SEVILLANA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0),
+                null,
+                0L
+        );
+
+        assertThat(plot.snapshot().variety()).isEqualTo(OliveVariety.SEVILLANA);
+        assertThat(plot.snapshot().revision()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Should keep the variety when update does not receive one")
+    void shouldKeepVarietyWhenUpdateOmitsIt() {
+        var plot = Plot.delimit(
+                producerId,
+                new PlotName("Cuartel Variedad"),
+                OliveVariety.ARBEQUINA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+
+        plot.update(
+                new PlotName("Cuartel Variedad"),
+                null,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0),
+                null,
+                0L
+        );
+
+        assertThat(plot.snapshot().variety()).isEqualTo(OliveVariety.ARBEQUINA);
+    }
 }

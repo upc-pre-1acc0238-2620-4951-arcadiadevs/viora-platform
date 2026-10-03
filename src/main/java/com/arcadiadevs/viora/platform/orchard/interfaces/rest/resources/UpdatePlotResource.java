@@ -37,6 +37,9 @@ public record UpdatePlotResource(
 
         @NotBlank(message = "Polygon GeoJSON cannot be blank")
         @Schema(description = "GeoJSON polygon geometry in WGS84 coordinates", example = "{\"type\":\"Polygon\",\"coordinates\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}")
-        String polygonGeoJson
+        String polygonGeoJson,
+
+        @Schema(description = "Corrected botanical olive variety; omit it to keep the current one", example = "SEVILLANA", allowableValues = {"CRIOLLA", "SEVILLANA", "MANZANILLA", "ARBEQUINA"})
+        String variety
 ) {
 }
