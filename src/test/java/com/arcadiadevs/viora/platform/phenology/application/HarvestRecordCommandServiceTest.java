@@ -1,8 +1,12 @@
 package com.arcadiadevs.viora.platform.phenology.application;
 
 import com.arcadiadevs.viora.platform.phenology.application.internal.commandservices.HarvestRecordCommandServiceImpl;
+import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
+import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
+import com.arcadiadevs.viora.platform.phenology.domain.model.events.HistoricalHarvestRemovedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -170,6 +174,85 @@ class HarvestRecordCommandServiceTest {
         assertThat(result.failure()).isPresent();
         assertThat(result.failure().get().code()).isEqualTo("TRACKER_PRECONDITION_FAILED");
         assertThat(result.failure().get().details()).isEqualTo("phenology.tracker.revision.mismatch");
+        verify(trackerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should return not found error when removing a harvest record of a non-existent plot")
+    void shouldReturnNotFoundWhenRemovingFromNonExistentPlot() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(false);
+
+        var result = commandService.handle(new RemoveHarvestRecordCommand(plotId, UUID.randomUUID().toString(), null));
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("PLOT_NOT_FOUND");
+        verify(trackerRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Should return not found error when removing a harvest record and the plot has no history")
+    void shouldReturnNotFoundWhenRemovingAndPlotHasNoHistory() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+        when(trackerRepository.findByPlotId(any(PlotId.class))).thenReturn(Optional.empty());
+
+        var result = commandService.handle(new RemoveHarvestRecordCommand(plotId, UUID.randomUUID().toString(), null));
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("HARVESTRECORD_NOT_FOUND");
+        verify(trackerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should return not found error when the harvest record to remove does not exist")
+    void shouldReturnNotFoundWhenRemovingUnknownRecord() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId), new CampaignYear(2024));
+        tracker.recordHarvest(new CampaignYear(2024), HarvestYield.ofTotal(12000.0));
+        when(trackerRepository.findByPlotId(any(PlotId.class))).thenReturn(Optional.of(tracker));
+
+        var result = commandService.handle(new RemoveHarvestRecordCommand(plotId, UUID.randomUUID().toString(), null));
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("HARVESTRECORD_NOT_FOUND");
+        verify(trackerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should remove the harvest record, save the tracker and publish the removal event")
+    void shouldSuccessfullyRemoveHarvestRecord() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId), new CampaignYear(2023));
+        tracker.recordHarvest(new CampaignYear(2023), HarvestYield.ofTotal(10000.0));
+        var wrong = tracker.recordHarvest(new CampaignYear(2024), HarvestYield.ofTotal(5000.0));
+        tracker.clearDomainEvents();
+        var entryId = wrong.snapshot().id().harvestEntryId();
+        when(trackerRepository.findByPlotId(any(PlotId.class))).thenReturn(Optional.of(tracker));
+        when(trackerRepository.save(any())).thenReturn(tracker);
+
+        var result = commandService.handle(new RemoveHarvestRecordCommand(plotId, entryId, 2L));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success()).contains(entryId);
+        assertThat(tracker.snapshot().harvestHistory()).hasSize(1);
+        verify(trackerRepository).save(tracker);
+        verify(eventPublisher).publishEvent(any(HistoricalHarvestRemovedEvent.class));
+    }
+
+    @Test
+    @DisplayName("Should return precondition failed error on revision mismatch while removing a harvest record")
+    void shouldReturnPreconditionFailedWhenRemovingWithRevisionMismatch() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+        var tracker = ChillAccumulationTracker.create(new PlotId(plotId), new CampaignYear(2024));
+        var entry = tracker.recordHarvest(new CampaignYear(2024), HarvestYield.ofTotal(12000.0));
+        when(trackerRepository.findByPlotId(any(PlotId.class))).thenReturn(Optional.of(tracker));
+
+        var result = commandService.handle(
+                new RemoveHarvestRecordCommand(plotId, entry.snapshot().id().harvestEntryId(), 99L));
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure().get().code()).isEqualTo("TRACKER_PRECONDITION_FAILED");
+        assertThat(tracker.snapshot().harvestHistory()).hasSize(1);
         verify(trackerRepository, never()).save(any());
     }
 }
