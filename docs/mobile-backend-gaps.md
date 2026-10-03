@@ -12,7 +12,7 @@
 | US | Dueño en la app | Pantallas | Backend hoy | Qué falta | Tamaño | Quién |
 |---|---|---|---|---|---|---|
 | **US09** Delimitar lote | Victor | P20–P26 | ✅ `POST /plots`, `GET /plots`, `GET /plots/{id}` | Opcional: fecha de registro y método de marcado (el diseño dice "registrado hoy con GPS"). El cupo del plan (P25) depende de suscripción (US06–US08, Sprint 3) | S | Victor |
-| **US10** Editar lote | Victor | P27–P29 | ✅ `PUT /plots/{id}` con `If-Match` (nombre, marco, poda, polígono) | 🟡 La **variedad no se puede editar** y el diseño dice "Nombre, variedad y marco". Decisión: permitirlo solo si el lote no tiene muestreos ni cosechas (el modelo de calibre se ajusta por variedad) | M | Decisión de Victor, implementa cualquiera |
+| **US10** Editar lote | Victor | P27–P29 | ✅ `PUT /plots/{id}` con `If-Match` (nombre, marco, poda, polígono) | ✅ `PUT /plots/{id}` acepta `variety` opcional (si se omite, se conserva). Sin restricción por muestreos o cosechas: el modelo de calibre se autocalibra con los datos del productor | — | Resuelto en `feature/plot-variety-edit` |
 | **US11** Baja de lote | Victor | P28, archivados | ✅ `DELETE /plots/{id}` (baja suave). ✅ **Listar archivados** (esta rama): `GET /plots?status=REMOVED_SOFT_DELETE` | Un lote archivado no se puede abrir por id (404), alcanza con los datos de la lista. No existe "restaurar" y el diseño no lo pide | — | — |
 | **US13** Alta de nodo virtual | Diana | P85–P88 | ✅ `POST /plots/{id}/iot-devices` | — | — | — |
 | **US14** Inventario de nodos | Diana | P85 | ✅ `GET /plots/{id}/iot-devices` (estado y última lectura) | — | — | — |
@@ -53,11 +53,10 @@
 2. **Frío (US22)** y luego **anomalía térmica (US23)**, que se enchufa a las alertas.
 3. **`windowOpensOn` y carga actual (US26, US27)** para el plan del lote.
 4. **Series y agregación (US17)** y **pronóstico (US19)**.
-5. Detalles pequeños: renombrar nodo (US15), consultar liquidaciones (US29), variedad editable (US10), fecha y método de registro del lote (US09).
+5. Detalles pequeños: renombrar nodo (US15), consultar liquidaciones (US29), fecha y método de registro del lote (US09).
 
 ## 5. Decisiones pendientes
 
-- ¿La **variedad** de un lote se puede editar? ¿Bajo qué condición?
 - ¿Quién calcula las **series de 24 h, 7 d y 30 d**: la app o el backend?
 - ¿Hay una fórmula de **rendimiento potencial** (t/ha)? La necesitan US26 y la alerta de invierno cálido.
 - ¿La **fase del año** la calcula la app o el backend?

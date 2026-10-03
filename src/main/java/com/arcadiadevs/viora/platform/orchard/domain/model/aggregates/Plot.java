@@ -147,11 +147,28 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
             LocalDate newPruningDate,
             long expectedRevision
     ) {
+        update(newName, null, newGeometry, newFrame, newPruningDate, expectedRevision);
+    }
+
+    /**
+     * Same as the update above, also correcting the botanical variety of the plot.
+     *
+     * @param newVariety the corrected variety; {@code null} keeps the current one
+     */
+    public void update(
+            PlotName newName,
+            OliveVariety newVariety,
+            PlotGeometry newGeometry,
+            PlantationFrame newFrame,
+            LocalDate newPruningDate,
+            long expectedRevision
+    ) {
         if (this.revision == null || this.revision != expectedRevision) {
             long currentRev = this.revision == null ? 0L : this.revision;
             throw new PlotRevisionMismatchException(this.id, currentRev, expectedRevision);
         }
         this.name = newName;
+        this.variety = newVariety == null ? this.variety : newVariety;
         this.geometry = newGeometry;
         this.frame = newFrame;
         this.density = TreeDensity.from(newFrame);

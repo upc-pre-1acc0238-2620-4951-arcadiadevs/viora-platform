@@ -34,6 +34,7 @@ public final class UpdatePlotCommandFromResourceAssembler {
                 resource.treeSpacingM(),
                 resource.lastPruningDate(),
                 resource.polygonGeoJson(),
+                resource.variety(),
                 expectedRevision
         );
     }
