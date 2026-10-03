@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.application.internal.commandservic
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RestorePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -378,6 +379,73 @@ class PlotCommandServiceTest {
 
         var result = plotCommandService.handle(new UpdatePlotCommand(
                 plotId.plotId(), prodId.producerId(), "Cuartel Antiguo", 7.0, 5.0, null, validGeoJson, "PICUAL", 0L));
+
+        assertThat(result.isFailure()).isTrue();
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    private Plot archivedPlot(ProducerId prodId) {
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Archivado"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        plot.remove("No longer farmed");
+        plot.clearDomainEvents();
+        return plot;
+    }
+
+    @Test
+    @DisplayName("Should restore an archived plot and publish PlotRestoredEvent")
+    void shouldRestoreArchivedPlot() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = archivedPlot(prodId);
+        var plotId = plot.snapshot().id();
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+        when(plotRepository.save(any(Plot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = plotCommandService.handle(new RestorePlotCommand(plotId.plotId(), prodId.producerId()));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success().orElseThrow().snapshot().status()).isEqualTo(PlotStatus.ACTIVE);
+        verify(plotRepository, times(1)).save(plot);
+        verify(eventPublisher, atLeastOnce()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("Should return Not Found when restoring a plot that does not exist or belongs to another producer")
+    void shouldReturnNotFoundWhenRestoringUnknownOrForeignPlot() {
+        var foreign = archivedPlot(new ProducerId(UUID.randomUUID().toString()));
+        var foreignId = foreign.snapshot().id();
+        when(plotRepository.findById(foreignId)).thenReturn(java.util.Optional.of(foreign));
+        var missingId = new PlotId();
+        when(plotRepository.findById(missingId)).thenReturn(java.util.Optional.empty());
+
+        var foreignResult = plotCommandService.handle(new RestorePlotCommand(foreignId.plotId(), producerId.toString()));
+        var missingResult = plotCommandService.handle(new RestorePlotCommand(missingId.plotId(), producerId.toString()));
+
+        assertThat(foreignResult.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
+        assertThat(missingResult.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    @Test
+    @DisplayName("Should return Conflict when restoring a plot that is still active")
+    void shouldReturnConflictWhenRestoringActivePlot() {
+        var prodId = new ProducerId(producerId.toString());
+        var plot = Plot.delimit(
+                prodId,
+                new PlotName("Cuartel Activo"),
+                OliveVariety.CRIOLLA,
+                new PlotGeometry(validGeoJson, 1.25),
+                new PlantationFrame(7.0, 5.0)
+        );
+        var plotId = plot.snapshot().id();
+        when(plotRepository.findById(plotId)).thenReturn(java.util.Optional.of(plot));
+
+        var result = plotCommandService.handle(new RestorePlotCommand(plotId.plotId(), prodId.producerId()));
 
         assertThat(result.isFailure()).isTrue();
         verify(plotRepository, never()).save(any(Plot.class));

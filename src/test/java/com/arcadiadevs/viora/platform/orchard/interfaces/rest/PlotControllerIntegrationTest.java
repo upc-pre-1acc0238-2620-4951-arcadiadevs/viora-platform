@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQuer
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RestorePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
@@ -408,5 +409,42 @@ class PlotControllerIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(plotQueryService);
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/restore should return 200 OK with the restored plot")
+    void shouldReturnOkWhenRestoringPlot() throws Exception {
+        var plot = samplePlot("Cuartel Restaurado");
+        var plotId = plot.snapshot().id().plotId();
+        when(plotCommandService.handle(any(RestorePlotCommand.class))).thenReturn(Result.success(plot));
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/restore", plotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(plotId)))
+                .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/restore should return 404 Not Found when the plot does not exist")
+    void shouldReturnNotFoundWhenRestoringNonExistentPlot() throws Exception {
+        var plotId = UUID.randomUUID().toString();
+        when(plotCommandService.handle(any(RestorePlotCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("Plot", plotId)));
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/restore", plotId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-not-found")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/restore should return 409 Conflict when the plot is not archived")
+    void shouldReturnConflictWhenRestoringActivePlot() throws Exception {
+        var plotId = UUID.randomUUID().toString();
+        when(plotCommandService.handle(any(RestorePlotCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.conflict("plot", "plot.not_removed")));
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/restore", plotId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")));
     }
 }
