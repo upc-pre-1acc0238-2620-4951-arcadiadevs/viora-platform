@@ -59,7 +59,7 @@ public record PlotResource(
         @Schema(description = "Date of last registered pruning labor", example = "2026-06-15")
         @Nullable LocalDate lastPruningDate,
 
-        @Schema(description = "Lifecycle status of the plot", example = "ACTIVE", allowableValues = {"ACTIVE", "INACTIVE"})
+        @Schema(description = "Lifecycle status of the plot", example = "ACTIVE", allowableValues = {"ACTIVE", "REMOVED_SOFT_DELETE"})
         String status,
 
         @Schema(description = "Optimistic locking revision number", example = "0")

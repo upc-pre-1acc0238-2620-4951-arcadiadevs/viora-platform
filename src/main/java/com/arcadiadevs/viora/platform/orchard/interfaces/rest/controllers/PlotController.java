@@ -7,8 +7,10 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.CreatePlotResource;
@@ -138,15 +140,19 @@ public class PlotController {
     }
 
     /**
-     * Lists plots belonging to the authenticated producer with optional incremental delta synchronization.
+     * Lists plots belonging to the authenticated producer with optional incremental delta synchronization
+     * and an optional lifecycle status filter.
      *
      * @param updatedSince optional timestamp for delta synchronization
+     * @param status       optional lifecycle status the plots must be in
      * @return list of PlotResource objects with 200 OK
      */
     @GetMapping
     @Operation(
             summary = "List plots or delta synchronization",
-            description = "Retrieves active orchard plots or increments modified since a timestamp for offline synchronization."
+            description = "Retrieves the active orchard plots by default, or the plots in the given lifecycle status "
+                    + "(REMOVED_SOFT_DELETE lists the archived ones), or the increments modified since a timestamp for "
+                    + "offline synchronization (which includes removed plots, optionally narrowed by status)."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -154,17 +160,28 @@ public class PlotController {
                     description = "Plots successfully retrieved",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = PlotResource.class)))
             ),
-            @ApiResponse(responseCode = "400", description = "Malformed updatedSince date parameter format")
+            @ApiResponse(responseCode = "400", description = "Malformed updatedSince date or unknown status")
     })
     public ResponseEntity<List<PlotResource>> listPlots(
             @Parameter(description = "Timestamp threshold for incremental delta sync (ISO-8601)", example = "2026-09-01T00:00:00Z")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant updatedSince
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant updatedSince,
+            @Parameter(description = "Lifecycle status the plots must be in; active plots when omitted",
+                    schema = @Schema(allowableValues = {"ACTIVE", "REMOVED_SOFT_DELETE"}))
+            @RequestParam(required = false) @Nullable PlotStatus status
     ) {
         var effectiveProducerId = resolveEffectiveProducerId();
 
-        var plots = (updatedSince != null)
-                ? plotQueryService.handle(new GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery(effectiveProducerId, updatedSince))
-                : plotQueryService.handle(new GetAllActivePlotsByProducerIdQuery(effectiveProducerId));
+        List<Plot> plots;
+        if (updatedSince != null) {
+            plots = plotQueryService.handle(new GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery(effectiveProducerId, updatedSince));
+            if (status != null) {
+                plots = plots.stream().filter(plot -> plot.snapshot().status() == status).toList();
+            }
+        } else if (status != null && status != PlotStatus.ACTIVE) {
+            plots = plotQueryService.handle(new GetPlotsByProducerIdAndStatusQuery(effectiveProducerId, status));
+        } else {
+            plots = plotQueryService.handle(new GetAllActivePlotsByProducerIdQuery(effectiveProducerId));
+        }
 
         return ResponseEntity.ok(PlotResourceFromEntityAssembler.toResourceList(plots));
     }

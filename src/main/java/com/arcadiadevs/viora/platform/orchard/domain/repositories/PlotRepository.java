@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.orchard.domain.repositories;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotName;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 
 import java.time.Instant;
@@ -46,6 +47,15 @@ public interface PlotRepository {
      * @return list of active plot aggregate roots
      */
     List<Plot> findActiveByProducerId(ProducerId producerId);
+
+    /**
+     * Finds the plots associated with a producer that are in a given lifecycle status.
+     *
+     * @param producerId the producer identifier value object
+     * @param status     the lifecycle status the plots must be in
+     * @return list of plot aggregate roots in that status
+     */
+    List<Plot> findByProducerIdAndStatus(ProducerId producerId, PlotStatus status);
 
     /**
      * Finds plots associated with a producer updated since a given timestamp for delta synchronization.

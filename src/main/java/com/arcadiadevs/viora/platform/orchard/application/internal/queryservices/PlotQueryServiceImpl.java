@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQuer
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
@@ -34,6 +35,11 @@ public class PlotQueryServiceImpl implements PlotQueryService {
     @Override
     public List<Plot> handle(GetAllActivePlotsByProducerIdQuery query) {
         return plotRepository.findActiveByProducerId(query.producerId());
+    }
+
+    @Override
+    public List<Plot> handle(GetPlotsByProducerIdAndStatusQuery query) {
+        return plotRepository.findByProducerIdAndStatus(query.producerId(), query.status());
     }
 
     @Override
