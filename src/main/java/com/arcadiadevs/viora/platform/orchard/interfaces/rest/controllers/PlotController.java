@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQuer
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotNotFoundException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RestorePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
@@ -307,5 +308,39 @@ public class PlotController {
 
         return ResponseEntityAssembler.toResponseEntityFromResult(result, message -> message, HttpStatus.OK);
     }
-}
 
+    /**
+     * Restores an archived plot to the active inventory.
+     *
+     * @param plotId the identifier of the archived plot
+     * @return the restored PlotResource with 200 OK, or ProblemDetail on error
+     */
+    @PostMapping("/{plotId}/restore")
+    @Operation(
+            summary = "Restore an archived plot",
+            description = "Brings an archived plot back to the active inventory, with its history intact."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Plot restored successfully",
+                    content = @Content(schema = @Schema(implementation = PlotResource.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "Plot not found for the producer"),
+            @ApiResponse(responseCode = "409", description = "The plot is not archived")
+    })
+    public ResponseEntity<?> restorePlot(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+            @PathVariable String plotId
+    ) {
+        var effectiveProducerId = resolveEffectiveProducerId();
+
+        var result = plotCommandService.handle(new RestorePlotCommand(plotId, effectiveProducerId.producerId()));
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(
+                result,
+                PlotResourceFromEntityAssembler::toResourceFromEntity,
+                HttpStatus.OK
+        );
+    }
+}
