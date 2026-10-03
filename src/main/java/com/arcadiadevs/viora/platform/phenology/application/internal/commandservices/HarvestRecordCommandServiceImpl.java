@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisio
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand;
+import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestEntryId;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
@@ -121,6 +122,45 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
             return Result.failure(ApplicationError.unexpected("harvest-rectify", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<String, ApplicationError> handle(RemoveHarvestRecordCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("phenology.command.null");
+        }
+        try {
+            var plotId = new PlotId(command.plotId());
+
+            if (!externalOrchardService.existsActivePlot(plotId)) {
+                return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+            }
+
+            var trackerOpt = trackerRepository.findByPlotId(plotId);
+            if (trackerOpt.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("HarvestRecord", command.recordId()));
+            }
+
+            var tracker = trackerOpt.get();
+            var removedEntry = tracker.removeHarvestRecord(new HarvestEntryId(command.recordId()), command.expectedRevision());
+
+            trackerRepository.save(tracker);
+
+            for (var event : tracker.domainEvents()) {
+                eventPublisher.publishEvent(event);
+            }
+            tracker.clearDomainEvents();
+
+            return Result.success(removedEntry.snapshot().id().harvestEntryId());
+        } catch (TrackerRevisionMismatchException ex) {
+            return Result.failure(ApplicationError.preconditionFailed("tracker", ex.getMessage()));
+        } catch (HarvestRecordNotFoundException ex) {
+            return Result.failure(ApplicationError.notFound("HarvestRecord", command.recordId()));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        } catch (Exception ex) {
+            return Result.failure(ApplicationError.unexpected("harvest-remove", ex.getMessage()));
         }
     }
 }

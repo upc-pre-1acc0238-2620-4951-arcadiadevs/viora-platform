@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.orchard.application.queryservices;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 
 import java.util.List;
@@ -21,6 +22,14 @@ public interface PlotQueryService {
      * @return list of active plot aggregate roots
      */
     List<Plot> handle(GetAllActivePlotsByProducerIdQuery query);
+
+    /**
+     * Retrieves the orchard plots of the specified producer that are in a given lifecycle status.
+     *
+     * @param query the query containing the producer identifier and the status
+     * @return list of plot aggregate roots in that status
+     */
+    List<Plot> handle(GetPlotsByProducerIdAndStatusQuery query);
 
     /**
      * Retrieves orchard plots modified at or after a specific timestamp for delta synchronization.

@@ -6,6 +6,9 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCommand;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActivePlotsByProducerIdQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
+import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.controllers.PlotController;
@@ -16,21 +19,28 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -305,5 +315,98 @@ class PlotControllerIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status", is(409)))
                 .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")));
+    }
+
+    private Plot samplePlot(String name) {
+        return Plot.delimit(
+                new ProducerId(producerId.toString()),
+                new PlotName(name),
+                OliveVariety.SEVILLANA,
+                new PlotGeometry(validGeoJson, 0.92),
+                new PlantationFrame(7.0, 7.0)
+        );
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots should list the active plots when no status is given")
+    void shouldListActivePlotsByDefault() throws Exception {
+        when(plotQueryService.handle(any(GetAllActivePlotsByProducerIdQuery.class)))
+                .thenReturn(List.of(samplePlot("La Yarada 03")));
+
+        mockMvc.perform(get("/api/v1/plots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("La Yarada 03")))
+                .andExpect(jsonPath("$[0].status", is("ACTIVE")));
+
+        verify(plotQueryService, never()).handle(any(GetPlotsByProducerIdAndStatusQuery.class));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots?status=REMOVED_SOFT_DELETE should list the archived plots")
+    void shouldListArchivedPlotsWhenStatusIsRemoved() throws Exception {
+        var archived = samplePlot("Lote Archivado");
+        archived.remove("Manual plot removal");
+        when(plotQueryService.handle(any(GetPlotsByProducerIdAndStatusQuery.class)))
+                .thenReturn(List.of(archived));
+
+        mockMvc.perform(get("/api/v1/plots").param("status", "REMOVED_SOFT_DELETE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("Lote Archivado")))
+                .andExpect(jsonPath("$[0].status", is("REMOVED_SOFT_DELETE")));
+
+        var captor = ArgumentCaptor.forClass(GetPlotsByProducerIdAndStatusQuery.class);
+        verify(plotQueryService).handle(captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().status()).isEqualTo(PlotStatus.REMOVED_SOFT_DELETE);
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots?status=ACTIVE should list the active plots like the default")
+    void shouldListActivePlotsWhenStatusIsActive() throws Exception {
+        when(plotQueryService.handle(any(GetAllActivePlotsByProducerIdQuery.class)))
+                .thenReturn(List.of(samplePlot("La Yarada 03")));
+
+        mockMvc.perform(get("/api/v1/plots").param("status", "ACTIVE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots?updatedSince should keep returning every changed plot, removed ones included")
+    void shouldReturnDeltaWithRemovedPlotsWhenNoStatusIsGiven() throws Exception {
+        var archived = samplePlot("Lote Archivado");
+        archived.remove("Manual plot removal");
+        when(plotQueryService.handle(any(GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery.class)))
+                .thenReturn(List.of(samplePlot("La Yarada 03"), archived));
+
+        mockMvc.perform(get("/api/v1/plots").param("updatedSince", "2026-09-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots?updatedSince&status should narrow the delta to that status")
+    void shouldNarrowDeltaByStatus() throws Exception {
+        var archived = samplePlot("Lote Archivado");
+        archived.remove("Manual plot removal");
+        when(plotQueryService.handle(any(GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery.class)))
+                .thenReturn(List.of(samplePlot("La Yarada 03"), archived));
+
+        mockMvc.perform(get("/api/v1/plots")
+                        .param("updatedSince", "2026-09-01T00:00:00Z")
+                        .param("status", "REMOVED_SOFT_DELETE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("Lote Archivado")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots with an unknown status should return 400 Bad Request")
+    void shouldReturnBadRequestOnUnknownStatus() throws Exception {
+        mockMvc.perform(get("/api/v1/plots").param("status", "INACTIVE"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(plotQueryService);
     }
 }

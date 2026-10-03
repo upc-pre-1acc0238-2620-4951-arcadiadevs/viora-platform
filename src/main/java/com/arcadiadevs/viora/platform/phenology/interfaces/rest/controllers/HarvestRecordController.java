@@ -2,9 +2,11 @@ package com.arcadiadevs.viora.platform.phenology.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.phenology.application.commandservices.HarvestRecordCommandService;
+import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.HarvestRecordResource;
@@ -234,5 +236,54 @@ public class HarvestRecordController {
                 res -> res,
                 HttpStatus.OK
         );
+    }
+
+    /**
+     * Removes an erroneous or duplicated harvest record from the plot's history (US21, scenario 2).
+     *
+     * @param plotId   the unique plot UUID string
+     * @param recordId the unique harvest record UUID string
+     * @param ifMatch  optional optimistic locking revision of the plot's phenology tracker
+     * @return a confirmation MessageResource with 200 OK, or ProblemDetail on error
+     */
+    @DeleteMapping("/{recordId}")
+    @Operation(
+            summary = "Remove a historical harvest record",
+            description = "Removes an erroneous or duplicated campaign harvest record from the plot history and recalculates "
+                    + "Hoblyn's BBI over the campaigns that remain valid. The campaign can be registered again afterwards."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Harvest record successfully removed",
+                    content = @Content(schema = @Schema(implementation = MessageResource.class))
+            ),
+            @ApiResponse(responseCode = "400", description = "Malformed UUID or invalid If-Match revision"),
+            @ApiResponse(responseCode = "404", description = "Harvest record or plot not found"),
+            @ApiResponse(responseCode = "412", description = "Precondition Failed: If-Match revision mismatch")
+    })
+    public ResponseEntity<?> removeHarvestRecord(
+            @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String plotId,
+            @Parameter(description = "Unique harvest record UUID", example = "550e8400-e29b-41d4-a716-446655440001")
+            @PathVariable String recordId,
+            @Parameter(description = "Optimistic locking revision", example = "\"0\"")
+            @RequestHeader(value = "If-Match", required = false) @Nullable String ifMatch
+    ) {
+        Long expectedRevision = null;
+        if (ifMatch != null && !ifMatch.isBlank()) {
+            try {
+                expectedRevision = Long.parseLong(ifMatch.replace("\"", "").trim());
+            } catch (NumberFormatException ex) {
+                var error = ApplicationError.validationError("If-Match", "phenology.tracker.revision.invalid");
+                return ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+            }
+        }
+
+        var result = harvestRecordCommandService
+                .handle(new RemoveHarvestRecordCommand(plotId, recordId, expectedRevision))
+                .map(removedId -> new MessageResource("Harvest record deleted successfully"));
+
+        return ResponseEntityAssembler.toResponseEntityFromResult(result, message -> message, HttpStatus.OK);
     }
 }
