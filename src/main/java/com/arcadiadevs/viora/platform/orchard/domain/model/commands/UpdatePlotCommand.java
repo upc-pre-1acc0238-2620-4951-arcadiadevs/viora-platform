@@ -22,8 +22,25 @@ public record UpdatePlotCommand(
         Double treeSpacingM,
         LocalDate lastPruningDate,
         String polygonGeoJson,
+        String variety,
         long expectedRevision
 ) {
+
+    /**
+     * Keeps the previous shape of the command: the variety is left unchanged.
+     */
+    public UpdatePlotCommand(
+            String plotId,
+            String producerId,
+            String name,
+            Double rowSpacingM,
+            Double treeSpacingM,
+            LocalDate lastPruningDate,
+            String polygonGeoJson,
+            long expectedRevision
+    ) {
+        this(plotId, producerId, name, rowSpacingM, treeSpacingM, lastPruningDate, polygonGeoJson, null, expectedRevision);
+    }
 
     /**
      * Compact constructor enforcing non-null constraints and valid expected revision.
@@ -40,6 +57,9 @@ public record UpdatePlotCommand(
         }
         if (polygonGeoJson == null || polygonGeoJson.isBlank()) {
             throw new IllegalArgumentException("plot.geometry.empty");
+        }
+        if (variety != null && variety.isBlank()) {
+            throw new IllegalArgumentException("plot.variety.blank");
         }
         if (rowSpacingM == null || treeSpacingM == null) {
             throw new IllegalArgumentException("plot.spacing.positive");
