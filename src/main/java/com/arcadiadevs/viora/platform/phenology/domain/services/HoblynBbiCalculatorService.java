@@ -75,6 +75,9 @@ public final class HoblynBbiCalculatorService {
 
     /**
      * Determines the qualitative alternation category according to Hoblyn BBI agronomic thresholds.
+     * Fewer than 2 evaluated campaigns yield {@link BbiAlternationCategory#INSUFFICIENT_DATA}; otherwise
+     * {@code REGULAR} applies below 0.20, {@code MODERATE_ALTERNATION} on [0.20, 0.40] and
+     * {@code SEVERE_ALTERNATION} above 0.40.
      *
      * @param bbi        the calculated BBI value object
      * @param sampleSize the number of evaluated harvest campaigns
@@ -88,9 +91,9 @@ public final class HoblynBbiCalculatorService {
             return BbiAlternationCategory.INSUFFICIENT_DATA;
         }
         double val = bbi.value();
-        if (val < 0.25) {
+        if (val < 0.20) {
             return BbiAlternationCategory.REGULAR;
-        } else if (val <= 0.50) {
+        } else if (val <= 0.40) {
             return BbiAlternationCategory.MODERATE_ALTERNATION;
         } else {
             return BbiAlternationCategory.SEVERE_ALTERNATION;

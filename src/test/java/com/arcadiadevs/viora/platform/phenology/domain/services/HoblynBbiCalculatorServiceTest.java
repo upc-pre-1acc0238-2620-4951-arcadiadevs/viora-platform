@@ -7,6 +7,8 @@ import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.Campai
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
 
@@ -41,8 +43,8 @@ class HoblynBbiCalculatorServiceTest {
     }
 
     @Test
-    @DisplayName("Should calculate exact BBI and classify as REGULAR when variation is low (< 0.25)")
-    void shouldClassifyAsRegularWhenBbiBelowPoint25() {
+    @DisplayName("Should calculate exact BBI and classify as REGULAR when variation is low (< 0.20)")
+    void shouldClassifyAsRegularWhenBbiBelowPoint20() {
         // Year 2021: 10,000 kg, Year 2022: 12,000 kg -> |12000 - 10000| / (22000) = 2000 / 22000 = 0.091
         var entries = List.of(
                 HistoricalHarvestEntry.create(new CampaignYear(2021), HarvestYield.ofTotal(10000.0)),
@@ -57,8 +59,8 @@ class HoblynBbiCalculatorServiceTest {
     }
 
     @Test
-    @DisplayName("Should calculate exact BBI and classify as MODERATE_ALTERNATION when 0.25 <= BBI <= 0.50")
-    void shouldClassifyAsModerateAlternationWhenBetween25And50() {
+    @DisplayName("Should calculate exact BBI and classify as MODERATE_ALTERNATION when 0.20 <= BBI <= 0.40")
+    void shouldClassifyAsModerateAlternationWhenBetween20And40() {
         // Year 2021: 10,000 kg, Year 2022: 5,000 kg -> |5000 - 10000| / (15000) = 0.333
         var entries = List.of(
                 HistoricalHarvestEntry.create(new CampaignYear(2021), HarvestYield.ofTotal(10000.0)),
@@ -73,8 +75,8 @@ class HoblynBbiCalculatorServiceTest {
     }
 
     @Test
-    @DisplayName("Should calculate exact BBI and classify as SEVERE_ALTERNATION when BBI > 0.50")
-    void shouldClassifyAsSevereAlternationWhenBbiAbove50() {
+    @DisplayName("Should calculate exact BBI and classify as SEVERE_ALTERNATION when BBI > 0.40")
+    void shouldClassifyAsSevereAlternationWhenBbiAbove40() {
         // Year 2021: 20,000 kg, Year 2022: 2,000 kg -> |2000 - 20000| / (22000) = 18000 / 22000 = 0.818
         var entries = List.of(
                 HistoricalHarvestEntry.create(new CampaignYear(2021), HarvestYield.ofTotal(20000.0)),
@@ -86,6 +88,21 @@ class HoblynBbiCalculatorServiceTest {
 
         var category = HoblynBbiCalculatorService.classifyAlternation(bbi, entries.size());
         assertThat(category).isEqualTo(BbiAlternationCategory.SEVERE_ALTERNATION);
+    }
+
+    @ParameterizedTest(name = "BBI {0} classifies as {1}")
+    @CsvSource({
+            "0.19, REGULAR",
+            "0.20, MODERATE_ALTERNATION",
+            "0.40, MODERATE_ALTERNATION",
+            "0.41, SEVERE_ALTERNATION"
+    })
+    @DisplayName("Should classify the exact 0.20 and 0.40 band boundaries inclusively as MODERATE_ALTERNATION")
+    void shouldClassifyBandBoundaries(double bbiValue, BbiAlternationCategory expected) {
+        // The bands are closed on the moderate side: 0.20 and 0.40 stay MODERATE, only 0.41 flips to SEVERE
+        var category = HoblynBbiCalculatorService.classifyAlternation(new BiennialBearingIndex(bbiValue), 3);
+
+        assertThat(category).isEqualTo(expected);
     }
 
     @Test
