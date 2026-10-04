@@ -64,7 +64,15 @@ class PhenologyMetricControllerIntegrationTest {
                 MetricType.EREZ_CHILLING_PORTIONS,
                 28.5,
                 "SATISFIED",
-                Map.of("model", "Dynamic Erez-Fishman", "thresholdTarget", 27.0, "completionPercentage", 105.56),
+                Map.of(
+                        "model", "Dynamic Erez-Fishman",
+                        "thresholdTarget", 27.0,
+                        "completionPercentage", 105.56,
+                        "seasonStart", "2026-06-01",
+                        "completionDate", "2026-08-18",
+                        "idleDays", 0,
+                        "seasonState", "COMPLETED"
+                ),
                 Instant.parse("2026-09-28T14:00:00Z")
         );
 
@@ -81,7 +89,11 @@ class PhenologyMetricControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].details.formula", is("Hoblyn (1936)")))
                 .andExpect(jsonPath("$[1].metricName", is("EREZ_CHILLING_PORTIONS")))
                 .andExpect(jsonPath("$[1].value", is(28.5)))
-                .andExpect(jsonPath("$[1].qualitativeCategory", is("SATISFIED")));
+                .andExpect(jsonPath("$[1].qualitativeCategory", is("SATISFIED")))
+                .andExpect(jsonPath("$[1].details.seasonStart", is("2026-06-01")))
+                .andExpect(jsonPath("$[1].details.completionDate", is("2026-08-18")))
+                .andExpect(jsonPath("$[1].details.idleDays", is(0)))
+                .andExpect(jsonPath("$[1].details.seasonState", is("COMPLETED")));
     }
 
     @Test
@@ -113,7 +125,15 @@ class PhenologyMetricControllerIntegrationTest {
                 MetricType.EREZ_CHILLING_PORTIONS,
                 28.5,
                 "SATISFIED",
-                Map.of("model", "Dynamic Erez-Fishman"),
+                Map.of(
+                        "model", "Dynamic Erez-Fishman",
+                        "thresholdPortions", 27.0,
+                        "completionPercentage", 105.56,
+                        "seasonStart", "2026-06-01",
+                        "completionDate", "2026-08-18",
+                        "idleDays", 0,
+                        "seasonState", "COMPLETED"
+                ),
                 Instant.parse("2026-09-28T14:00:00Z")
         );
 
@@ -125,7 +145,11 @@ class PhenologyMetricControllerIntegrationTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].metricName", is("EREZ_CHILLING_PORTIONS")));
+                .andExpect(jsonPath("$[0].metricName", is("EREZ_CHILLING_PORTIONS")))
+                .andExpect(jsonPath("$[0].details.seasonStart", is("2026-06-01")))
+                .andExpect(jsonPath("$[0].details.completionDate", is("2026-08-18")))
+                .andExpect(jsonPath("$[0].details.idleDays", is(0)))
+                .andExpect(jsonPath("$[0].details.seasonState", is("COMPLETED")));
     }
 
     @Test
