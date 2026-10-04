@@ -23,7 +23,7 @@
 | **US19** Pronóstico 7 días | Piero | P90, Home | ✅ `GET /plots/{id}/forecasts` (máx., mín., prob. de lluvia, viento, `isFrostRisk`) | 🟡 El estado del cielo ("Soleado") no viene: se deriva en la app. Confirmar que siempre entrega 7 días y su `syncedAt` | S | Piero |
 | **US20** Cosechas históricas y BBI | Jahat | P40, P41 | ✅ `POST/GET /plots/{id}/harvest-records` y `GET .../metrics?name=BBI` (404 si no hay historial; con menos de 3 campañas `sampleSufficiency = INSUFFICIENT`) | — | — | — |
 | **US21** Rectificar o eliminar cosecha | Jahat | P41 | ✅ `PUT` (rectificar) y ✅ **`DELETE /plots/{id}/harvest-records/{recordId}`** (0.22.0; `If-Match` opcional, recalcula el BBI y la campaña se puede volver a registrar) | — | — | — |
-| **US22** Frío acumulado (Erez) | Piero | P80, P81 | 🟡 `GET .../metrics?name=CHILLING`: valor, categoría, modelo, umbral y % de avance | Inicio de temporada ("Inicio · 1 jun"), fecha de completado ("Frío completo el 18 de agosto"), días sin acumular (estado "frenado") y estado de temporada (en curso / completa / fuera de temporada) | M | Piero |
+| **US22** Frío acumulado (Erez) | Piero | P80, P81 | ✅ `GET .../metrics?name=CHILLING`: valor, categoría, modelo, umbral, % de avance, inicio de temporada (`seasonStart`), fecha de completado (`completionDate`), días sin acumular (`idleDays`) y estado de temporada (`seasonState`) | Resuelto en 0.23.0 (`phenology`). Incluye `ChillSeasonDetails` y cálculo dinámico de temporada | — | Piero |
 | **US23** Anomalía térmica / ENOS | Piero | T15 invierno cálido | 🔴 **No existe** | Regla de detección (máximas semanales sobre el umbral durante días seguidos), señal en la métrica de frío y alerta que se integra con US18 ("qué cambia": frío frenado, floración en riesgo, carga esperada reajustada 9,8 → 7,4 t/ha, que depende de un rendimiento potencial, ver US26) | **L** | Piero, tras el contrato de alertas |
 | **US24** Muestreo en campo | Fabrizio | P50–P54 | ✅ `POST /plots/{id}/samplings` (idempotente con `clientBatchId`; `trunkDiameterMm` obligatorio, como en el diseño) | — | — | — |
 | **US25** Representatividad e historial | Fabrizio | P50, P54 | ✅ `GET /plots/{id}/samplings` (resumen) y `?view=detailed` (árboles) | — | — | — |
@@ -69,7 +69,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 
 | Endpoint | US | Estado |
 |---|---|---|
-| `GET /plots/{id}/metrics?name=CHILLING` | US22 | 🟡 faltan inicio de temporada, fecha de completado, días sin acumular y estado de temporada (M) |
+| `GET /plots/{id}/metrics?name=CHILLING` | US22 | ✅ resuelto: incluye valor, categoría, `seasonStart`, `completionDate`, `idleDays` y `seasonState` |
 | Señal de anomalía térmica / ENOS en la métrica de frío y alerta | US23 | 🔴 no existe (L); se enchufa al contrato de alertas de US18 |
 | `GET /plots/{id}/forecasts` | US19 | ✅ 🟡 el estado del cielo se deriva en la app; confirmar que siempre entrega 7 días |
 
