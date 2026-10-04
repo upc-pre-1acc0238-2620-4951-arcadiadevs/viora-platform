@@ -1,7 +1,7 @@
 # Brechas del backend para las historias de la app Android (Productor)
 
 - **Última actualización:** 2026-10-04
-- **Backend revisado:** `develop` en la etiqueta **0.24.0** más el cambio pendiente de `feature/bbi-thresholds-campaign-year-range` (cambios desde la 0.21.0 en la sección 4)
+- **Backend revisado:** `develop` en la etiqueta **0.26.0** más el cambio pendiente de `feature/bbi-thresholds-campaign-year-range` (cambios desde la 0.21.0 en la sección 4)
 - **Fuentes:** reporte (US y escenarios BDD), mockups de Figma (`Viora202602_Mobile_App`, sección App Productor · Kotlin) y el código del backend
 - **Para qué sirve:** que cada desarrollador sepa qué le falta al backend para completar las historias que tiene asignadas en la app, antes de empezar la pantalla, y dar seguimiento a los endpoints que requiere la app (sección 3).
 
@@ -103,8 +103,8 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | 0.23.0 | `feature/plot-variety-edit` | `PUT /plots/{plotId}` acepta `variety` opcional | US10 |
 | 0.24.0 | `feature/plot-restore` | `POST /plots/{plotId}/restore` | US11 |
 | 0.24.0 | igual | Corrección: las respuestas de PUT y DELETE devolvían la `revision` anterior | US10, US11 |
-| 0.25.0 (pendiente) | `feature/bbi-thresholds-campaign-year-range` | Bandas del BBI alineadas con el diseño de "¿Qué es el BBI?" | US20 |
-| 0.25.0 (pendiente) | igual | El año de campaña que se registra va de 2000 al año en curso | US20 |
+| 0.27.0 | `feature/bbi-thresholds-campaign-year-range` | Bandas del BBI alineadas con el diseño de "¿Qué es el BBI?" | US20 |
+| 0.27.0 | igual | El año de campaña que se registra va de 2000 al año en curso | US20 |
 
 **0.22.0**
 1. **`DELETE /api/v1/plots/{plotId}/harvest-records/{recordId}`** (US21, escenario 2): quita el registro, recalcula el BBI y la clasificación sobre las campañas válidas que quedan, y deja volver a registrar esa campaña. `If-Match` opcional. Respuesta 200 con `MessageResource` (no 204); también 400 (UUID o `If-Match` inválido), 404 y 412.
@@ -118,7 +118,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 5. **`POST /api/v1/plots/{plotId}/restore`** (US11): trae de vuelta un lote archivado con su historial y su nombre (un archivado sigue reservando su nombre, así que restaurarlo nunca choca con otro). 200 con el lote (`status` ACTIVE y `revision` +1), 404 si no existe o es de otro productor, 409 si no está archivado.
 6. **Corrección:** `PlotRepositoryImpl.save` devolvía la entidad antes del flush de `@Version`, y el PUT y el DELETE respondían con la `revision` anterior; el cliente que la guardaba recibía 412 en el siguiente `If-Match`. Ahora usa `saveAndFlush`. El mismo patrón podría existir en los repositorios de otros agregados (sin revisar). Un PUT con datos idénticos no sube la revisión.
 
-**0.25.0 (pendiente)**
+**0.27.0**
 7. **Bandas del BBI según el diseño** (US20, sheet "¿Qué es el BBI?"): `REGULAR` por debajo de 0.20, `MODERATE_ALTERNATION` de 0.20 a 0.40 inclusive y `SEVERE_ALTERNATION` por encima de 0.40 (antes 0.25 / 0.50). Los nombres de las categorías no cambian, así que la app no se rompe; solo cambia el texto de `qualitativeCategory` en `GET /plots/{id}/metrics?name=BBI` y qué producción cae en cada banda.
 8. **Rango del año de campaña al registrar una cosecha** (US20): la regla vive ahora en el dominio (`HarvestCampaignYearPolicy`), que acepta de 2000 al año en curso y rechaza con 400 las campañas futuras. Antes `POST /plots/{id}/harvest-records` aceptaba 1980–2100. El `CampaignYear` compartido sigue siendo la guarda estructural de 1980–2100 porque la liquidación necesita años futuros.
 
