@@ -17,6 +17,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,9 +45,12 @@ class HarvestRecordCommandServiceTest {
 
     private final String plotId = UUID.randomUUID().toString();
 
+    // Fixed at 2026 so the harvest campaign year range is deterministic
+    private final Clock clock = Clock.fixed(Instant.parse("2026-10-04T00:00:00Z"), ZoneOffset.UTC);
+
     @BeforeEach
     void setUp() {
-        commandService = new HarvestRecordCommandServiceImpl(trackerRepository, eventPublisher, externalOrchardService);
+        commandService = new HarvestRecordCommandServiceImpl(trackerRepository, eventPublisher, externalOrchardService, clock);
     }
 
     @Test
@@ -97,6 +103,58 @@ class HarvestRecordCommandServiceTest {
         assertThat(result.failure()).isPresent();
         assertThat(result.failure().get().code()).isEqualTo("HARVEST_CONFLICT");
         assertThat(result.failure().get().details()).isEqualTo("phenology.harvest_yield.duplicate_campaign");
+    }
+
+    @Test
+    @DisplayName("Should return validation error when the campaign year is earlier than 2000")
+    void shouldReturnValidationErrorWhenCampaignYearIsTooEarly() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+
+        var command = new RecordHarvestYieldCommand(plotId, 1999, 12000.0, 7000.0, 5000.0, "Legacy harvest");
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure()).isPresent();
+        assertThat(result.failure().get().code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(result.failure().get().details()).isEqualTo("phenology.campaign_year.too_early");
+
+        verify(trackerRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Should return validation error when the campaign year is in the future")
+    void shouldReturnValidationErrorWhenCampaignYearIsInTheFuture() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+
+        var command = new RecordHarvestYieldCommand(plotId, 2027, 12000.0, 7000.0, 5000.0, "Premature harvest");
+        var result = commandService.handle(command);
+
+        assertThat(result.isFailure()).isTrue();
+        assertThat(result.failure()).isPresent();
+        assertThat(result.failure().get().code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(result.failure().get().details()).isEqualTo("phenology.campaign_year.future");
+
+        verify(trackerRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Should successfully record a harvest for the current campaign year")
+    void shouldRecordHarvestYieldForCurrentCampaignYear() {
+        when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
+        when(trackerRepository.existsByPlotIdAndCampaignYear(any(PlotId.class), any(CampaignYear.class)))
+                .thenReturn(false);
+        when(trackerRepository.findByPlotId(any(PlotId.class)))
+                .thenReturn(Optional.empty());
+
+        var command = new RecordHarvestYieldCommand(plotId, 2026, 12000.0, 7000.0, 5000.0, "Current harvest");
+        var result = commandService.handle(command);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.success()).isPresent();
+
+        verify(trackerRepository, times(1)).save(any());
     }
 
     @Test

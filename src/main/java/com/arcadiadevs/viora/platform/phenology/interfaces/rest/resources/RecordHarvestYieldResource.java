@@ -22,9 +22,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public record RecordHarvestYieldResource(
         @NotNull(message = "phenology.campaign_year.null")
-        @Min(value = 1980, message = "phenology.campaign_year.invalid")
-        @Max(value = 2100, message = "phenology.campaign_year.invalid")
-        @Schema(description = "Agricultural campaign year (1980 - 2100)", example = "2025", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Agricultural campaign year (2000 to the current year; future campaigns are rejected)", example = "2025", requiredMode = Schema.RequiredMode.REQUIRED)
         Integer campaignYear,
 
         @NotNull(message = "phenology.harvest_yield.null")

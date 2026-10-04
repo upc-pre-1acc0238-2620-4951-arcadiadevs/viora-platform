@@ -28,7 +28,7 @@ public record MetricResource(
         @Schema(description = "Quantitative numerical value of the metric", example = "28.5")
         Double value,
 
-        @Schema(description = "Qualitative agronomic classification or status", example = "SATISFIED")
+        @Schema(description = "Qualitative agronomic classification or status. For BIENNIAL_BEARING_INDEX: REGULAR (< 0.20), MODERATE_ALTERNATION (0.20-0.40), SEVERE_ALTERNATION (> 0.40), INSUFFICIENT_DATA (fewer than 2 campaigns)", example = "SATISFIED")
         String qualitativeCategory,
 
         @Schema(description = "Detailed parameters and formula metadata (includes seasonStart, completionDate, idleDays, and seasonState for chilling metrics)")
