@@ -10,14 +10,16 @@ import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAcc
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RecordHarvestYieldCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
-import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestEntryId;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
+import com.arcadiadevs.viora.platform.phenology.domain.services.HarvestCampaignYearPolicy;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
 
 /**
  * Application service implementation orchestrating harvest yield recording and BBI assessments.
@@ -29,6 +31,7 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
     private final ChillAccumulationTrackerRepository trackerRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ExternalOrchardService externalOrchardService;
+    private final Clock clock;
 
     /**
      * Constructs the command service injecting dependencies.
@@ -36,15 +39,18 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
      * @param trackerRepository      the domain repository port
      * @param eventPublisher         the application event publisher
      * @param externalOrchardService the outbound ACL service for orchard verifications
+     * @param clock                  the application clock used to reject future harvest campaigns
      */
     public HarvestRecordCommandServiceImpl(
             ChillAccumulationTrackerRepository trackerRepository,
             ApplicationEventPublisher eventPublisher,
-            ExternalOrchardService externalOrchardService
+            ExternalOrchardService externalOrchardService,
+            Clock clock
     ) {
         this.trackerRepository = trackerRepository;
         this.eventPublisher = eventPublisher;
         this.externalOrchardService = externalOrchardService;
+        this.clock = clock;
     }
 
     @Override
@@ -56,7 +62,7 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
                 return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
             }
 
-            var campaignYear = new CampaignYear(command.campaignYear());
+            var campaignYear = HarvestCampaignYearPolicy.forHarvestRecording(command.campaignYear(), clock);
             var harvestYield = new HarvestYield(command.totalYieldKg(), command.greenKg(), command.blackKg());
 
             if (trackerRepository.existsByPlotIdAndCampaignYear(plotId, campaignYear)) {
