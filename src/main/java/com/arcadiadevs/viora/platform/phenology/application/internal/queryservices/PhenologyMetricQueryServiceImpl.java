@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,10 +92,25 @@ public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryServ
             double completionPct = ErezDynamicModelCalculator.computeCompletionPercentage(portionsValue, targetThreshold);
             String qualitativeStatus = ErezDynamicModelCalculator.evaluateSatisfactionStatus(portionsValue, targetThreshold);
 
+            int campaignYear = snapshot.currentCampaign().value();
+            LocalDate evaluationDate = LocalDate.now();
+            var seasonDetails = ErezDynamicModelCalculator.buildSeasonDetails(
+                    campaignYear,
+                    portionsValue,
+                    targetThreshold,
+                    evaluationDate,
+                    0,
+                    null
+            );
+
             Map<String, Object> chillingDetails = new LinkedHashMap<>();
             chillingDetails.put("model", "Dynamic Erez-Fishman");
             chillingDetails.put("thresholdTarget", targetThreshold);
             chillingDetails.put("completionPercentage", completionPct);
+            chillingDetails.put("seasonStart", seasonDetails.seasonStart().toString());
+            chillingDetails.put("completionDate", seasonDetails.completionDate() != null ? seasonDetails.completionDate().toString() : null);
+            chillingDetails.put("idleDays", seasonDetails.idleDays());
+            chillingDetails.put("seasonState", seasonDetails.seasonState().name());
 
             metrics.add(new MetricEvaluationResult(
                     MetricType.EREZ_CHILLING_PORTIONS,
