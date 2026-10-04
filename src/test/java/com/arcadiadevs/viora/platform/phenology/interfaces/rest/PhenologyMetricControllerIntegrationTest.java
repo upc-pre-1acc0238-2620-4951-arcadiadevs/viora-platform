@@ -127,7 +127,7 @@ class PhenologyMetricControllerIntegrationTest {
                 "SATISFIED",
                 Map.of(
                         "model", "Dynamic Erez-Fishman",
-                        "thresholdPortions", 27.0,
+                        "thresholdTarget", 27.0,
                         "completionPercentage", 105.56,
                         "seasonStart", "2026-06-01",
                         "completionDate", "2026-08-18",

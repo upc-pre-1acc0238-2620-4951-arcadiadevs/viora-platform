@@ -18,7 +18,7 @@ import java.util.Map;
 @Schema(
         name = "MetricResource",
         description = "Response resource representing an evaluated phenological metric (e.g. BIENNIAL_BEARING_INDEX or EREZ_CHILLING_PORTIONS)",
-        example = "{\"metricName\": \"EREZ_CHILLING_PORTIONS\", \"value\": 28.5, \"qualitativeCategory\": \"SATISFIED\", \"details\": {\"model\": \"Dynamic Erez-Fishman\", \"thresholdPortions\": 27.0, \"completionPercentage\": 105.56, \"seasonStart\": \"2026-06-01\", \"completionDate\": \"2026-08-18\", \"idleDays\": 0, \"seasonState\": \"COMPLETED\"}, \"evaluatedAt\": \"2026-09-28T14:00:00Z\"}"
+        example = "{\"metricName\": \"EREZ_CHILLING_PORTIONS\", \"value\": 28.5, \"qualitativeCategory\": \"SATISFIED\", \"details\": {\"model\": \"Dynamic Erez-Fishman\", \"thresholdTarget\": 27.0, \"completionPercentage\": 105.56, \"seasonStart\": \"2026-06-01\", \"completionDate\": \"2026-08-18\", \"idleDays\": 0, \"seasonState\": \"COMPLETED\"}, \"evaluatedAt\": \"2026-09-28T14:00:00Z\"}"
 )
 @NullMarked
 public record MetricResource(
