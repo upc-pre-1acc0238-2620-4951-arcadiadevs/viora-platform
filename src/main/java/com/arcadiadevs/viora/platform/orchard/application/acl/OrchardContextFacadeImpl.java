@@ -2,12 +2,14 @@ package com.arcadiadevs.viora.platform.orchard.application.acl;
 
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
+import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
 import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -120,6 +122,21 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
         } catch (IllegalArgumentException ex) {
             // Malformed UUID or VO validation failure means plot does not exist
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<String> findActivePlotIdsByProducerId(String producerId) {
+        if (producerId == null || producerId.isBlank()) {
+            return List.of();
+        }
+        try {
+            var domainProducerId = new ProducerId(producerId);
+            return plotRepository.findActiveByProducerId(domainProducerId).stream()
+                    .map(plot -> plot.snapshot().id().plotId())
+                    .toList();
+        } catch (IllegalArgumentException ex) {
+            return List.of();
         }
     }
 }

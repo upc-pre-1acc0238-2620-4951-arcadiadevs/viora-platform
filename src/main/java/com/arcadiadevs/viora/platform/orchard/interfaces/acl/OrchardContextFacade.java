@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.orchard.interfaces.acl;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -49,4 +50,12 @@ public interface OrchardContextFacade {
      * @return Optional containing the plot name, or empty if plot is not found or not active
      */
     Optional<String> findPlotName(String plotId);
+
+    /**
+     * Retrieves the active plot identifier strings belonging to a producer.
+     *
+     * @param producerId the producer identifier string (UUID)
+     * @return list of active plot identifier strings
+     */
+    List<String> findActivePlotIdsByProducerId(String producerId);
 }

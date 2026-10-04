@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.PlotId;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -89,5 +90,20 @@ public class ExternalOrchardService {
             return Optional.empty();
         }
         return orchardContextFacade.findPlotProducerId(plotId.plotId());
+    }
+
+    /**
+     * Retrieves all active plot identifiers associated with a given producer.
+     *
+     * @param producerId the producer identifier string (UUID)
+     * @return list of Telemetry {@link PlotId} value objects
+     */
+    public List<PlotId> findActivePlotIdsByProducerId(String producerId) {
+        if (producerId == null || producerId.isBlank()) {
+            return List.of();
+        }
+        return orchardContextFacade.findActivePlotIdsByProducerId(producerId).stream()
+                .map(PlotId::new)
+                .toList();
     }
 }
