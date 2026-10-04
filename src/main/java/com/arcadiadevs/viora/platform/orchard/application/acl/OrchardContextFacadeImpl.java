@@ -106,4 +106,20 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
             return Optional.empty();
         }
     }
+
+    @Override
+    public Optional<String> findPlotName(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            var domainPlotId = new PlotId(plotId);
+            return plotRepository.findById(domainPlotId)
+                    .filter(plot -> plot.snapshot().status() == PlotStatus.ACTIVE)
+                    .map(plot -> plot.snapshot().name().value());
+        } catch (IllegalArgumentException ex) {
+            // Malformed UUID or VO validation failure means plot does not exist
+            return Optional.empty();
+        }
+    }
 }
