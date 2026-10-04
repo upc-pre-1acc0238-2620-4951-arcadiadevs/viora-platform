@@ -1,7 +1,11 @@
 package com.arcadiadevs.viora.platform.phenology.domain.services;
 
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.ChillSeasonDetails;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.ChillSeasonState;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.DynamicErezPortion;
 
+import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 /**
@@ -31,12 +35,105 @@ public final class ErezDynamicModelCalculator {
     private static final double KELVIN_OFFSET = 273.15;
 
     /**
+     * Standard calendar start month for winter chill tracking in Tacna (June).
+     */
+    public static final Month DEFAULT_SEASON_START_MONTH = Month.JUNE;
+
+    /**
+     * Standard calendar start day for winter chill tracking in Tacna (1st).
+     */
+    public static final int DEFAULT_SEASON_START_DAY = 1;
+
+    /**
+     * Standard calendar end month for winter chill tracking in Tacna (August).
+     */
+    public static final Month DEFAULT_SEASON_END_MONTH = Month.AUGUST;
+
+    /**
+     * Standard calendar end day for winter chill tracking in Tacna (31st).
+     */
+    public static final int DEFAULT_SEASON_END_DAY = 31;
+
+    /**
+     * Calibrated historical baseline completion month for Tacna olive valleys when explicit series date is absent.
+     */
+    public static final Month DEFAULT_CALIBRATED_COMPLETION_MONTH = Month.AUGUST;
+
+    /**
+     * Calibrated historical baseline completion day for Tacna olive valleys when explicit series date is absent.
+     */
+    public static final int DEFAULT_CALIBRATED_COMPLETION_DAY = 18;
+
+    /**
      * Standard varietal chilling portions target required for olive floral bud release.
      */
     public static final double DEFAULT_VARIETAL_CHILL_THRESHOLD = 27.0;
 
     private ErezDynamicModelCalculator() {
     }
+
+    /**
+     * Determines the operational and biological state of the chilling season for a plot.
+     *
+     * @param portions        the accumulated chilling portions
+     * @param targetThreshold the varietal chilling threshold
+     * @param referenceDate   the reference date to evaluate seasonal positioning
+     * @return the evaluated {@link ChillSeasonState}
+     */
+    public static ChillSeasonState determineSeasonState(double portions, double targetThreshold, LocalDate referenceDate) {
+        if (portions >= targetThreshold) {
+            return ChillSeasonState.COMPLETED;
+        }
+        if (referenceDate == null) {
+            return ChillSeasonState.IN_PROGRESS;
+        }
+
+        LocalDate seasonStart = LocalDate.of(referenceDate.getYear(), DEFAULT_SEASON_START_MONTH, DEFAULT_SEASON_START_DAY);
+        LocalDate seasonEnd = LocalDate.of(referenceDate.getYear(), DEFAULT_SEASON_END_MONTH, DEFAULT_SEASON_END_DAY);
+
+        if (!referenceDate.isBefore(seasonStart) && !referenceDate.isAfter(seasonEnd)) {
+            return ChillSeasonState.IN_PROGRESS;
+        }
+        return ChillSeasonState.OFF_SEASON;
+    }
+
+    /**
+     * Builds the complete winter chill season details encapsulation.
+     *
+     * @param campaignYear             the agricultural campaign year
+     * @param portions                 the accumulated chilling portions
+     * @param targetThreshold          the varietal chilling threshold
+     * @param referenceDate            the reference evaluation date
+     * @param idleDays                 the count of consecutive days without chill accumulation
+     * @param explicitCompletionDate   optional explicit date when threshold was crossed
+     * @return consistent {@link ChillSeasonDetails} value object
+     */
+    public static ChillSeasonDetails buildSeasonDetails(
+            int campaignYear,
+            double portions,
+            double targetThreshold,
+            LocalDate referenceDate,
+            Integer idleDays,
+            LocalDate explicitCompletionDate
+    ) {
+        LocalDate seasonStart = LocalDate.of(campaignYear, DEFAULT_SEASON_START_MONTH, DEFAULT_SEASON_START_DAY);
+        ChillSeasonState state = determineSeasonState(portions, targetThreshold, referenceDate);
+
+        LocalDate completionDate = null;
+        if (state == ChillSeasonState.COMPLETED) {
+            completionDate = (explicitCompletionDate != null)
+                    ? explicitCompletionDate
+                    : LocalDate.of(campaignYear, DEFAULT_CALIBRATED_COMPLETION_MONTH, DEFAULT_CALIBRATED_COMPLETION_DAY);
+        }
+
+        return new ChillSeasonDetails(
+                seasonStart,
+                completionDate,
+                idleDays != null ? idleDays : 0,
+                state
+        );
+    }
+
 
     /**
      * Evaluates whether the accumulated chilling portions fulfill the varietal physiological requirement.

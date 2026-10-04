@@ -106,6 +106,13 @@ class PhenologyMetricQueryServiceTest {
                 .orElseThrow();
         assertThat(chillingMetric.value()).isEqualTo(28.5);
         assertThat(chillingMetric.qualitativeCategory()).isEqualTo("SATISFIED");
+        assertThat(chillingMetric.details()).containsEntry("model", "Dynamic Erez-Fishman");
+        assertThat(chillingMetric.details()).containsEntry("thresholdTarget", 27.0);
+        assertThat(chillingMetric.details()).containsEntry("completionPercentage", 105.56);
+        assertThat(chillingMetric.details()).containsEntry("seasonStart", "2022-06-01");
+        assertThat(chillingMetric.details()).containsEntry("completionDate", "2022-08-18");
+        assertThat(chillingMetric.details()).containsEntry("idleDays", 0);
+        assertThat(chillingMetric.details()).containsEntry("seasonState", "COMPLETED");
     }
 
     @Test
@@ -139,6 +146,10 @@ class PhenologyMetricQueryServiceTest {
         assertThat(result).isInstanceOf(Result.Success.class);
         var success = (Result.Success<List<MetricEvaluationResult>, ApplicationError>) result;
         assertThat(success.value()).hasSize(1);
-        assertThat(success.value().get(0).metricType()).isEqualTo(MetricType.EREZ_CHILLING_PORTIONS);
+        var chilling = success.value().get(0);
+        assertThat(chilling.metricType()).isEqualTo(MetricType.EREZ_CHILLING_PORTIONS);
+        assertThat(chilling.details()).containsEntry("seasonStart", "2023-06-01");
+        assertThat(chilling.details()).containsEntry("completionDate", "2023-08-18");
+        assertThat(chilling.details()).containsEntry("seasonState", "COMPLETED");
     }
 }
