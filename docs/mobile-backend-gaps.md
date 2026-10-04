@@ -1,7 +1,7 @@
 # Brechas del backend para las historias de la app Android (Productor)
 
-- **Última actualización:** 2026-10-03
-- **Backend revisado:** `develop` en la etiqueta **0.24.0** (cambios desde la 0.21.0 en la sección 4)
+- **Última actualización:** 2026-10-04
+- **Backend revisado:** `develop` en la etiqueta **0.26.0** más el cambio pendiente de `feature/bbi-thresholds-campaign-year-range` (cambios desde la 0.21.0 en la sección 4)
 - **Fuentes:** reporte (US y escenarios BDD), mockups de Figma (`Viora202602_Mobile_App`, sección App Productor · Kotlin) y el código del backend
 - **Para qué sirve:** que cada desarrollador sepa qué le falta al backend para completar las historias que tiene asignadas en la app, antes de empezar la pantalla, y dar seguimiento a los endpoints que requiere la app (sección 3).
 
@@ -21,7 +21,7 @@
 | **US17** Series de telemetría | Diana | P90, P91 | ✅ `GET /plots/{id}/telemetries?startDate&endDate` (lecturas crudas) | 🟡 Sin agregación por ventanas (24 h, 7 d, 30 d): la app recibiría todas las lecturas. Decidir si agrega la app o el backend (`resolution`). El viento actual no viene en la telemetría (solo en el pronóstico) | M | Diana |
 | **US18** Alertas automáticas | Fabrizio | T14, T15 | 🔴 **No existe** el contexto de alertas | Modelo de alerta (tipo, severidad crítica / atención / normalizada, lote, ventana horaria, métrica y umbral, serie de valores, "qué hacer", fuente del dato, normalización); reglas (estrés hídrico, golpe de calor / umbral térmico, humedad normalizada); `GET /alerts` (por lote y estado, con conteo de activas) y `GET /alerts/{id}`. Push queda para el Sprint 2 o 3 | **L** | Fabrizio |
 | **US19** Pronóstico 7 días | Piero | P90, Home | ✅ `GET /plots/{id}/forecasts` (máx., mín., prob. de lluvia, viento, `isFrostRisk`) | 🟡 El estado del cielo ("Soleado") no viene: se deriva en la app. Confirmar que siempre entrega 7 días y su `syncedAt` | S | Piero |
-| **US20** Cosechas históricas y BBI | Jahat | P40, P41 | ✅ `POST/GET /plots/{id}/harvest-records` y `GET .../metrics?name=BBI` (404 si no hay historial; con menos de 3 campañas `sampleSufficiency = INSUFFICIENT`) | — | — | — |
+| **US20** Cosechas históricas y BBI | Jahat | P40, P41 | ✅ `POST/GET /plots/{id}/harvest-records` y `GET .../metrics?name=BBI` (404 si no hay historial; con menos de 3 campañas `sampleSufficiency = INSUFFICIENT`). ✅ Bandas del BBI alineadas con el diseño: `REGULAR` < 0.20, `MODERATE_ALTERNATION` 0.20–0.40, `SEVERE_ALTERNATION` > 0.40. ✅ El año de campaña que se registra va de 2000 al año en curso (las campañas futuras se rechazan) | — | — | — |
 | **US21** Rectificar o eliminar cosecha | Jahat | P41 | ✅ `PUT` (rectificar) y ✅ **`DELETE /plots/{id}/harvest-records/{recordId}`** (0.22.0; `If-Match` opcional, recalcula el BBI y la campaña se puede volver a registrar) | — | — | — |
 | **US22** Frío acumulado (Erez) | Piero | P80, P81 | ✅ `GET .../metrics?name=CHILLING`: valor, categoría, modelo, umbral, % de avance, inicio de temporada (`seasonStart`), fecha de completado (`completionDate`), días sin acumular (`idleDays`) y estado de temporada (`seasonState`) | Resuelto en 0.23.0 (`phenology`). Incluye `ChillSeasonDetails` y cálculo dinámico de temporada | — | Piero |
 | **US23** Anomalía térmica / ENOS | Piero | T15 invierno cálido | 🔴 **No existe** | Regla de detección (máximas semanales sobre el umbral durante días seguidos), señal en la métrica de frío y alerta que se integra con US18 ("qué cambia": frío frenado, floración en riesgo, carga esperada reajustada 9,8 → 7,4 t/ha, que depende de un rendimiento potencial, ver US26) | **L** | Piero, tras el contrato de alertas |
@@ -87,7 +87,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 
 | Endpoint | US | Estado |
 |---|---|---|
-| `POST/GET /plots/{id}/harvest-records`, `GET .../metrics?name=BBI` | US20 | ✅ |
+| `POST/GET /plots/{id}/harvest-records`, `GET .../metrics?name=BBI` | US20 | ✅ el BBI usa las bandas del diseño (`REGULAR` < 0.20, `MODERATE_ALTERNATION` 0.20–0.40, `SEVERE_ALTERNATION` > 0.40) y la cosecha solo se registra de 2000 al año en curso |
 | `PUT` y `DELETE /plots/{id}/harvest-records/{recordId}` | US21 | ✅ (el DELETE llegó en la 0.22.0) |
 | `POST /plots/{id}/harvest-settlements` | US29 | ✅ |
 | Consultar liquidaciones hechas (`GET`) | US29 | 🟡 no existe; la Bitácora lo necesita (S) |
@@ -103,6 +103,8 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | 0.23.0 | `feature/plot-variety-edit` | `PUT /plots/{plotId}` acepta `variety` opcional | US10 |
 | 0.24.0 | `feature/plot-restore` | `POST /plots/{plotId}/restore` | US11 |
 | 0.24.0 | igual | Corrección: las respuestas de PUT y DELETE devolvían la `revision` anterior | US10, US11 |
+| 0.27.0 | `feature/bbi-thresholds-campaign-year-range` | Bandas del BBI alineadas con el diseño de "¿Qué es el BBI?" | US20 |
+| 0.27.0 | igual | El año de campaña que se registra va de 2000 al año en curso | US20 |
 
 **0.22.0**
 1. **`DELETE /api/v1/plots/{plotId}/harvest-records/{recordId}`** (US21, escenario 2): quita el registro, recalcula el BBI y la clasificación sobre las campañas válidas que quedan, y deja volver a registrar esa campaña. `If-Match` opcional. Respuesta 200 con `MessageResource` (no 204); también 400 (UUID o `If-Match` inválido), 404 y 412.
@@ -116,10 +118,15 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 5. **`POST /api/v1/plots/{plotId}/restore`** (US11): trae de vuelta un lote archivado con su historial y su nombre (un archivado sigue reservando su nombre, así que restaurarlo nunca choca con otro). 200 con el lote (`status` ACTIVE y `revision` +1), 404 si no existe o es de otro productor, 409 si no está archivado.
 6. **Corrección:** `PlotRepositoryImpl.save` devolvía la entidad antes del flush de `@Version`, y el PUT y el DELETE respondían con la `revision` anterior; el cliente que la guardaba recibía 412 en el siguiente `If-Match`. Ahora usa `saveAndFlush`. El mismo patrón podría existir en los repositorios de otros agregados (sin revisar). Un PUT con datos idénticos no sube la revisión.
 
+**0.27.0**
+7. **Bandas del BBI según el diseño** (US20, sheet "¿Qué es el BBI?"): `REGULAR` por debajo de 0.20, `MODERATE_ALTERNATION` de 0.20 a 0.40 inclusive y `SEVERE_ALTERNATION` por encima de 0.40 (antes 0.25 / 0.50). Los nombres de las categorías no cambian, así que la app no se rompe; solo cambia el texto de `qualitativeCategory` en `GET /plots/{id}/metrics?name=BBI` y qué producción cae en cada banda.
+8. **Rango del año de campaña al registrar una cosecha** (US20): la regla vive ahora en el dominio (`HarvestCampaignYearPolicy`), que acepta de 2000 al año en curso y rechaza con 400 las campañas futuras. Antes `POST /plots/{id}/harvest-records` aceptaba 1980–2100. El `CampaignYear` compartido sigue siendo la guarda estructural de 1980–2100 porque la liquidación necesita años futuros.
+
 **Para el reporte**
 - Baja de lote: `DELETE /plots/{id}?reason=` da 200 con `MessageResource`; la restauración es un `POST .../restore` aparte.
 - Agregar `variety` al contrato `UpdatePlot` y los estados `ACTIVE | REMOVED_SOFT_DELETE` a `PlotResource`.
 - Las cosechas históricas ya tienen CRUD completo (POST, GET, PUT, DELETE).
+- Las bandas del BBI y el rango del año de campaña ya son los del diseño (0.20 / 0.40 y 2000–año en curso); la app puede leer `qualitativeCategory` sin dejar de mapear a ningún lado.
 - Ya estaban en la 0.21.0, no son parte de este cambio: resumen de muestreos, prescripción activa, confirmación de ejecución, liquidación de campaña y certificación del dossier.
 
 ## 5. Orden sugerido en el backend

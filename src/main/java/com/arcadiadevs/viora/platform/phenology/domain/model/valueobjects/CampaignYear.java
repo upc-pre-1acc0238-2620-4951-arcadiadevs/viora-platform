@@ -1,7 +1,11 @@
 package com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects;
 
 /**
- * Value object representing an agricultural campaign year (1980 <= year <= 2100).
+ * Value object representing an agricultural campaign year (1980 &lt;= year &lt;= 2100).
+ *
+ * <p>This is a purely structural year guard shared across bounded contexts, so it stays deliberately wide.
+ * Recording a completed harvest applies the stricter range (2000 up to the current year) enforced by
+ * {@link com.arcadiadevs.viora.platform.phenology.domain.services.HarvestCampaignYearPolicy}.
  *
  * @param value the calendar year of the harvest campaign
  */

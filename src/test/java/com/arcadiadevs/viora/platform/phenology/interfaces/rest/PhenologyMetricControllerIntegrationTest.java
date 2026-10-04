@@ -55,7 +55,7 @@ class PhenologyMetricControllerIntegrationTest {
     void shouldReturnAllMetricsWhenNoFilterSpecified() throws Exception {
         var bbiResult = new MetricEvaluationResult(
                 MetricType.BIENNIAL_BEARING_INDEX,
-                0.42,
+                0.33,
                 "MODERATE_ALTERNATION",
                 Map.of("formula", "Hoblyn (1936)", "evaluatedYearsCount", 4, "sampleSufficiency", "SUFFICIENT"),
                 Instant.parse("2026-09-28T14:00:00Z")
@@ -84,7 +84,7 @@ class PhenologyMetricControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].metricName", is("BIENNIAL_BEARING_INDEX")))
-                .andExpect(jsonPath("$[0].value", is(0.42)))
+                .andExpect(jsonPath("$[0].value", is(0.33)))
                 .andExpect(jsonPath("$[0].qualitativeCategory", is("MODERATE_ALTERNATION")))
                 .andExpect(jsonPath("$[0].details.formula", is("Hoblyn (1936)")))
                 .andExpect(jsonPath("$[1].metricName", is("EREZ_CHILLING_PORTIONS")))
@@ -101,7 +101,7 @@ class PhenologyMetricControllerIntegrationTest {
     void shouldReturnFilteredBbiMetric() throws Exception {
         var bbiResult = new MetricEvaluationResult(
                 MetricType.BIENNIAL_BEARING_INDEX,
-                0.42,
+                0.33,
                 "MODERATE_ALTERNATION",
                 Map.of("formula", "Hoblyn (1936)"),
                 Instant.parse("2026-09-28T14:00:00Z")

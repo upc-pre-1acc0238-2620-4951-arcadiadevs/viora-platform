@@ -143,6 +143,27 @@ class HarvestRecordControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/harvest-records should resolve the future campaign year i18n key in the ProblemDetail")
+    void shouldReturnLocalizedDetailWhenCampaignYearIsInTheFuture() throws Exception {
+        when(harvestRecordCommandService.handle(any(RecordHarvestYieldCommand.class)))
+                .thenReturn(Result.failure(ApplicationError.validationError("argument", "phenology.campaign_year.future")));
+
+        String payload = """
+                {
+                    "campaignYear": 2027,
+                    "totalYieldKg": 10000.0
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/harvest-records", plotId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("VALIDATION_ERROR")))
+                .andExpect(jsonPath("$.detail", is("Campaign year cannot be in the future")));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/plots/{plotId}/harvest-records should return 200 OK with harvest record list")
     void shouldReturnOkWithHarvestRecordsList() throws Exception {
         var tracker = ChillAccumulationTracker.create(new PlotId(plotId.toString()), new CampaignYear(2024));
