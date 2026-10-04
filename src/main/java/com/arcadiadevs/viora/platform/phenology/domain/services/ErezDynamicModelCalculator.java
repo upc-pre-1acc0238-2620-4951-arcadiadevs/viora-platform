@@ -55,6 +55,16 @@ public final class ErezDynamicModelCalculator {
     public static final int DEFAULT_SEASON_END_DAY = 31;
 
     /**
+     * Calibrated historical baseline completion month for Tacna olive valleys when explicit series date is absent.
+     */
+    public static final Month DEFAULT_CALIBRATED_COMPLETION_MONTH = Month.AUGUST;
+
+    /**
+     * Calibrated historical baseline completion day for Tacna olive valleys when explicit series date is absent.
+     */
+    public static final int DEFAULT_CALIBRATED_COMPLETION_DAY = 18;
+
+    /**
      * Standard varietal chilling portions target required for olive floral bud release.
      */
     public static final double DEFAULT_VARIETAL_CHILL_THRESHOLD = 27.0;
@@ -111,11 +121,9 @@ public final class ErezDynamicModelCalculator {
 
         LocalDate completionDate = null;
         if (state == ChillSeasonState.COMPLETED) {
-            if (explicitCompletionDate != null) {
-                completionDate = explicitCompletionDate;
-            } else {
-                completionDate = LocalDate.of(campaignYear, Month.AUGUST, 18);
-            }
+            completionDate = (explicitCompletionDate != null)
+                    ? explicitCompletionDate
+                    : LocalDate.of(campaignYear, DEFAULT_CALIBRATED_COMPLETION_MONTH, DEFAULT_CALIBRATED_COMPLETION_DAY);
         }
 
         return new ChillSeasonDetails(
