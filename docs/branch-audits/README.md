@@ -28,6 +28,7 @@ Cualquier agente desarrollador o auditor ([backend-ddd-auditor](file:///home/san
 | **09** | `feature/telemetry-deactivate-iot-device` | `DELETE /api/v1/plots/{plotId}/iot-devices/{deviceId}` | - | **COMPLETADO** |
 | **10** | `feature/telemetry-get-series` | `GET /api/v1/plots/{plotId}/telemetries` | [10-feature-telemetry-get-series.md](10-feature-telemetry-get-series.md) | **COMPLETADO** |
 | **11** | `feature/telemetry-get-weather-forecast` | `GET /api/v1/plots/{plotId}/forecasts` | [11-feature-telemetry-get-weather-forecast.md](11-feature-telemetry-get-weather-forecast.md) | **COMPLETADO** |
+| **22** | `feature/telemitry-agroclimatic-incidents` | `GET /api/v1/agroclimatic-incidents`<br>`POST .../postponements`<br>`PUT .../mitigation-steps/{stepId}` | [22-feature-telemetry-agroclimatic-incidents.md](22-feature-telemetry-agroclimatic-incidents.md) | **COMPLETADO** |
 
 ---
 
@@ -55,10 +56,10 @@ Cualquier agente desarrollador o auditor ([backend-ddd-auditor](file:///home/san
 
 ## 5. Bounded Context: Harvest Settlement and Performance Reporting (`settlement`)
 
-| Orden | Rama `feature/` | Endpoint Único | Propósito Táctico DDD |
-| :---: | :--- | :--- | :--- |
-| **20** | `feature/settlement-settle-campaign-harvest` | `POST /api/v1/plots/{plotId}/harvest-settlements` | Balance comercial definitivo de aceituna verde y negra. |
-| **21** | `feature/settlement-certify-agronomic-dossier` | `POST /api/v1/plots/{plotId}/certifications` | Certificación oficial colegiada con hash criptográfico SHA-256. |
+| Orden | Rama `feature/` | Endpoint Único | Archivo de Especificación de Auditoría | Estado |
+| :---: | :--- | :--- | :--- | :---: |
+| **20** | `feature/settlement-settle-campaign-harvest` | `POST /api/v1/plots/{plotId}/harvest-settlements` | [20-feature-settlement-settle-campaign-harvest.md](20-feature-settlement-settle-campaign-harvest.md) | Pendiente |
+| **21** | `feature/settlement-certify-agronomic-dossier` | `POST /api/v1/plots/{plotId}/certifications` | [21-feature-settlement-certify-agronomic-dossier.md](21-feature-settlement-certify-agronomic-dossier.md) | Pendiente |
 
 ---
 

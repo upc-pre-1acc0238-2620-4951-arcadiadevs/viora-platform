@@ -51,4 +51,43 @@ public class ExternalOrchardService {
         }
         return orchardContextFacade.findPlotCentroid(plotId.plotId());
     }
+
+    /**
+     * Retrieves the human-readable name of an active plot.
+     *
+     * @param plotId the Telemetry PlotId value object
+     * @return Optional containing the plot name, or empty if not found
+     */
+    public Optional<String> findPlotName(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotName(plotId.plotId());
+    }
+
+    /**
+     * Retrieves the botanical olive variety of an active plot.
+     *
+     * @param plotId the Telemetry PlotId value object
+     * @return Optional containing the variety name, or empty if not found
+     */
+    public Optional<String> findPlotVariety(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotVariety(plotId.plotId());
+    }
+
+    /**
+     * Retrieves the owner producer identifier of an active plot.
+     *
+     * @param plotId the Telemetry PlotId value object
+     * @return Optional containing the producer identifier, or empty if not found
+     */
+    public Optional<String> findPlotProducerId(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotProducerId(plotId.plotId());
+    }
 }
