@@ -28,7 +28,7 @@ public class TreeSamplingRecordPersistenceEntity {
     @Column(name = "fruit_set_count", nullable = false)
     private Integer fruitSetCount;
 
-    @Column(name = "trunk_diameter_mm", nullable = false)
+    @Column(name = "trunk_diameter_mm", nullable = true)
     private Double trunkDiameterMm;
 
     @Column(name = "sampling_date", nullable = false)

@@ -139,4 +139,19 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
             return List.of();
         }
     }
+
+    @Override
+    public Optional<Double> findPlotAreaHectares(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            var domainPlotId = new PlotId(plotId);
+            return plotRepository.findById(domainPlotId)
+                    .filter(plot -> plot.snapshot().status() == PlotStatus.ACTIVE)
+                    .map(plot -> plot.snapshot().geometry().areaHa());
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
 }

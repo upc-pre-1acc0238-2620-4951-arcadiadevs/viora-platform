@@ -11,13 +11,14 @@ import java.util.List;
  *
  * @param plotId             target plot identifier
  * @param campaignYear       agricultural campaign year
- * @param sampledTreesCount  unique evaluated trees
- * @param sampledShootsCount total evaluated shoots
- * @param meanFruitsPerShoot mean fruits per sampled shoot
- * @param isRepresentative   statistical representativeness flag
- * @param treesNeeded        additional unique trees needed for representativeness
- * @param loadUnit           unit of the mean load: {@code FRUITS_PER_SHOOT}
- * @param trees              ordered per-observation tree data
+ * @param sampledTreesCount    unique evaluated trees
+ * @param sampledShootsCount   total evaluated shoots
+ * @param sampledFruitSetCount total evaluated set fruits
+ * @param meanFruitsPerShoot   mean fruits per sampled shoot
+ * @param isRepresentative     statistical representativeness flag
+ * @param treesNeeded          additional unique trees needed for representativeness
+ * @param loadUnit             unit of the mean load: {@code FRUITS_PER_SHOOT}
+ * @param trees                ordered per-observation tree data
  */
 @Schema(
         name = "SamplingDetailedResource",
@@ -29,6 +30,7 @@ public record SamplingDetailedResource(
         Integer campaignYear,
         Integer sampledTreesCount,
         Integer sampledShootsCount,
+        Integer sampledFruitSetCount,
         Double meanFruitsPerShoot,
         Boolean isRepresentative,
         Integer treesNeeded,

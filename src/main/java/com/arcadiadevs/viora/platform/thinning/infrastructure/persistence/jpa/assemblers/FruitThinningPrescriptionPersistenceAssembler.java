@@ -62,6 +62,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             roundEntity.setActorId(UUID.fromString(roundSnap.actorId().actorId()));
             roundEntity.setClientBatchId(roundSnap.batchId().batchId());
             roundEntity.setIsRepresentative(roundSnap.isRepresentative());
+            roundEntity.setCreatedAt(roundSnap.createdAt());
 
             var recordEntities = new ArrayList<TreeSamplingRecordPersistenceEntity>();
             for (var recordSnap : roundSnap.samplingRecords()) {
@@ -71,7 +72,9 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 recordEntity.setTreeTag(recordSnap.treeTag().value());
                 recordEntity.setShootCount(recordSnap.shootFruitCount().shootCount());
                 recordEntity.setFruitSetCount(recordSnap.shootFruitCount().fruitSetCount());
-                recordEntity.setTrunkDiameterMm(recordSnap.trunkCrossSectionalArea().trunkDiameterMm());
+                recordEntity.setTrunkDiameterMm(
+                        recordSnap.trunkCrossSectionalArea() != null ? recordSnap.trunkCrossSectionalArea().trunkDiameterMm() : null
+                );
                 recordEntity.setSamplingDate(recordSnap.samplingDate());
                 recordEntities.add(recordEntity);
             }
@@ -120,6 +123,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 roundEntity.setActorId(UUID.fromString(roundSnap.actorId().actorId()));
                 roundEntity.setClientBatchId(roundSnap.batchId().batchId());
                 roundEntity.setIsRepresentative(roundSnap.isRepresentative());
+                roundEntity.setCreatedAt(roundSnap.createdAt());
 
                 var recordEntities = new ArrayList<TreeSamplingRecordPersistenceEntity>();
                 for (var recordSnap : roundSnap.samplingRecords()) {
@@ -129,7 +133,9 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                     recordEntity.setTreeTag(recordSnap.treeTag().value());
                     recordEntity.setShootCount(recordSnap.shootFruitCount().shootCount());
                     recordEntity.setFruitSetCount(recordSnap.shootFruitCount().fruitSetCount());
-                    recordEntity.setTrunkDiameterMm(recordSnap.trunkCrossSectionalArea().trunkDiameterMm());
+                    recordEntity.setTrunkDiameterMm(
+                            recordSnap.trunkCrossSectionalArea() != null ? recordSnap.trunkCrossSectionalArea().trunkDiameterMm() : null
+                    );
                     recordEntity.setSamplingDate(recordSnap.samplingDate());
                     recordEntities.add(recordEntity);
                 }
@@ -160,7 +166,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                                 new SamplingRecordId(recordEntity.getId().toString()),
                                 new TreeTag(recordEntity.getTreeTag()),
                                 new ShootFruitCount(recordEntity.getShootCount(), recordEntity.getFruitSetCount()),
-                                new TrunkCrossSectionalArea(recordEntity.getTrunkDiameterMm()),
+                                recordEntity.getTrunkDiameterMm() != null ? new TrunkCrossSectionalArea(recordEntity.getTrunkDiameterMm()) : null,
                                 recordEntity.getSamplingDate()
                         ));
                     }
@@ -170,7 +176,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                         new UserId(roundEntity.getActorId().toString()),
                         new SamplingBatchId(roundEntity.getClientBatchId()),
                         roundEntity.getIsRepresentative(),
-                        recordSnapshots
+                        recordSnapshots,
+                        roundEntity.getCreatedAt()
                 ));
             }
         }

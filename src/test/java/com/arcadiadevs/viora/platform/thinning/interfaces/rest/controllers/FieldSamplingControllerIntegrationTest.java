@@ -98,8 +98,56 @@ class FieldSamplingControllerIntegrationTest {
                 .andExpect(jsonPath("$.plotId", is(plotId.toString())))
                 .andExpect(jsonPath("$.campaignYear", is(2026)))
                 .andExpect(jsonPath("$.sampledTreesCount", is(5)))
+                .andExpect(jsonPath("$.sampledFruitSetCount", is(540)))
                 .andExpect(jsonPath("$.isRepresentative", is(true)))
                 .andExpect(jsonPath("$.treesNeeded", is(0)));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/samplings - 201 Created when trunkDiameterMm is omitted")
+    void shouldReturnCreatedWhenTrunkDiameterMmIsOmitted() throws Exception {
+        var prescription = FruitThinningPrescription.createForPlot(
+                new PlotId(plotId.toString()),
+                new CampaignYear(2026),
+                1L
+        );
+        var actorId = new UserId(UUID.randomUUID().toString());
+        prescription.ingestSamplingsBatch(
+                actorId,
+                new SamplingBatchId("e4c18495-e224-497f-cd46-de32fc054d6b"),
+                List.of(
+                        TreeSamplingRecord.create("T-01", 10, 50, null, LocalDate.now()),
+                        TreeSamplingRecord.create("T-02", 10, 50, null, LocalDate.now()),
+                        TreeSamplingRecord.create("T-03", 10, 50, null, LocalDate.now()),
+                        TreeSamplingRecord.create("T-04", 10, 50, null, LocalDate.now()),
+                        TreeSamplingRecord.create("T-05", 10, 50, null, LocalDate.now())
+                )
+        );
+
+        when(thinningCommandService.handle(any(IngestFieldSamplingsBatchCommand.class)))
+                .thenReturn(Result.success(prescription));
+
+        String requestBody = """
+                {
+                  "clientBatchId": "e4c18495-e224-497f-cd46-de32fc054d6b",
+                  "campaignYear": 2026,
+                  "samples": [
+                    {
+                      "treeTag": "T-01",
+                      "shootCount": 10,
+                      "fruitSetCount": 50,
+                      "samplingDate": "2026-05-15"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/samplings", plotId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sampledFruitSetCount", is(250)))
+                .andExpect(jsonPath("$.isRepresentative", is(true)));
     }
 
     @Test
