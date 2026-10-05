@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.RoundId
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingBatchId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.UserId;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -14,18 +15,37 @@ import java.util.List;
  * @param batchId          field sampling batch identifier
  * @param isRepresentative flag indicating if this round satisfies statistical coverage
  * @param samplingRecords  list of tree evaluations conducted in this round
+ * @param createdAt        creation timestamp of the sampling round
  */
 public record SamplingRoundSnapshot(
         RoundId id,
         UserId actorId,
         SamplingBatchId batchId,
         Boolean isRepresentative,
-        List<TreeSamplingRecordSnapshot> samplingRecords
+        List<TreeSamplingRecordSnapshot> samplingRecords,
+        Instant createdAt
 ) {
+
+    /**
+     * Backward-compatible constructor defaulting createdAt to current time.
+     */
+    public SamplingRoundSnapshot(
+            RoundId id,
+            UserId actorId,
+            SamplingBatchId batchId,
+            Boolean isRepresentative,
+            List<TreeSamplingRecordSnapshot> samplingRecords
+    ) {
+        this(id, actorId, batchId, isRepresentative, samplingRecords, Instant.now());
+    }
+
     /**
      * Compact constructor creating an immutable defensive copy of the records list.
      */
     public SamplingRoundSnapshot {
         samplingRecords = (samplingRecords == null) ? List.of() : List.copyOf(samplingRecords);
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
     }
 }

@@ -20,9 +20,36 @@ public class SamplingRound {
     private final SamplingBatchId batchId;
     private boolean isRepresentative;
     private final List<TreeSamplingRecord> samplingRecords;
+    private final java.time.Instant createdAt;
 
     /**
      * Constructs a SamplingRound entity.
+     *
+     * @param id               round identifier
+     * @param actorId          user who conducted sampling
+     * @param batchId          field sampling batch identifier
+     * @param isRepresentative flag indicating if round fulfills statistical representativeness
+     * @param samplingRecords  evaluated trees
+     * @param createdAt        creation timestamp
+     */
+    public SamplingRound(
+            RoundId id,
+            UserId actorId,
+            SamplingBatchId batchId,
+            boolean isRepresentative,
+            List<TreeSamplingRecord> samplingRecords,
+            java.time.Instant createdAt
+    ) {
+        this.id = id;
+        this.actorId = actorId;
+        this.batchId = batchId;
+        this.isRepresentative = isRepresentative;
+        this.samplingRecords = (samplingRecords == null) ? new ArrayList<>() : new ArrayList<>(samplingRecords);
+        this.createdAt = createdAt != null ? createdAt : java.time.Instant.now();
+    }
+
+    /**
+     * Constructs a SamplingRound entity defaulting createdAt to current time.
      *
      * @param id               round identifier
      * @param actorId          user who conducted sampling
@@ -37,11 +64,7 @@ public class SamplingRound {
             boolean isRepresentative,
             List<TreeSamplingRecord> samplingRecords
     ) {
-        this.id = id;
-        this.actorId = actorId;
-        this.batchId = batchId;
-        this.isRepresentative = isRepresentative;
-        this.samplingRecords = (samplingRecords == null) ? new ArrayList<>() : new ArrayList<>(samplingRecords);
+        this(id, actorId, batchId, isRepresentative, samplingRecords, java.time.Instant.now());
     }
 
     /**
@@ -62,7 +85,8 @@ public class SamplingRound {
                 actorId,
                 batchId,
                 false,
-                samplingRecords
+                samplingRecords,
+                java.time.Instant.now()
         );
     }
 
@@ -84,7 +108,8 @@ public class SamplingRound {
                 snapshot.actorId(),
                 snapshot.batchId(),
                 Boolean.TRUE.equals(snapshot.isRepresentative()),
-                records
+                records,
+                snapshot.createdAt() != null ? snapshot.createdAt() : java.time.Instant.now()
         );
     }
 
@@ -103,8 +128,13 @@ public class SamplingRound {
                 actorId,
                 batchId,
                 isRepresentative,
-                recordSnapshots
+                recordSnapshots,
+                createdAt
         );
+    }
+
+    public java.time.Instant createdAt() {
+        return createdAt;
     }
 
     public RoundId id() {

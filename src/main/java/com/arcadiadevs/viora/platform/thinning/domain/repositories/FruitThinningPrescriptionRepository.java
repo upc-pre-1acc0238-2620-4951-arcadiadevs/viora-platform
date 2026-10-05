@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.Campaig
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionId;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,6 +32,15 @@ public interface FruitThinningPrescriptionRepository {
      * @return an {@link Optional} containing the aggregate if found, or empty otherwise
      */
     Optional<FruitThinningPrescription> findByPlotIdAndCampaignYear(PlotId plotId, CampaignYear year);
+
+    /**
+     * Finds thinning prescription aggregates associated with a collection of plots and a campaign year.
+     *
+     * @param plotIds the plot identifiers
+     * @param year    the campaign year
+     * @return list of matching thinning prescription aggregates
+     */
+    List<FruitThinningPrescription> findByPlotIdInAndCampaignYear(List<PlotId> plotIds, CampaignYear year);
 
     /**
      * Persists the given prescription aggregate and returns the updated domain model.

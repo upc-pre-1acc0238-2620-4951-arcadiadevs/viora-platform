@@ -27,6 +27,15 @@ public interface FruitThinningPrescriptionPersistenceRepository
      */
     Optional<FruitThinningPrescriptionPersistenceEntity> findByPlotIdAndCampaignYear(UUID plotId, Integer campaignYear);
 
+    /**
+     * Finds prescription persistence entities by a collection of plot UUIDs and campaign year.
+     *
+     * @param plotIds      the plot UUID list
+     * @param campaignYear the campaign year
+     * @return list of matching prescription entities
+     */
+    java.util.List<FruitThinningPrescriptionPersistenceEntity> findByPlotIdInAndCampaignYear(java.util.List<UUID> plotIds, Integer campaignYear);
+
     /** Locks the parent row before reading its execution evidence. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from FruitThinningPrescriptionPersistenceEntity p where p.id = :id")

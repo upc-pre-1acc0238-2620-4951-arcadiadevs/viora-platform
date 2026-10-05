@@ -17,7 +17,7 @@ public record SamplingTreeObservation(
         TreeTag treeTag,
         int shootCount,
         int fruitSetCount,
-        double trunkDiameterMm,
+        Double trunkDiameterMm,
         LocalDate samplingDate
 ) {
 
@@ -28,7 +28,7 @@ public record SamplingTreeObservation(
      * @param treeTag         physical tree identifier
      * @param shootCount      number of evaluated shoots
      * @param fruitSetCount   number of observed set fruits
-     * @param trunkDiameterMm trunk diameter in millimeters
+     * @param trunkDiameterMm trunk diameter in millimeters (optional)
      * @param samplingDate    date of the field observation
      */
     public SamplingTreeObservation {
@@ -44,7 +44,7 @@ public record SamplingTreeObservation(
         if (fruitSetCount < 0) {
             throw new IllegalArgumentException("thinning.fruit_count.negative");
         }
-        if (!Double.isFinite(trunkDiameterMm) || trunkDiameterMm <= 0.0) {
+        if (trunkDiameterMm != null && (!Double.isFinite(trunkDiameterMm) || trunkDiameterMm <= 0.0)) {
             throw new IllegalArgumentException("thinning.trunk_diameter.positive");
         }
         if (samplingDate == null) {
