@@ -9,14 +9,14 @@ import java.util.Locale;
  * @param plotId                 plot where the campaign happened
  * @param campaignYear           harvested campaign
  * @param variety                olive variety of the plot (Orchard published name, e.g. SEVILLANA)
- * @param residualFruitsPerMeter crop load left after the on-time thinning of that campaign
+ * @param residualFruitsPerShoot crop load left after the on-time thinning of that campaign
  * @param commercialFruitsPerKg  fruits per kilogram reported at harvest settlement
  */
 public record CaliberCalibrationObservation(
         PlotId plotId,
         CampaignYear campaignYear,
         String variety,
-        double residualFruitsPerMeter,
+        double residualFruitsPerShoot,
         double commercialFruitsPerKg
 ) {
 
@@ -28,7 +28,7 @@ public record CaliberCalibrationObservation(
             throw new IllegalArgumentException("thinning.calibration.variety.null_or_empty");
         }
         variety = variety.trim().toUpperCase(Locale.ROOT);
-        if (!Double.isFinite(residualFruitsPerMeter) || residualFruitsPerMeter <= 0.0) {
+        if (!Double.isFinite(residualFruitsPerShoot) || residualFruitsPerShoot <= 0.0) {
             throw new IllegalArgumentException("thinning.calibration.load.invalid");
         }
         if (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0) {

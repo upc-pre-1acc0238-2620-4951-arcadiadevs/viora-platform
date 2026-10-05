@@ -117,7 +117,7 @@ class HarvestSettlementControllerIntegrationTest {
                 .filter(o -> o.plotId().plotId().equals(plotId)).toList();
         assertEquals(1, observations.size());
         assertEquals(2026, observations.getFirst().campaignYear().value());
-        assertEquals(31.5, observations.getFirst().residualFruitsPerMeter(), 1e-9);
+        assertEquals(6.3, observations.getFirst().residualFruitsPerShoot(), 1e-9);
         assertEquals(103.0, observations.getFirst().commercialFruitsPerKg());
     }
 

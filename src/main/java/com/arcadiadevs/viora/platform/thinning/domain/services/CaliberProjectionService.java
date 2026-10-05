@@ -39,7 +39,7 @@ public final class CaliberProjectionService {
         }
         CaliberCalibration state = calibration == null ? CaliberCalibration.none() : calibration;
         int observations = state.observationCount();
-        double residualLoad = loadBalance.residualFruitsPerMeter();
+        double residualLoad = loadBalance.residualFruitsPerShoot();
 
         if (residualLoad <= 0.0) {
             return CaliberProjection.withoutEstimate(CaliberProjectionStatus.NOT_APPLICABLE, observations);

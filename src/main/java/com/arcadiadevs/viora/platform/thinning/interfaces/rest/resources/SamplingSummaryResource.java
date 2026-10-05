@@ -10,14 +10,15 @@ import org.jspecify.annotations.NullMarked;
  * @param campaignYear       the agricultural campaign year
  * @param sampledTreesCount  total unique evaluated trees
  * @param sampledShootsCount total shoots counted
- * @param meanFruitsPerMeter average fruit load density per canopy meter
+ * @param meanFruitsPerShoot average fruits per sampled shoot
  * @param isRepresentative   whether minimum statistical confidence was reached (minimum 5 trees)
  * @param treesNeeded        count of additional trees needed to achieve representativeness
+ * @param loadUnit           unit of the load: {@code FRUITS_PER_SHOOT}
  */
 @Schema(
         name = "SamplingSummaryResource",
         description = "Response resource representing the statistical representativeness and shoot density of field samplings",
-        example = "{\"plotId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\", \"campaignYear\": 2026, \"sampledTreesCount\": 5, \"sampledShootsCount\": 60, \"meanFruitsPerMeter\": 54.2, \"isRepresentative\": true, \"treesNeeded\": 0}"
+        example = "{\"plotId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\", \"campaignYear\": 2026, \"sampledTreesCount\": 5, \"sampledShootsCount\": 60, \"meanFruitsPerShoot\": 0.903, \"isRepresentative\": true, \"treesNeeded\": 0, \"loadUnit\": \"FRUITS_PER_SHOOT\"}"
 )
 @NullMarked
 public record SamplingSummaryResource(
@@ -33,13 +34,16 @@ public record SamplingSummaryResource(
         @Schema(description = "Total number of shoots observed across all sampling rounds", example = "60")
         Integer sampledShootsCount,
 
-        @Schema(description = "Assessed mean fruit set density per linear canopy meter", example = "54.2")
-        Double meanFruitsPerMeter,
+        @Schema(description = "Assessed mean fruits per sampled shoot", example = "0.903")
+        Double meanFruitsPerShoot,
 
         @Schema(description = "Whether the sample fulfills the statistical threshold of at least 5 evaluated trees", example = "true")
         Boolean isRepresentative,
 
         @Schema(description = "Number of additional trees required to achieve statistical confidence", example = "0")
-        Integer treesNeeded
+        Integer treesNeeded,
+
+        @Schema(description = "Unit of the mean load", example = "FRUITS_PER_SHOOT")
+        String loadUnit
 ) {
 }

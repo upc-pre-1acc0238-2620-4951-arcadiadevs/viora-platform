@@ -42,10 +42,14 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         entity.setObservedPlotRevision(snap.observedPlotRevision());
         entity.setStatus(snap.status().name());
         if (snap.sustainableLoad() != null) {
-            entity.setTargetFruitsPerMeter(snap.sustainableLoad().targetFruitsPerMeter());
+            entity.setTargetFruitsPerShoot(snap.sustainableLoad().targetFruitsPerShoot());
             entity.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
+            entity.setWindowOpensOn(snap.sustainableLoad().windowOpensOn());
             entity.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
+            entity.setProfileVersion(snap.sustainableLoad().profileVersion());
+            entity.setProfileStatus(snap.sustainableLoad().profileStatus());
         }
+        entity.setFullBloomOn(snap.fullBloomOn());
         entity.setIssuedAt(snap.issuedAt());
         appendConfirmation(entity, snap.executionConfirmation());
 
@@ -92,10 +96,14 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         var snap = domain.snapshot();
         target.setStatus(snap.status().name());
         if (snap.sustainableLoad() != null) {
-            target.setTargetFruitsPerMeter(snap.sustainableLoad().targetFruitsPerMeter());
+            target.setTargetFruitsPerShoot(snap.sustainableLoad().targetFruitsPerShoot());
             target.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
+            target.setWindowOpensOn(snap.sustainableLoad().windowOpensOn());
             target.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
+            target.setProfileVersion(snap.sustainableLoad().profileVersion());
+            target.setProfileStatus(snap.sustainableLoad().profileStatus());
         }
+        target.setFullBloomOn(snap.fullBloomOn());
         target.setIssuedAt(snap.issuedAt());
         appendConfirmation(target, snap.executionConfirmation());
 
@@ -167,8 +175,9 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             }
         }
 
-        SustainableCropLoad load = (entity.getTargetFruitsPerMeter() != null || entity.getPercentageToRemove() != null)
-                ? new SustainableCropLoad(entity.getTargetFruitsPerMeter(), entity.getPercentageToRemove(), entity.getWindowClosesOn())
+        SustainableCropLoad load = (entity.getTargetFruitsPerShoot() != null || entity.getPercentageToRemove() != null)
+                ? new SustainableCropLoad(entity.getTargetFruitsPerShoot(), entity.getPercentageToRemove(), entity.getWindowOpensOn(), entity.getWindowClosesOn(),
+                        entity.getProfileVersion(), entity.getProfileStatus())
                 : SustainableCropLoad.empty();
 
         var snapshot = new FruitThinningPrescriptionSnapshot(
@@ -181,7 +190,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 entity.getIssuedAt(),
                 roundSnapshots,
                 confirmationSnapshot(entity.getExecutionConfirmation()),
-                entity.getRevision()
+                entity.getRevision(),
+                entity.getFullBloomOn()
         );
 
         return FruitThinningPrescription.reconstitute(snapshot);
@@ -204,10 +214,10 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         entity.setNotes(snapshot.notes());
         var balance = snapshot.loadBalance();
         if (balance != null) {
-            entity.setPreThinningFruitsPerMeter(balance.preThinningFruitsPerMeter());
-            entity.setResidualFruitsPerMeter(balance.residualFruitsPerMeter());
-            entity.setTargetFruitsPerMeter(balance.targetFruitsPerMeter());
-            entity.setDeltaFruitsPerMeter(balance.deltaFruitsPerMeter());
+            entity.setPreThinningFruitsPerShoot(balance.preThinningFruitsPerShoot());
+            entity.setResidualFruitsPerShoot(balance.residualFruitsPerShoot());
+            entity.setTargetFruitsPerShoot(balance.targetFruitsPerShoot());
+            entity.setDeltaFruitsPerShoot(balance.deltaFruitsPerShoot());
             entity.setLoadRatio(balance.loadRatio());
             entity.setLoadState(balance.loadState().name());
         }
@@ -238,8 +248,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         if (entity.getLoadState() == null) {
             return null;
         }
-        return new LoadBalance(entity.getPreThinningFruitsPerMeter(), entity.getResidualFruitsPerMeter(),
-                entity.getTargetFruitsPerMeter(), entity.getDeltaFruitsPerMeter(), entity.getLoadRatio(),
+        return new LoadBalance(entity.getPreThinningFruitsPerShoot(), entity.getResidualFruitsPerShoot(),
+                entity.getTargetFruitsPerShoot(), entity.getDeltaFruitsPerShoot(), entity.getLoadRatio(),
                 LoadState.valueOf(entity.getLoadState()));
     }
 

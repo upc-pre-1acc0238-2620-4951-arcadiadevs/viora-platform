@@ -92,10 +92,10 @@ class ThinningExecutionControllerIntegrationTest {
                 .andExpect(jsonPath("$.laborCrewSize").value(4))
                 .andExpect(jsonPath("$.notes").value("Aclareo registrado"))
                 .andExpect(jsonPath("$.recordedAt").isNotEmpty())
-                .andExpect(jsonPath("$.loadBalance.preThinningFruitsPerMeter").value(42.0))
-                .andExpect(jsonPath("$.loadBalance.residualFruitsPerMeter").value(31.5))
-                .andExpect(jsonPath("$.loadBalance.targetFruitsPerMeter").value(30.0))
-                .andExpect(jsonPath("$.loadBalance.deltaFruitsPerMeter").value(1.5))
+                .andExpect(jsonPath("$.loadBalance.preThinningFruitsPerShoot").value(8.4))
+                .andExpect(jsonPath("$.loadBalance.residualFruitsPerShoot").value(6.3))
+                .andExpect(jsonPath("$.loadBalance.targetFruitsPerShoot").value(6.0))
+                .andExpect(jsonPath("$.loadBalance.deltaFruitsPerShoot").value(0.3))
                 .andExpect(jsonPath("$.loadBalance.loadRatio").value(1.05))
                 .andExpect(jsonPath("$.loadBalance.loadState").value("MODERATE_OVERLOAD"))
                 .andExpect(jsonPath("$.caliberProjection.status")
@@ -107,7 +107,7 @@ class ThinningExecutionControllerIntegrationTest {
                 .andExpect(jsonPath("$.caliberProjection.model").value("LOAD_RESPONSE_V1"));
         var saved = reload(id);
         var evidence = saved.executionConfirmation();
-        assertEquals(LoadBalance.of(42.0, 25.0, 30.0), evidence.loadBalance());
+        assertEquals(LoadBalance.of(8.4, 25.0, 6.0), evidence.loadBalance());
         assertEquals(opportune ? CaliberProjectionStatus.NOT_CALIBRATED : CaliberProjectionStatus.NOT_ESTIMATED_LATE,
                 evidence.caliberProjection().status());
         assertEquals(PrescriptionStatus.EXECUTED, saved.status());
@@ -181,7 +181,7 @@ class ThinningExecutionControllerIntegrationTest {
         var plotId = createPlot("SEVILLANA");
         exactObservations("SEVILLANA").forEach(observationRepository::save);
         var id = transactions.execute(tx -> repository.save(prescribed(date, plotId)).snapshot().id().prescriptionId());
-        // Residual 31.5 fruits/m with the calibrated curve W = 10 x (L/30)^-0.6 -> 103.0 fruits/kg
+        // Residual 6.3 fruits/shoot with the calibrated curve W = 10 x (L/6)^-0.6 -> 103.0 fruits/kg
         mvc.perform(post(route(id)).contentType(MediaType.APPLICATION_JSON).content(body(date)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.caliberProjection.status").value("ESTIMATED"))
@@ -201,7 +201,7 @@ class ThinningExecutionControllerIntegrationTest {
         var first = exactObservations("ARBEQUINA").getFirst();
         observationRepository.save(first);
         observationRepository.save(new CaliberCalibrationObservation(first.plotId(), first.campaignYear(),
-                "arbequina", first.residualFruitsPerMeter(), 350.0));
+                "arbequina", first.residualFruitsPerShoot(), 350.0));
         var stored = observationRepository.findByVariety("ARBEQUINA");
         assertEquals(1, stored.size());
         assertEquals(350.0, stored.getFirst().commercialFruitsPerKg());

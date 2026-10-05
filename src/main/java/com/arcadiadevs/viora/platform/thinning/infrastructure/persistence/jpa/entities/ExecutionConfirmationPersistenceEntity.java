@@ -38,13 +38,13 @@ public class ExecutionConfirmationPersistenceEntity {
 
     // Load balance left by the labor (nullable only for confirmations recorded before it existed)
     @Column(updatable = false)
-    private Double preThinningFruitsPerMeter;
+    private Double preThinningFruitsPerShoot;
     @Column(updatable = false)
-    private Double residualFruitsPerMeter;
+    private Double residualFruitsPerShoot;
     @Column(updatable = false)
-    private Double targetFruitsPerMeter;
+    private Double targetFruitsPerShoot;
     @Column(updatable = false)
-    private Double deltaFruitsPerMeter;
+    private Double deltaFruitsPerShoot;
     @Column(updatable = false)
     private Double loadRatio;
     @Column(updatable = false, length = 20)

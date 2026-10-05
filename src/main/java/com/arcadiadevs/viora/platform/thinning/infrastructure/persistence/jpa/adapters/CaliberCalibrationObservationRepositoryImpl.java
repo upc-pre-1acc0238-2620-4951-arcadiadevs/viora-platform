@@ -46,7 +46,7 @@ public class CaliberCalibrationObservationRepositoryImpl implements CaliberCalib
                     return created;
                 });
         entity.setVariety(observation.variety());
-        entity.setResidualFruitsPerMeter(observation.residualFruitsPerMeter());
+        entity.setResidualFruitsPerShoot(observation.residualFruitsPerShoot());
         entity.setCommercialFruitsPerKg(observation.commercialFruitsPerKg());
         return toDomain(persistenceRepository.save(entity));
     }
@@ -54,6 +54,6 @@ public class CaliberCalibrationObservationRepositoryImpl implements CaliberCalib
     private static CaliberCalibrationObservation toDomain(CaliberCalibrationObservationPersistenceEntity entity) {
         return new CaliberCalibrationObservation(new PlotId(entity.getPlotId().toString()),
                 new CampaignYear(entity.getCampaignYear()), entity.getVariety(),
-                entity.getResidualFruitsPerMeter(), entity.getCommercialFruitsPerKg());
+                entity.getResidualFruitsPerShoot(), entity.getCommercialFruitsPerKg());
     }
 }

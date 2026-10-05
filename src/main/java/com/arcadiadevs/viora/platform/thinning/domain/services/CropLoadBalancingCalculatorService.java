@@ -7,8 +7,9 @@ import java.time.LocalDate;
 /**
  * Pure domain service calculating thinning removal according to the sustainable crop-load curve.
  *
- * <p>The target threshold is supplied by agronomic calibration instead of being hardcoded in this service.
- * The BBI modulation is applied as defined by the thinning domain rule.</p>
+ * <p>The target threshold is supplied by an approved technical profile instead of being hardcoded in this
+ * service. The removal brings the observed load down to the target, both in fruits per shoot:
+ * {@code p = 100 * max(0, 1 - target / load)}. No other coefficient is applied.</p>
  */
 public final class CropLoadBalancingCalculatorService {
 
@@ -17,7 +18,7 @@ public final class CropLoadBalancingCalculatorService {
     /**
      * Creates the calculator with a calibrated target fruit density.
      *
-     * @param targetThreshold calibrated target fruits per linear canopy meter
+     * @param targetThreshold calibrated target fruits per shoot
      */
     public CropLoadBalancingCalculatorService(double targetThreshold) {
         if (!Double.isFinite(targetThreshold) || targetThreshold <= 0.0) {
@@ -29,44 +30,41 @@ public final class CropLoadBalancingCalculatorService {
     /**
      * Calculates the recommended sustainable crop load.
      *
-     * @param currentFruitsPerMeter current measured fruit density per meter
-     * @param bbi                     historical Biennial Bearing Index in [0, 1]
+     * @param currentFruitsPerShoot current measured fruits per shoot
+     * @param windowOpensOn           first recommended thinning date
      * @param windowClosesOn          latest recommended thinning date
      * @return sustainable crop load recommendation
      */
     public SustainableCropLoad calculate(
-            double currentFruitsPerMeter,
-            double bbi,
+            double currentFruitsPerShoot,
+            LocalDate windowOpensOn,
             LocalDate windowClosesOn
     ) {
-        if (!Double.isFinite(currentFruitsPerMeter) || currentFruitsPerMeter < 0.0) {
-            throw new IllegalArgumentException("thinning.current_fruits_per_meter.invalid");
-        }
-        if (!Double.isFinite(bbi) || bbi < 0.0 || bbi > 1.0) {
-            throw new IllegalArgumentException("thinning.bbi.invalid_range");
+        if (!Double.isFinite(currentFruitsPerShoot) || currentFruitsPerShoot < 0.0) {
+            throw new IllegalArgumentException("thinning.current_fruits_per_shoot.invalid");
         }
 
-        if (currentFruitsPerMeter == 0.0) {
-            return new SustainableCropLoad(targetThreshold, 0.0, windowClosesOn);
+        if (currentFruitsPerShoot == 0.0) {
+            return new SustainableCropLoad(targetThreshold, 0.0, windowOpensOn, windowClosesOn, null, null);
         }
 
-        double rawRemoval = ((currentFruitsPerMeter - targetThreshold) / currentFruitsPerMeter)
-                * 100.0
-                * (1.0 + 0.3 * bbi);
-        double removalPercentage = Math.max(0.0, Math.min(100.0, rawRemoval));
-        removalPercentage = Math.round(removalPercentage * 100.0) / 100.0;
+        // Full precision: only the REST layer rounds.
+        double removalPercentage = 100.0 * Math.max(0.0, 1.0 - targetThreshold / currentFruitsPerShoot);
 
         return new SustainableCropLoad(
                 targetThreshold,
                 removalPercentage,
-                windowClosesOn
+                windowOpensOn,
+                windowClosesOn,
+                null,
+                null
         );
     }
 
     /**
      * Returns the calibrated target threshold used by this calculator.
      *
-     * @return target fruits per meter
+     * @return target fruits per shoot
      */
     public double targetThreshold() {
         return targetThreshold;

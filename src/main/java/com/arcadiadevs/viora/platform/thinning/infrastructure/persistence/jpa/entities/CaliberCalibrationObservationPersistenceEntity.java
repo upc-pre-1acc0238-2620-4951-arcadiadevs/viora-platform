@@ -32,8 +32,10 @@ public class CaliberCalibrationObservationPersistenceEntity {
     @Column(nullable = false, length = 20)
     private String variety;
 
-    @Column(nullable = false)
-    private Double residualFruitsPerMeter;
+    // The column keeps its old name on purpose: it is NOT NULL, and a renamed column would leave the old one
+    // behind making every insert fail on an existing database. It holds fruits per shoot (it held per-0.20 m values).
+    @Column(name = "residual_fruits_per_meter", nullable = false)
+    private Double residualFruitsPerShoot;
 
     @Column(nullable = false)
     private Double commercialFruitsPerKg;

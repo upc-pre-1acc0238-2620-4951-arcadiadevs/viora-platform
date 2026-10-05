@@ -25,10 +25,10 @@
 | **US21** Rectificar o eliminar cosecha | Jahat | P41 | ✅ `PUT` (rectificar) y ✅ **`DELETE /plots/{id}/harvest-records/{recordId}`** (0.22.0; `If-Match` opcional, recalcula el BBI y la campaña se puede volver a registrar) | — | — | — |
 | **US22** Frío acumulado (Erez) | Piero | P80, P81 | ✅ `GET .../metrics?name=CHILLING`: valor, categoría, modelo, umbral, % de avance, inicio de temporada (`seasonStart`), fecha de completado (`completionDate`), días sin acumular (`idleDays`) y estado de temporada (`seasonState`) | Resuelto en 0.23.0 (`phenology`). Incluye `ChillSeasonDetails` y cálculo dinámico de temporada | — | Piero |
 | **US23** Anomalía térmica / ENOS | Piero | T15 invierno cálido | 🔴 **No existe** | Regla de detección (máximas semanales sobre el umbral durante días seguidos), señal en la métrica de frío y alerta que se integra con US18 ("qué cambia": frío frenado, floración en riesgo, carga esperada reajustada 9,8 → 7,4 t/ha, que depende de un rendimiento potencial, ver US26) | **L** | Piero, tras el contrato de alertas |
-| **US24** Muestreo en campo | Fabrizio | P50–P54 | ✅ `POST /plots/{id}/samplings` (idempotente con `clientBatchId`; `trunkDiameterMm` obligatorio, como en el diseño) | — | — | — |
+| **US24** Muestreo en campo | Fabrizio | P50–P54 | ✅ `POST /plots/{id}/samplings` (idempotente con `clientBatchId`; `trunkDiameterMm` obligatorio, como en el diseño; la carga media va en `meanFruitsPerShoot` con `loadUnit: FRUITS_PER_SHOOT`) | — | — | — |
 | **US25** Representatividad e historial | Fabrizio | P50, P54 | ✅ `GET /plots/{id}/samplings` (resumen) y `?view=detailed` (árboles) | — | — | — |
-| **US26** Carga frutal sostenible | Victor | P61 | 🟡 La prescripción trae `targetFruitsPerMeter` y `percentageToRemove` | Carga estimada actual (frutos por metro del muestreo), estado óptima / moderada / sobrecarga antes de aclarear y rendimiento potencial (t/ha estimadas y sostenibles). **No hay fórmula de rendimiento definida**: es una decisión de producto. Además el diseño muestra frutos por árbol y el backend trabaja por metro | M y decisión | Victor y el equipo |
-| **US27** Prescripción de aclareo | Victor | P60, P61 | ✅ `GET /plots/{id}/thinning-prescriptions` (porcentaje, `windowClosesOn`, `windowOpen`, estado) | 🟡 Falta `windowOpensOn` (el diseño muestra "Desde 3 nov · hasta 30 nov"; el servicio de fenología ya recibe la fecha de inicio pero no se guarda) | S–M | Victor |
+| **US26** Carga frutal sostenible | Victor | P61 | 🟡 La prescripción trae `targetFruitsPerShoot`, `percentageToRemove` y `loadUnit` (frutos por brote) | Estado óptima / moderada / sobrecarga antes de aclarear y rendimiento potencial (t/ha estimadas y sostenibles). **No hay fórmula de rendimiento definida**: es una decisión de producto; la propuesta es mostrar el rendimiento potencial solo con peso de fruto calibrado. P61 pasa a frutos por brote, la unidad que el productor cuenta | M y decisión | Victor y el equipo |
+| **US27** Prescripción de aclareo | Victor | P60, P61 | ✅ `GET /plots/{id}/thinning-prescriptions` (porcentaje, `windowOpensOn`, `windowClosesOn`, `windowBasis`, `profileVersion`, `profileStatus`, `windowOpen`, estado y `blockers`) y `PUT /plots/{id}/thinning-prescriptions/full-bloom` | 🟡 La prescripción solo se emite con un **perfil técnico aprobado** de la variedad y la **plena floración** registrada; si falta algo, `blockers` lo dice (ver ADR-004) | S | Victor |
 | **US28** Confirmar el aclareo | Victor | P62, P63 | ✅ `POST /thinning-prescriptions/{id}/execution-confirmations` (carga resultante y proyección de calibre) | — | — | — |
 | **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` | 🟡 No se pueden **consultar** las liquidaciones hechas (la Bitácora muestra "Cosecha asentada") | S | Jahat |
 
@@ -51,7 +51,8 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 |---|---|---|
 | `POST /plots`, `GET /plots`, `GET /plots/{id}`, `PUT /plots/{id}` (`If-Match`, `variety` opcional) | US09, US10 | ✅ |
 | `DELETE /plots/{id}?reason=`, `GET /plots?status=REMOVED_SOFT_DELETE`, `POST /plots/{id}/restore` | US11 | ✅ (app terminada en 0.5.0) |
-| `GET /plots/{id}/thinning-prescriptions` | US27 | 🟡 falta `windowOpensOn` |
+| `GET /plots/{id}/thinning-prescriptions` | US27 | ✅ en cualquier estado, con `blockers`; `status=ACTIVE` solo la emitida |
+| `PUT /plots/{id}/thinning-prescriptions/full-bloom` | US27 | ✅ registra la plena floración y emite la prescripción si era lo último que faltaba |
 | `POST /thinning-prescriptions/{id}/execution-confirmations` | US28 | ✅ |
 | Carga actual y rendimiento potencial | US26 | 🔴 falta la fórmula (decisión de producto) |
 | `GET /plots/{id}/samplings`, `.../metrics?name=BBI`, `.../thinning-prescriptions` (tarjeta del lote) | Home | ✅ en 3 llamadas; `overview` opcional |
@@ -122,6 +123,14 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 7. **Bandas del BBI según el diseño** (US20, sheet "¿Qué es el BBI?"): `REGULAR` por debajo de 0.20, `MODERATE_ALTERNATION` de 0.20 a 0.40 inclusive y `SEVERE_ALTERNATION` por encima de 0.40 (antes 0.25 / 0.50). Los nombres de las categorías no cambian, así que la app no se rompe; solo cambia el texto de `qualitativeCategory` en `GET /plots/{id}/metrics?name=BBI` y qué producción cae en cada banda.
 8. **Rango del año de campaña al registrar una cosecha** (US20): la regla vive ahora en el dominio (`HarvestCampaignYearPolicy`), que acepta de 2000 al año en curso y rechaza con 400 las campañas futuras. Antes `POST /plots/{id}/harvest-records` aceptaba 1980–2100. El `CampaignYear` compartido sigue siendo la guarda estructural de 1980–2100 porque la liquidación necesita años futuros.
 
+**Próxima versión (aclareo, US26 y US27)**
+9. **La prescripción de aclareo se emite sola.** Antes nada llamaba a `determineSustainableCropLoad`: el muestreo se guardaba pero la prescripción se quedaba en `SAMPLING_IN_PROGRESS` y `GET /plots/{id}/thinning-prescriptions` (que filtraba por `PRESCRIBED`) respondía 404 para cualquier lote. Ahora se emite al completarse un muestreo representativo, al registrar la plena floración y al leer, siempre que haya un perfil técnico aprobado para la variedad.
+10. **Unidad: frutos por brote.** El muestreo dividía frutos por brote entre 0,20 «m» (una longitud que no se mide, sin respaldo) para llamarlo frutos por metro. Ahora la carga es frutos contados entre brotes contados (`loadUnit: FRUITS_PER_SHOOT`). **Cambio de contrato:** `targetFruitsPerMeter`, `meanFruitsPerMeter` y los `…FruitsPerMeter` de `loadBalance` pasan a `…FruitsPerShoot`. Los porcentajes y el calibre no cambian (son invariantes a la escala).
+11. **Porcentaje sin coeficientes inventados:** `100 × max(0, 1 − objetivo / carga)`. Se quitó el multiplicador `1 + 0,3 × BBI`, que no estaba en el reporte.
+12. **Perfil técnico por variedad, sin valores por defecto** (`viora.thinning.profiles.<variedad>.*`): carga objetivo, ventana en días después de la plena floración, estado, versión, fuente y quién lo aprobó. Sin perfil completo no hay prescripción y `blockers` trae `TARGET_NOT_CONFIGURED`. Cada prescripción guarda la versión y el estado del perfil. Para demostraciones, el perfil de Spring `demo` trae valores **sintéticos** marcados `SYNTHETIC_DEMO`.
+13. **`PUT /api/v1/plots/{plotId}/thinning-prescriptions/full-bloom`** (`{ "campaignYear": 2026, "observedOn": "2026-10-15" }`): registra la plena floración observada (no futura, dentro del año de la campaña). La ventana (`windowOpensOn`, `windowClosesOn`) se cuenta desde ella. Volver a llamarlo corrige la fecha y recalcula la prescripción emitida.
+14. **`blockers` en `PrescriptionResource`:** lo que impide emitirla (`SAMPLING_NOT_REPRESENTATIVE`, `TARGET_NOT_CONFIGURED`, `FULL_BLOOM_MISSING`). El `GET` sin `status` devuelve la prescripción en el estado en que esté; con `status=ACTIVE` solo la emitida.
+
 **Para el reporte**
 - Baja de lote: `DELETE /plots/{id}?reason=` da 200 con `MessageResource`; la restauración es un `POST .../restore` aparte.
 - Agregar `variety` al contrato `UpdatePlot` y los estados `ACTIVE | REMOVED_SOFT_DELETE` a `PlotResource`.
@@ -142,3 +151,6 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 - ¿Quién calcula las **series de 24 h, 7 d y 30 d**: la app o el backend?
 - ¿Hay una fórmula de **rendimiento potencial** (t/ha)? La necesitan US26 y la alerta de invierno cálido.
 - ¿La **fase del año** la calcula la app o el backend?
+- ¿Qué **perfil técnico** (carga objetivo en frutos por brote y ventana) se aprueba por variedad? No hay valor en el reporte ni en la literatura revisada para Tacna; lo debe aportar un técnico (ver ADR-004). Hasta entonces la app muestra qué falta.
+- ¿Quién registra la **plena floración** de cada lote y campaña? El endpoint existe; falta la pantalla de la app (todavía sin diseño en Figma) y un técnico o productor que lo observe.
+- El **modelo de grados-día (GDD)** queda para después de la entrega: requiere fecha de plena floración, histórico de temperatura por lote y una temperatura base validada (ver ADR-004).

@@ -1,5 +1,9 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.commandservices;
 
+import java.time.Clock;
+import com.arcadiadevs.viora.platform.thinning.domain.model.commands.RecordFullBloomCommand;
+import com.arcadiadevs.viora.platform.thinning.domain.model.commands.EvaluateThinningPrescriptionCommand;
+import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.ThinningPrescriptionIssuer;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.FruitThinningPrescriptionCommandService;
@@ -28,6 +32,8 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
     private final FruitThinningPrescriptionRepository prescriptionRepository;
     private final ExternalOrchardService externalOrchardService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ThinningPrescriptionIssuer issuer;
+    private final Clock clock;
 
     /**
      * Constructs the command service with required dependencies.
@@ -35,15 +41,21 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
      * @param prescriptionRepository the domain repository
      * @param externalOrchardService the outbound orchard ACL
      * @param eventPublisher         the spring application event publisher
+     * @param issuer                 issues the prescription once its inputs are known
+     * @param clock                  clock used to reject future dates
      */
     public FruitThinningPrescriptionCommandServiceImpl(
             FruitThinningPrescriptionRepository prescriptionRepository,
             ExternalOrchardService externalOrchardService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            ThinningPrescriptionIssuer issuer,
+            Clock clock
     ) {
         this.prescriptionRepository = prescriptionRepository;
         this.externalOrchardService = externalOrchardService;
         this.eventPublisher = eventPublisher;
+        this.issuer = issuer;
+        this.clock = clock;
     }
 
     @Override
@@ -103,5 +115,75 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
         prescription.clearDomainEvents();
 
         return Result.success(saved);
+    }
+
+    @Override
+    public Result<FruitThinningPrescription, ApplicationError> handle(RecordFullBloomCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "thinning.command.null"));
+        }
+        final PlotId plotId;
+        final CampaignYear campaignYear;
+        try {
+            plotId = new PlotId(command.plotId());
+            campaignYear = new CampaignYear(command.campaignYear());
+        } catch (IllegalArgumentException e) {
+            return Result.failure(ApplicationError.validationError("request", e.getMessage()));
+        }
+        if (!externalOrchardService.existsActivePlot(plotId)) {
+            return Result.failure(ApplicationError.notFound("Plot", command.plotId()));
+        }
+        FruitThinningPrescription prescription = prescriptionRepository.findByPlotIdAndCampaignYear(plotId, campaignYear)
+                .orElseGet(() -> FruitThinningPrescription.createForPlot(plotId, campaignYear, 1L));
+        // Work on a candidate: a failed reissue must not mutate the original issued prescription.
+        prescription = FruitThinningPrescription.reconstitute(prescription.snapshot());
+        boolean requiresReissue = prescription.snapshot().status()
+                == com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus.PRESCRIBED;
+        try {
+            prescription.recordFullBloom(command.observedOn(), clock);
+        } catch (IllegalArgumentException e) {
+            return Result.failure(ApplicationError.validationError("observedOn", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return Result.failure(ApplicationError.conflict("ThinningPrescription", e.getMessage()));
+        }
+        boolean issued = issuer.issueIfReady(prescription, true);
+        if (requiresReissue && !issued) {
+            return Result.failure(ApplicationError.conflict("ThinningPrescription",
+                    "thinning.full_bloom.reissue_unavailable"));
+        }
+        return Result.success(saveAndPublish(prescription));
+    }
+
+    @Override
+    public Result<FruitThinningPrescription, ApplicationError> handle(EvaluateThinningPrescriptionCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "thinning.command.null"));
+        }
+        final PlotId plotId;
+        final CampaignYear campaignYear;
+        try {
+            plotId = new PlotId(command.plotId());
+            campaignYear = new CampaignYear(command.campaignYear());
+        } catch (IllegalArgumentException e) {
+            return Result.failure(ApplicationError.validationError("request", e.getMessage()));
+        }
+        var found = prescriptionRepository.findByPlotIdAndCampaignYear(plotId, campaignYear);
+        if (found.isEmpty()) {
+            return Result.failure(ApplicationError.notFound("ThinningPrescription", command.plotId()));
+        }
+        var prescription = found.get();
+        if (!issuer.issueIfReady(prescription, false)) {
+            return Result.success(prescription);
+        }
+        return Result.success(saveAndPublish(prescription));
+    }
+
+    private FruitThinningPrescription saveAndPublish(FruitThinningPrescription prescription) {
+        FruitThinningPrescription saved = prescriptionRepository.save(prescription);
+        for (var event : prescription.domainEvents()) {
+            eventPublisher.publishEvent(event);
+        }
+        prescription.clearDomainEvents();
+        return saved;
     }
 }

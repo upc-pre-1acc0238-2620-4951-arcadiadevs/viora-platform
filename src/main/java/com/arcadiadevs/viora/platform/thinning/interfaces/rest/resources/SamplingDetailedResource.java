@@ -13,9 +13,10 @@ import java.util.List;
  * @param campaignYear       agricultural campaign year
  * @param sampledTreesCount  unique evaluated trees
  * @param sampledShootsCount total evaluated shoots
- * @param meanFruitsPerMeter mean fruit density per linear canopy meter
+ * @param meanFruitsPerShoot mean fruits per sampled shoot
  * @param isRepresentative   statistical representativeness flag
  * @param treesNeeded        additional unique trees needed for representativeness
+ * @param loadUnit           unit of the mean load: {@code FRUITS_PER_SHOOT}
  * @param trees              ordered per-observation tree data
  */
 @Schema(
@@ -28,9 +29,10 @@ public record SamplingDetailedResource(
         Integer campaignYear,
         Integer sampledTreesCount,
         Integer sampledShootsCount,
-        Double meanFruitsPerMeter,
+        Double meanFruitsPerShoot,
         Boolean isRepresentative,
         Integer treesNeeded,
+        String loadUnit,
         @ArraySchema(schema = @Schema(implementation = SamplingTreeResource.class))
         List<SamplingTreeResource> trees
 ) {
