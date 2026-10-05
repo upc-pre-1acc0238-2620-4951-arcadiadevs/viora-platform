@@ -31,6 +31,7 @@ import java.util.concurrent.*;
 
 import static com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.prescribed;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -201,6 +202,63 @@ class HarvestSettlementControllerIntegrationTest {
         }
         assertEquals(1, jdbc.queryForObject("select count(*) from harvest_settlements s join agronomic_reports r "
                 + "on s.report_id = r.id where r.plot_id = ?", Integer.class, UUID.fromString(plotId)));
+    }
+
+    @Test
+    void listsTheSettlementsOfAPlotNewestCampaignFirst() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        settle(plotId, 2025, 5000, 500, null).andExpect(status().isCreated());
+        settle(plotId, 2026, 7000, 0, null).andExpect(status().isCreated());
+
+        mvc.perform(get(route(plotId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").isNotEmpty())
+                .andExpect(jsonPath("$[0].reportId").isNotEmpty())
+                .andExpect(jsonPath("$[0].plotId").value(plotId))
+                .andExpect(jsonPath("$[0].campaignYear").value(2026))
+                .andExpect(jsonPath("$[0].totalYieldKg").value(7000.0))
+                .andExpect(jsonPath("$[0].status").value("SETTLED"))
+                .andExpect(jsonPath("$[0].settledAt").isNotEmpty())
+                .andExpect(jsonPath("$[0].thinningBalance.status").value("NOT_RECORDED"))
+                .andExpect(jsonPath("$[0].stabilization.status").isNotEmpty())
+                .andExpect(jsonPath("$[1].campaignYear").value(2025))
+                .andExpect(jsonPath("$[1].totalYieldKg").value(5500.0));
+    }
+
+    @Test
+    void listsNoSettlementForAPlotThatHasNotClosedACampaign() throws Exception {
+        mvc.perform(get(route(createPlot("ARBEQUINA"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void returnsTheSettlementOfOneSettledCampaignAndNotOfTheOthers() throws Exception {
+        var plotId = createPlot("MANZANILLA");
+        settle(plotId, 2026, 7000, 0, null).andExpect(status().isCreated());
+
+        mvc.perform(get(route(plotId) + "/2026"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plotId").value(plotId))
+                .andExpect(jsonPath("$.campaignYear").value(2026))
+                .andExpect(jsonPath("$.greenOlivesKg").value(7000.0))
+                .andExpect(jsonPath("$.totalYieldKg").value(7000.0))
+                .andExpect(jsonPath("$.status").value("SETTLED"))
+                .andExpect(jsonPath("$.thinningBalance.status").value("NOT_RECORDED"))
+                .andExpect(jsonPath("$.stabilization.status").isNotEmpty());
+        mvc.perform(get(route(plotId) + "/2029")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rejectsMalformedRoutesAndUnknownPlotsWhenConsultingSettlements() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        settle(plotId, 2026, 10, 10, null).andExpect(status().isCreated());
+        mvc.perform(get(route("not-a-uuid"))).andExpect(status().isBadRequest());
+        mvc.perform(get(route(plotId) + "/x")).andExpect(status().isBadRequest());
+        mvc.perform(get(route(plotId) + "/1999")).andExpect(status().isBadRequest());
+        mvc.perform(get(route(UUID.randomUUID().toString()))).andExpect(status().isNotFound());
+        mvc.perform(get(route(UUID.randomUUID().toString()) + "/2026")).andExpect(status().isNotFound());
     }
 
     private ResultActions settle(String plotId, int year, double green, double black, Double fruitsPerKg)

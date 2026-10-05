@@ -33,7 +33,7 @@
 | **US26** Carga frutal sostenible | Victor | P61 | 🟡 La prescripción trae `targetFruitsPerMeter` y `percentageToRemove` | Carga estimada actual (frutos por metro del muestreo), estado óptima / moderada / sobrecarga antes de aclarear y rendimiento potencial (t/ha estimadas y sostenibles). **No hay fórmula de rendimiento definida**: es una decisión de producto. Además el diseño muestra frutos por árbol y el backend trabaja por metro | M y decisión | Victor y el equipo |
 | **US27** Prescripción de aclareo | Victor | P60, P61 | ✅ `GET /plots/{id}/thinning-prescriptions` (porcentaje, `windowClosesOn`, `windowOpen`, estado) | 🟡 Falta `windowOpensOn` (el diseño muestra "Desde 3 nov · hasta 30 nov"; el servicio de fenología ya recibe la fecha de inicio pero no se guarda) | S–M | Victor |
 | **US28** Confirmar el aclareo | Victor | P62, P63 | ✅ `POST /thinning-prescriptions/{id}/execution-confirmations` (carga resultante y proyección de calibre) | — | — | — |
-| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` | 🟡 No se pueden **consultar** las liquidaciones hechas (la Bitácora muestra "Cosecha asentada"); sin dueño por ahora | S | Pendiente de asignar |
+| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` y ✅ `GET /plots/{id}/harvest-settlements` + `GET /plots/{id}/harvest-settlements/{campaignYear}` | La consulta ya está en el backend; falta asignar la pantalla de la Bitácora ("Cosecha asentada"), sin dueño por ahora | — | Pendiente de asignar |
 
 ---
 
@@ -89,7 +89,7 @@
 2. **Frío (US22)** y luego **anomalía térmica (US23)**, que se enchufa a las alertas.
 3. **`windowOpensOn` y carga actual (US26, US27)** para el plan del lote.
 4. **Series y agregación (US17)** y **pronóstico (US19)**.
-5. **Detalles pequeños**: renombrar nodo (US15), consultar liquidaciones (US29), fecha y método de registro del lote (US09).
+5. **Detalles pequeños**: renombrar nodo (US15), fecha y método de registro del lote (US09).
 
 ---
 
@@ -98,4 +98,4 @@
 - ¿Quién calcula las **series de 24 h, 7 d y 30 d**: la app o el backend?
 - ¿Hay una fórmula de **rendimiento potencial** (t/ha)? La necesitan US26 y la alerta de invierno cálido.
 - ¿La **fase del año** la calcula la app o el backend?
-- ¿Se asigna a alguien la **consulta de liquidaciones** (US29)?
+- ¿Se asigna a alguien la **consulta de liquidaciones** (US29)? El backend ya la entrega (`GET /plots/{id}/harvest-settlements` y `GET /plots/{id}/harvest-settlements/{campaignYear}`); lo que falta es la asignación dentro del equipo mobile.
