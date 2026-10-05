@@ -51,4 +51,45 @@ public class ExternalOrchardService {
         }
         return orchardContextFacade.findPlotVariety(plotId.plotId());
     }
+
+    /**
+     * Resolves the human-readable name of an active plot.
+     *
+     * @param plotId the Thinning PlotId value object
+     * @return the plot name, or empty when the plot is unknown or not active
+     */
+    public Optional<String> findPlotName(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotName(plotId.plotId());
+    }
+
+    /**
+     * Resolves the surface area in hectares of an active plot.
+     *
+     * @param plotId the Thinning PlotId value object
+     * @return the surface area in hectares, or empty when the plot is unknown or not active
+     */
+    public Optional<Double> findPlotAreaHectares(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotAreaHectares(plotId.plotId());
+    }
+
+    /**
+     * Retrieves all active plot identifiers associated with a given producer.
+     *
+     * @param producerId the producer identifier string (UUID)
+     * @return list of Thinning PlotId value objects
+     */
+    public java.util.List<PlotId> findActivePlotIdsByProducerId(String producerId) {
+        if (producerId == null || producerId.isBlank()) {
+            return java.util.List.of();
+        }
+        return orchardContextFacade.findActivePlotIdsByProducerId(producerId).stream()
+                .map(PlotId::new)
+                .toList();
+    }
 }

@@ -141,6 +141,22 @@ class OrchardContextFacadeImplTest {
         assertThat(facade.findPlotVariety("not-a-valid-uuid")).isEmpty();
     }
 
+    @Test
+    @DisplayName("Should expose the surface area in hectares of an active plot only")
+    void shouldExposeAreaHectaresOfActivePlotOnly() {
+        var activePlot = mock(Plot.class);
+        when(activePlot.snapshot()).thenReturn(snapshot(OliveVariety.SEVILLANA, PlotStatus.ACTIVE));
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(activePlot));
+        assertThat(facade.findPlotAreaHectares(plotId.toString())).contains(1.0);
+
+        var removedPlot = mock(Plot.class);
+        when(removedPlot.snapshot()).thenReturn(snapshot(OliveVariety.SEVILLANA, PlotStatus.REMOVED_SOFT_DELETE));
+        when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(removedPlot));
+        assertThat(facade.findPlotAreaHectares(plotId.toString())).isEmpty();
+        assertThat(facade.findPlotAreaHectares(null)).isEmpty();
+        assertThat(facade.findPlotAreaHectares("not-a-valid-uuid")).isEmpty();
+    }
+
     private PlotSnapshot snapshot(OliveVariety variety, PlotStatus status) {
         return new PlotSnapshot(
                 new PlotId(plotId.toString()),

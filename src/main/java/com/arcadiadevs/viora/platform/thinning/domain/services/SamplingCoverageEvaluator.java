@@ -184,4 +184,42 @@ public final class SamplingCoverageEvaluator {
         }
         return totalShoots == 0 ? 0.0 : (double) totalFruits / totalShoots;
     }
+
+    /**
+     * Computes the total number of set fruits evaluated across all rounds.
+     *
+     * @param rounds the sampling rounds
+     * @return total counted fruits
+     */
+    public static int countTotalFruits(List<SamplingRound> rounds) {
+        if (rounds == null || rounds.isEmpty()) {
+            return 0;
+        }
+        int totalFruits = 0;
+        for (SamplingRound round : rounds) {
+            for (TreeSamplingRecord record : round.samplingRecords()) {
+                totalFruits += record.shootFruitCount().fruitSetCount();
+            }
+        }
+        return totalFruits;
+    }
+
+    /**
+     * Computes the total number of set fruits evaluated across all round snapshots.
+     *
+     * @param roundSnapshots the sampling round snapshots
+     * @return total counted fruits
+     */
+    public static int countTotalFruitsFromSnapshots(List<SamplingRoundSnapshot> roundSnapshots) {
+        if (roundSnapshots == null || roundSnapshots.isEmpty()) {
+            return 0;
+        }
+        int totalFruits = 0;
+        for (var round : roundSnapshots) {
+            for (var record : round.samplingRecords()) {
+                totalFruits += record.shootFruitCount().fruitSetCount();
+            }
+        }
+        return totalFruits;
+    }
 }

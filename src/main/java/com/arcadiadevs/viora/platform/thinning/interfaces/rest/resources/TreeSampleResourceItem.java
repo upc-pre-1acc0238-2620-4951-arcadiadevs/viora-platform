@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -12,7 +13,7 @@ import java.time.LocalDate;
  * @param treeTag         physical tag identifier of the tree
  * @param shootCount      number of evaluated shoots (must be > 0)
  * @param fruitSetCount   number of counted fruits (must be >= 0)
- * @param trunkDiameterMm trunk diameter in millimeters (must be > 0)
+ * @param trunkDiameterMm trunk diameter in millimeters (optional)
  * @param samplingDate    date when sample was taken (cannot be future date)
  */
 @Schema(
@@ -36,10 +37,9 @@ public record TreeSampleResourceItem(
         @Schema(description = "Total number of set fruits observed across shoots (>= 0)", example = "120", requiredMode = Schema.RequiredMode.REQUIRED)
         Integer fruitSetCount,
 
-        @NotNull(message = "thinning.trunk_diameter.positive")
         @DecimalMin(value = "0.01", message = "thinning.trunk_diameter.positive")
-        @Schema(description = "Trunk diameter measured in millimeters (> 0)", example = "165.5", requiredMode = Schema.RequiredMode.REQUIRED)
-        Double trunkDiameterMm,
+        @Schema(description = "Trunk diameter in mm (optional)", example = "165.5", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
+        @Nullable Double trunkDiameterMm,
 
         @NotNull(message = "thinning.sampling_date.null")
         @PastOrPresent(message = "thinning.sampling_date.future")

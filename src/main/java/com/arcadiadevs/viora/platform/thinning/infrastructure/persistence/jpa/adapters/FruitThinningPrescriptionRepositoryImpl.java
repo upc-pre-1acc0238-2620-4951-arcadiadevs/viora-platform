@@ -10,6 +10,7 @@ import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.en
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.repositories.FruitThinningPrescriptionPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +47,19 @@ public class FruitThinningPrescriptionRepositoryImpl implements FruitThinningPre
     public Optional<FruitThinningPrescription> findByPlotIdAndCampaignYear(PlotId plotId, CampaignYear year) {
         return prescriptionPersistenceRepository.findByPlotIdAndCampaignYear(UUID.fromString(plotId.plotId()), year.value())
                 .map(FruitThinningPrescriptionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<FruitThinningPrescription> findByPlotIdInAndCampaignYear(List<PlotId> plotIds, CampaignYear year) {
+        if (plotIds == null || plotIds.isEmpty() || year == null) {
+            return List.of();
+        }
+        List<UUID> uuids = plotIds.stream()
+                .map(id -> UUID.fromString(id.plotId()))
+                .toList();
+        return prescriptionPersistenceRepository.findByPlotIdInAndCampaignYear(uuids, year.value()).stream()
+                .map(FruitThinningPrescriptionPersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 
     @Override

@@ -100,6 +100,7 @@ public class GetSamplingSummaryQueryServiceImpl implements GetSamplingSummaryQue
 
         int uniqueTrees = SamplingCoverageEvaluator.countUniqueEvaluatedTreesFromSnapshots(rounds);
         int totalShoots = SamplingCoverageEvaluator.countTotalShootsFromSnapshots(rounds);
+        int totalFruits = SamplingCoverageEvaluator.countTotalFruitsFromSnapshots(rounds);
         double meanFruitsPerShoot = SamplingCoverageEvaluator.computeMeanFruitsPerShootFromSnapshots(rounds);
         boolean representative = SamplingCoverageEvaluator.isRepresentativeFromSnapshots(rounds);
         int treesNeeded = SamplingCoverageEvaluator.treesNeededFromSnapshots(rounds);
@@ -109,6 +110,7 @@ public class GetSamplingSummaryQueryServiceImpl implements GetSamplingSummaryQue
                 query.campaignYear(),
                 uniqueTrees,
                 totalShoots,
+                totalFruits,
                 meanFruitsPerShoot,
                 representative,
                 treesNeeded
@@ -124,7 +126,7 @@ public class GetSamplingSummaryQueryServiceImpl implements GetSamplingSummaryQue
                         record.treeTag(),
                         record.shootFruitCount().shootCount(),
                         record.shootFruitCount().fruitSetCount(),
-                        record.trunkCrossSectionalArea().trunkDiameterMm(),
+                        record.trunkCrossSectionalArea() != null ? record.trunkCrossSectionalArea().trunkDiameterMm() : null,
                         record.samplingDate()
                 ));
             }

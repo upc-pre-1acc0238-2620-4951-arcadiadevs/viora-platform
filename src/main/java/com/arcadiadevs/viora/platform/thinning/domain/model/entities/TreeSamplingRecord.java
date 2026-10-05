@@ -69,7 +69,7 @@ public class TreeSamplingRecord {
                 new SamplingRecordId(),
                 new TreeTag(treeTag),
                 new ShootFruitCount(shootCount, fruitSetCount),
-                new TrunkCrossSectionalArea(trunkDiameterMm),
+                trunkDiameterMm != null ? new TrunkCrossSectionalArea(trunkDiameterMm) : null,
                 samplingDate
         );
     }

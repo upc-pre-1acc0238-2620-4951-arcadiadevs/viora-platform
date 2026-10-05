@@ -58,4 +58,12 @@ public interface OrchardContextFacade {
      * @return list of active plot identifier strings
      */
     List<String> findActivePlotIdsByProducerId(String producerId);
+
+    /**
+     * Retrieves the surface area in hectares for an active plot.
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @return Optional containing the surface area in hectares, or empty if plot is not found or not active
+     */
+    Optional<Double> findPlotAreaHectares(String plotId);
 }

@@ -32,9 +32,6 @@ public record TreeSampleItem(
         if (fruitSetCount == null) {
             throw new IllegalArgumentException("thinning.fruit_count.negative");
         }
-        if (trunkDiameterMm == null) {
-            throw new IllegalArgumentException("thinning.trunk_diameter.positive");
-        }
         if (samplingDate == null) {
             throw new IllegalArgumentException("thinning.sampling_date.null");
         }
