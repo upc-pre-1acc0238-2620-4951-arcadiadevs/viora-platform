@@ -30,7 +30,7 @@
 | **US26** Carga frutal sostenible | Victor | P61 | 🟡 La prescripción trae `targetFruitsPerShoot`, `percentageToRemove` y `loadUnit` (frutos por brote) | Estado óptima / moderada / sobrecarga antes de aclarear y rendimiento potencial (t/ha estimadas y sostenibles). **No hay fórmula de rendimiento definida**: es una decisión de producto; la propuesta es mostrar el rendimiento potencial solo con peso de fruto calibrado. P61 pasa a frutos por brote, la unidad que el productor cuenta | M y decisión | Victor y el equipo |
 | **US27** Prescripción de aclareo | Victor | P60, P61 | ✅ `GET /plots/{id}/thinning-prescriptions` (porcentaje, `windowOpensOn`, `windowClosesOn`, `windowBasis`, `profileVersion`, `profileStatus`, `windowOpen`, estado y `blockers`) y `PUT /plots/{id}/thinning-prescriptions/full-bloom` | 🟡 La prescripción solo se emite con un **perfil técnico aprobado** de la variedad y la **plena floración** registrada; si falta algo, `blockers` lo dice (ver ADR-004) | S | Victor |
 | **US28** Confirmar el aclareo | Victor | P62, P63 | ✅ `POST /thinning-prescriptions/{id}/execution-confirmations` (carga resultante y proyección de calibre) | — | — | — |
-| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` | 🟡 No se pueden **consultar** las liquidaciones hechas (la Bitácora muestra "Cosecha asentada") | S | Jahat |
+| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` y ✅ `GET /plots/{id}/harvest-settlements` + `GET /plots/{id}/harvest-settlements/{campaignYear}` (todas las liquidaciones, de la campaña más reciente a la más antigua, y la de una campaña) | — | — | Jahat |
 
 ## 2. Lo que necesita el Home (armazón de Victor)
 
@@ -91,7 +91,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | `POST/GET /plots/{id}/harvest-records`, `GET .../metrics?name=BBI` | US20 | ✅ el BBI usa las bandas del diseño (`REGULAR` < 0.20, `MODERATE_ALTERNATION` 0.20–0.40, `SEVERE_ALTERNATION` > 0.40) y la cosecha solo se registra de 2000 al año en curso |
 | `PUT` y `DELETE /plots/{id}/harvest-records/{recordId}` | US21 | ✅ (el DELETE llegó en la 0.22.0) |
 | `POST /plots/{id}/harvest-settlements` | US29 | ✅ |
-| Consultar liquidaciones hechas (`GET`) | US29 | 🟡 no existe; la Bitácora lo necesita (S) |
+| Consultar liquidaciones hechas (`GET /plots/{id}/harvest-settlements` y `GET /plots/{id}/harvest-settlements/{campaignYear}`) | US29 | ✅ los dos endpoints; queda pendiente la asignación dentro del equipo mobile |
 | `POST /plots/{id}/certifications` (dossier) | fuera de las 4 pestañas del productor | ✅ |
 
 ## 4. Cambios del backend desde la 0.21.0 (para actualizar el reporte)
@@ -144,7 +144,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 2. **Frío (US22)** y luego **anomalía térmica (US23)**, que se enchufa a las alertas.
 3. **`windowOpensOn` y carga actual (US26, US27)** para el plan del lote.
 4. **Series y agregación (US17)** y **pronóstico (US19)**.
-5. Detalles pequeños: renombrar nodo (US15), consultar liquidaciones (US29), fecha y método de registro del lote (US09).
+5. Detalles pequeños: renombrar nodo (US15), fecha y método de registro del lote (US09).
 
 ## 6. Decisiones pendientes
 
