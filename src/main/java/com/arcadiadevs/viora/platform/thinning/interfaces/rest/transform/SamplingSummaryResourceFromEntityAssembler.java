@@ -41,9 +41,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 snapshot.campaignYear().value(),
                 uniqueTrees,
                 totalShoots,
-                meanFruits,
+                ThinningRounding.load(meanFruits),
                 isRepresentative,
-                needed
+                needed,
+                ThinningRounding.LOAD_UNIT
         );
     }
 
@@ -62,9 +63,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
-                summary.meanFruitsPerShoot(),
+                ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
-                summary.treesNeeded()
+                summary.treesNeeded(),
+                ThinningRounding.LOAD_UNIT
         );
     }
 
@@ -87,9 +89,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
-                summary.meanFruitsPerShoot(),
+                ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
                 summary.treesNeeded(),
+                ThinningRounding.LOAD_UNIT,
                 trees
         );
     }

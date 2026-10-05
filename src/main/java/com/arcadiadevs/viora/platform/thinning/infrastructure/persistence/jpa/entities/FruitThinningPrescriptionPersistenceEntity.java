@@ -34,7 +34,8 @@ public class FruitThinningPrescriptionPersistenceEntity {
     @Column(name = "observed_plot_revision")
     private Long observedPlotRevision;
 
-    @Column(name = "target_fruits_m")
+    // The old target_fruits_m column held fruits per meter (per-shoot value / 0.20 m, an unmeasured length) and is no longer read.
+    @Column(name = "target_fruits_per_shoot")
     private Double targetFruitsPerShoot;
 
     @Column(name = "percentage_remove")
@@ -42,6 +43,18 @@ public class FruitThinningPrescriptionPersistenceEntity {
 
     @Column(name = "status", nullable = false, length = 30)
     private String status;
+
+    @Column(name = "full_bloom_on")
+    private java.time.LocalDate fullBloomOn;
+
+    @Column(name = "profile_version", length = 40)
+    private String profileVersion;
+
+    @Column(name = "profile_status", length = 30)
+    private String profileStatus;
+
+    @Column(name = "window_opens_on")
+    private java.time.LocalDate windowOpensOn;
 
     @Column(name = "window_closes_on")
     private java.time.LocalDate windowClosesOn;
@@ -143,6 +156,38 @@ public class FruitThinningPrescriptionPersistenceEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public java.time.LocalDate getFullBloomOn() {
+        return fullBloomOn;
+    }
+
+    public void setFullBloomOn(java.time.LocalDate fullBloomOn) {
+        this.fullBloomOn = fullBloomOn;
+    }
+
+    public String getProfileVersion() {
+        return profileVersion;
+    }
+
+    public void setProfileVersion(String profileVersion) {
+        this.profileVersion = profileVersion;
+    }
+
+    public String getProfileStatus() {
+        return profileStatus;
+    }
+
+    public void setProfileStatus(String profileStatus) {
+        this.profileStatus = profileStatus;
+    }
+
+    public java.time.LocalDate getWindowOpensOn() {
+        return windowOpensOn;
+    }
+
+    public void setWindowOpensOn(java.time.LocalDate windowOpensOn) {
+        this.windowOpensOn = windowOpensOn;
     }
 
     public java.time.LocalDate getWindowClosesOn() {

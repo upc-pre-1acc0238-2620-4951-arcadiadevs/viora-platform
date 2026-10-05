@@ -11,6 +11,37 @@ import static com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThinningExecutionTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-09-01", "2026-09-14", "2026-09-23"})
+    void rejectsExecutionBeforeBloomOrOpeningWithoutCreatingEvidence(LocalDate date) {
+        var prescription = windowedPrescription();
+        var before = prescription.snapshot();
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> prescription.confirmExecution(date, 10, 25, 2, null, CLOCK));
+        assertEquals("thinning.execution.before_window", error.getMessage());
+        assertEquals(before, prescription.snapshot());
+        assertTrue(prescription.domainEvents().isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2026-09-24,OPTIMAL", "2026-09-25,OPTIMAL", "2026-09-26,LATE"})
+    void acceptsOpeningAndClosingBoundariesAndLateEvidence(LocalDate date, ExecutionTimeliness expected) {
+        var prescription = windowedPrescription();
+        prescription.confirmExecution(date, 10, 25, 2, null, CLOCK);
+        assertEquals(expected, prescription.snapshot().executionConfirmation().timeliness());
+    }
+
+    private FruitThinningPrescription windowedPrescription() {
+        var prescription = com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.representative(
+                com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.newPlot());
+        prescription.recordFullBloom(LocalDate.of(2026, 9, 10), CLOCK);
+        prescription.determineSustainableCropLoad(
+                new com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancingCalculatorService(0.4),
+                LocalDate.of(2026, 9, 24), CUTOFF, "test-1", "SYNTHETIC_DEMO");
+        prescription.clearDomainEvents();
+        return prescription;
+    }
+
     private static final LocalDate CUTOFF = LocalDate.of(2026, 9, 25);
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
 

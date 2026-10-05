@@ -34,7 +34,7 @@ public final class ThinningExecutionFixtures {
             List<SamplingRoundSnapshot> rounds) {
         return FruitThinningPrescription.reconstitute(new FruitThinningPrescriptionSnapshot(
                 new PrescriptionId(), new PlotId(plotId), new CampaignYear(2026),
-                1L, status, new SustainableCropLoad(TARGET_FRUITS_PER_SHOOT, 25.0, closesOn),
+                1L, status, new SustainableCropLoad(TARGET_FRUITS_PER_SHOOT, 25.0, null, closesOn, null, null),
                 Instant.parse("2026-01-01T00:00:00Z"), rounds, null, 0L));
     }
 

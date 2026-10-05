@@ -7,8 +7,9 @@ import java.time.LocalDate;
 /**
  * Pure domain service calculating thinning removal according to the sustainable crop-load curve.
  *
- * <p>The target threshold is supplied by agronomic calibration instead of being hardcoded in this service.
- * The BBI modulation is applied as defined by the thinning domain rule.</p>
+ * <p>The target threshold is supplied by an approved technical profile instead of being hardcoded in this
+ * service. The removal brings the observed load down to the target, both in fruits per shoot:
+ * {@code p = 100 * max(0, 1 - target / load)}. No other coefficient is applied.</p>
  */
 public final class CropLoadBalancingCalculatorService {
 
@@ -30,36 +31,33 @@ public final class CropLoadBalancingCalculatorService {
      * Calculates the recommended sustainable crop load.
      *
      * @param currentFruitsPerShoot current measured fruits per shoot
-     * @param bbi                     historical Biennial Bearing Index in [0, 1]
+     * @param windowOpensOn           first recommended thinning date
      * @param windowClosesOn          latest recommended thinning date
      * @return sustainable crop load recommendation
      */
     public SustainableCropLoad calculate(
             double currentFruitsPerShoot,
-            double bbi,
+            LocalDate windowOpensOn,
             LocalDate windowClosesOn
     ) {
         if (!Double.isFinite(currentFruitsPerShoot) || currentFruitsPerShoot < 0.0) {
             throw new IllegalArgumentException("thinning.current_fruits_per_shoot.invalid");
         }
-        if (!Double.isFinite(bbi) || bbi < 0.0 || bbi > 1.0) {
-            throw new IllegalArgumentException("thinning.bbi.invalid_range");
-        }
 
         if (currentFruitsPerShoot == 0.0) {
-            return new SustainableCropLoad(targetThreshold, 0.0, windowClosesOn);
+            return new SustainableCropLoad(targetThreshold, 0.0, windowOpensOn, windowClosesOn, null, null);
         }
 
-        double rawRemoval = ((currentFruitsPerShoot - targetThreshold) / currentFruitsPerShoot)
-                * 100.0
-                * (1.0 + 0.3 * bbi);
-        double removalPercentage = Math.max(0.0, Math.min(100.0, rawRemoval));
-        removalPercentage = Math.round(removalPercentage * 100.0) / 100.0;
+        // Full precision: only the REST layer rounds.
+        double removalPercentage = 100.0 * Math.max(0.0, 1.0 - targetThreshold / currentFruitsPerShoot);
 
         return new SustainableCropLoad(
                 targetThreshold,
                 removalPercentage,
-                windowClosesOn
+                windowOpensOn,
+                windowClosesOn,
+                null,
+                null
         );
     }
 

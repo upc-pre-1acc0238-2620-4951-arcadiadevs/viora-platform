@@ -44,8 +44,12 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         if (snap.sustainableLoad() != null) {
             entity.setTargetFruitsPerShoot(snap.sustainableLoad().targetFruitsPerShoot());
             entity.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
+            entity.setWindowOpensOn(snap.sustainableLoad().windowOpensOn());
             entity.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
+            entity.setProfileVersion(snap.sustainableLoad().profileVersion());
+            entity.setProfileStatus(snap.sustainableLoad().profileStatus());
         }
+        entity.setFullBloomOn(snap.fullBloomOn());
         entity.setIssuedAt(snap.issuedAt());
         appendConfirmation(entity, snap.executionConfirmation());
 
@@ -94,8 +98,12 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         if (snap.sustainableLoad() != null) {
             target.setTargetFruitsPerShoot(snap.sustainableLoad().targetFruitsPerShoot());
             target.setPercentageToRemove(snap.sustainableLoad().percentageToRemove());
+            target.setWindowOpensOn(snap.sustainableLoad().windowOpensOn());
             target.setWindowClosesOn(snap.sustainableLoad().windowClosesOn());
+            target.setProfileVersion(snap.sustainableLoad().profileVersion());
+            target.setProfileStatus(snap.sustainableLoad().profileStatus());
         }
+        target.setFullBloomOn(snap.fullBloomOn());
         target.setIssuedAt(snap.issuedAt());
         appendConfirmation(target, snap.executionConfirmation());
 
@@ -168,7 +176,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         }
 
         SustainableCropLoad load = (entity.getTargetFruitsPerShoot() != null || entity.getPercentageToRemove() != null)
-                ? new SustainableCropLoad(entity.getTargetFruitsPerShoot(), entity.getPercentageToRemove(), entity.getWindowClosesOn())
+                ? new SustainableCropLoad(entity.getTargetFruitsPerShoot(), entity.getPercentageToRemove(), entity.getWindowOpensOn(), entity.getWindowClosesOn(),
+                        entity.getProfileVersion(), entity.getProfileStatus())
                 : SustainableCropLoad.empty();
 
         var snapshot = new FruitThinningPrescriptionSnapshot(
@@ -181,7 +190,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 entity.getIssuedAt(),
                 roundSnapshots,
                 confirmationSnapshot(entity.getExecutionConfirmation()),
-                entity.getRevision()
+                entity.getRevision(),
+                entity.getFullBloomOn()
         );
 
         return FruitThinningPrescription.reconstitute(snapshot);

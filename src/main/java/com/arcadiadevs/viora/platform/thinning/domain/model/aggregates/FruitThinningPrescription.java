@@ -34,6 +34,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
     private final List<SamplingRound> samplingRounds;
     private ExecutionConfirmationSnapshot executionConfirmation;
     private Long revision;
+    private LocalDate fullBloomOn;
 
     private FruitThinningPrescription(
             PrescriptionId id,
@@ -45,7 +46,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             Instant issuedAt,
             List<SamplingRound> samplingRounds,
             ExecutionConfirmationSnapshot executionConfirmation,
-            Long revision
+            Long revision,
+            LocalDate fullBloomOn
     ) {
         this.id = id;
         this.plotId = plotId;
@@ -57,6 +59,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         this.samplingRounds = new ArrayList<>(samplingRounds);
         this.executionConfirmation = executionConfirmation;
         this.revision = revision;
+        this.fullBloomOn = fullBloomOn;
     }
 
     /**
@@ -82,7 +85,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 null,
                 new ArrayList<>(),
                 null,
-                0L
+                0L,
+                null
         );
     }
 
@@ -110,7 +114,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 snapshot.issuedAt(),
                 rounds,
                 snapshot.executionConfirmation(),
-                snapshot.revision()
+                snapshot.revision(),
+                snapshot.fullBloomOn()
         );
     }
 
@@ -156,14 +161,18 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
     /**
      * Determines the sustainable crop load after representative field sampling is available.
      *
-     * @param calculator      pure domain calculator using calibrated agronomic target data
-     * @param bbi             historical Biennial Bearing Index
+     * @param calculator      pure domain calculator using the approved target of the plot variety
+     * @param windowOpensOn   first recommended thinning date
      * @param windowClosesOn  latest recommended thinning date
+     * @param profileVersion  version of the technical profile the target and the window come from
+     * @param profileStatus   approval status of that profile
      */
     public void determineSustainableCropLoad(
             CropLoadBalancingCalculatorService calculator,
-            double bbi,
-            LocalDate windowClosesOn
+            LocalDate windowOpensOn,
+            LocalDate windowClosesOn,
+            String profileVersion,
+            String profileStatus
     ) {
         if (calculator == null) {
             throw new IllegalArgumentException("thinning.calculator.null");
@@ -178,9 +187,9 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         double currentFruitsPerShoot = SamplingCoverageEvaluator.computeMeanFruitsPerShoot(samplingRounds);
         SustainableCropLoad calculatedLoad = calculator.calculate(
                 currentFruitsPerShoot,
-                bbi,
+                windowOpensOn,
                 windowClosesOn
-        );
+        ).basedOn(profileVersion, profileStatus);
 
         this.sustainableLoad = calculatedLoad;
         this.status = PrescriptionStatus.PRESCRIBED;
@@ -192,6 +201,51 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 calculatedLoad.percentageToRemove(),
                 issuedAt
         ));
+    }
+
+    /**
+     * Records the observed full bloom date of the campaign, the origin of the intervention window.
+     *
+     * @param observedOn date the plot reached full bloom
+     * @param clock      clock used to reject future dates
+     */
+    public void recordFullBloom(LocalDate observedOn, Clock clock) {
+        if (observedOn == null) {
+            throw new IllegalArgumentException("thinning.full_bloom.null");
+        }
+        if (observedOn.getYear() != campaignYear.value()) {
+            throw new IllegalArgumentException("thinning.full_bloom.campaign_mismatch");
+        }
+        if (observedOn.isAfter(LocalDate.now(clock))) {
+            throw new IllegalArgumentException("thinning.full_bloom.future");
+        }
+        if (status == PrescriptionStatus.CONFIRMED || status == PrescriptionStatus.EXECUTED) {
+            throw new IllegalStateException("thinning.prescription.already_confirmed");
+        }
+        this.fullBloomOn = observedOn;
+    }
+
+    /**
+     * Tells what still prevents the prescription from being issued.
+     *
+     * @param targetConfigured whether an approved profile gives the target load of the plot variety
+     * @return the missing inputs, empty once the prescription was issued
+     */
+    public List<PrescriptionBlocker> blockers(boolean targetConfigured) {
+        if (status != PrescriptionStatus.SAMPLING_IN_PROGRESS) {
+            return List.of();
+        }
+        var missing = new ArrayList<PrescriptionBlocker>();
+        if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
+            missing.add(PrescriptionBlocker.SAMPLING_NOT_REPRESENTATIVE);
+        }
+        if (!targetConfigured) {
+            missing.add(PrescriptionBlocker.TARGET_NOT_CONFIGURED);
+        }
+        if (fullBloomOn == null) {
+            missing.add(PrescriptionBlocker.FULL_BLOOM_MISSING);
+        }
+        return missing;
     }
 
     /** Records field execution using the current UTC date and no caliber calibration. */
@@ -230,6 +284,11 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 || sustainableLoad.targetFruitsPerShoot() == null || sustainableLoad.percentageToRemove() == null) {
             throw new IllegalStateException("thinning.execution.window.missing");
         }
+        if (executionDate != null && ((fullBloomOn != null && executionDate.isBefore(fullBloomOn))
+                || (sustainableLoad.windowOpensOn() != null
+                && executionDate.isBefore(sustainableLoad.windowOpensOn())))) {
+            throw new IllegalArgumentException("thinning.execution.before_window");
+        }
         var biomass = new RemovedBiomass(removedKg, actualRemovalPercentage);
         var crew = new LaborCrewSize(laborCrewSize);
         if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
@@ -264,7 +323,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
                 issuedAt,
                 roundSnapshots,
                 executionConfirmation,
-                revision
+                revision,
+                fullBloomOn
         );
     }
 }
