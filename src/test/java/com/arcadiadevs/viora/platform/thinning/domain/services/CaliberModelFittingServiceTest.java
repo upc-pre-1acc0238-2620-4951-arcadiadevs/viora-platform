@@ -21,12 +21,12 @@ class CaliberModelFittingServiceTest {
         var model = calibration.model();
         assertEquals("SEVILLANA", model.variety());
         assertEquals(0.6, model.beta(), 1e-9);
-        assertEquals(Math.log(10.0) + 0.6 * Math.log(30.0), model.intercept(), 1e-9);
+        assertEquals(Math.log(10.0) + 0.6 * Math.log(6.0), model.intercept(), 1e-9);
         assertEquals(0.0, model.residualStdError(), 1e-9);
         assertEquals(8, model.observationCount());
         assertEquals(4, model.plotCount());
-        assertEquals(18.0, model.minResidualLoad());
-        assertEquals(45.0, model.maxResidualLoad());
+        assertEquals(3.6, model.minResidualLoad(), 1e-9);
+        assertEquals(9.0, model.maxResidualLoad(), 1e-9);
     }
 
     @Test
@@ -54,7 +54,7 @@ class CaliberModelFittingServiceTest {
         for (int i = 0; i < source.size(); i++) {
             var original = source.get(i);
             twoPlots.add(new CaliberCalibrationObservation(new PlotId(plots[i % 2]), original.campaignYear(),
-                    original.variety(), original.residualFruitsPerMeter(), original.commercialFruitsPerKg()));
+                    original.variety(), original.residualFruitsPerShoot(), original.commercialFruitsPerKg()));
         }
         assertFalse(CaliberModelFittingService.calibrate("SEVILLANA", twoPlots).isCalibrated());
     }
@@ -63,8 +63,8 @@ class CaliberModelFittingServiceTest {
     void requiresAWideEnoughLoadRange() {
         var narrow = new ArrayList<CaliberCalibrationObservation>();
         for (int i = 0; i < 8; i++) {
-            double load = 30.0 + i;
-            narrow.add(observation(i, load, 1000.0 / (10.0 * Math.pow(load / 30.0, -0.6))));
+            double load = 6.0 + 0.2 * i;
+            narrow.add(observation(i, load, 1000.0 / (10.0 * Math.pow(load / 6.0, -0.6))));
         }
         assertFalse(CaliberModelFittingService.calibrate("SEVILLANA", narrow).isCalibrated());
     }
@@ -73,10 +73,10 @@ class CaliberModelFittingServiceTest {
     void refusesARelationWithoutEvidenceThatLoadReducesFruitSize() {
         var flat = new ArrayList<CaliberCalibrationObservation>();
         var increasing = new ArrayList<CaliberCalibrationObservation>();
-        double[] loads = {18, 22, 26, 30, 34, 38, 42, 45};
+        double[] loads = {3.6, 4.4, 5.2, 6, 6.8, 7.6, 8.4, 9};
         for (int i = 0; i < loads.length; i++) {
             flat.add(observation(i, loads[i], 100.0));
-            increasing.add(observation(i, loads[i], 1000.0 / (10.0 * Math.pow(loads[i] / 30.0, 0.6))));
+            increasing.add(observation(i, loads[i], 1000.0 / (10.0 * Math.pow(loads[i] / 6.0, 0.6))));
         }
         assertFalse(CaliberModelFittingService.calibrate("SEVILLANA", flat).isCalibrated());
         assertFalse(CaliberModelFittingService.calibrate("SEVILLANA", increasing).isCalibrated());

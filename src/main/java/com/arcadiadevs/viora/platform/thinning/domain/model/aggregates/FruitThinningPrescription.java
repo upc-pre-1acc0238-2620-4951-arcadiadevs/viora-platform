@@ -175,9 +175,9 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             throw new IllegalStateException("thinning.prescription.already_confirmed");
         }
 
-        double currentFruitsPerMeter = SamplingCoverageEvaluator.computeMeanFruitsPerMeter(samplingRounds);
+        double currentFruitsPerShoot = SamplingCoverageEvaluator.computeMeanFruitsPerShoot(samplingRounds);
         SustainableCropLoad calculatedLoad = calculator.calculate(
-                currentFruitsPerMeter,
+                currentFruitsPerShoot,
                 bbi,
                 windowClosesOn
         );
@@ -227,7 +227,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             throw new IllegalStateException("thinning.prescription.not_prescribed");
         }
         if (sustainableLoad == null || sustainableLoad.windowClosesOn() == null
-                || sustainableLoad.targetFruitsPerMeter() == null || sustainableLoad.percentageToRemove() == null) {
+                || sustainableLoad.targetFruitsPerShoot() == null || sustainableLoad.percentageToRemove() == null) {
             throw new IllegalStateException("thinning.execution.window.missing");
         }
         var biomass = new RemovedBiomass(removedKg, actualRemovalPercentage);
@@ -235,8 +235,8 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
         if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
             throw new IllegalStateException("thinning.sampling.not_representative");
         }
-        var loadBalance = LoadBalance.of(SamplingCoverageEvaluator.computeMeanFruitsPerMeter(samplingRounds),
-                biomass.actualRemovalPercentage(), sustainableLoad.targetFruitsPerMeter());
+        var loadBalance = LoadBalance.of(SamplingCoverageEvaluator.computeMeanFruitsPerShoot(samplingRounds),
+                biomass.actualRemovalPercentage(), sustainableLoad.targetFruitsPerShoot());
         var confirmation = ExecutionConfirmation.create(executionDate, biomass, crew, notes,
                 sustainableLoad.windowClosesOn(), loadBalance, calibration, clock);
         executionConfirmation = confirmation.snapshot();

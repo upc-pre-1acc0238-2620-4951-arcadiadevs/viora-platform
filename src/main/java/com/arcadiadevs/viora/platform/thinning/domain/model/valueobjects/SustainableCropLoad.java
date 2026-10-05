@@ -5,12 +5,12 @@ import java.time.LocalDate;
 /**
  * Value Object encapsulating sustainable crop load advisory parameters.
  *
- * @param targetFruitsPerMeter recommended linear fruit density per meter of canopy
+ * @param targetFruitsPerShoot recommended sustainable fruits per shoot
  * @param percentageToRemove   percentage of green fruits to manually remove
  * @param windowClosesOn       estimated cutoff date before pit hardening
  */
 public record SustainableCropLoad(
-        Double targetFruitsPerMeter,
+        Double targetFruitsPerShoot,
         Double percentageToRemove,
         LocalDate windowClosesOn
 ) {
@@ -19,7 +19,7 @@ public record SustainableCropLoad(
      * Compact constructor validating advisory metrics.
      */
     public SustainableCropLoad {
-        if (targetFruitsPerMeter != null && targetFruitsPerMeter <= 0.0) {
+        if (targetFruitsPerShoot != null && targetFruitsPerShoot <= 0.0) {
             throw new IllegalArgumentException("thinning.target_fruits.positive");
         }
         if (percentageToRemove != null && (percentageToRemove < 0.0 || percentageToRemove > 100.0)) {

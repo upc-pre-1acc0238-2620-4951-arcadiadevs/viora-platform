@@ -4,7 +4,7 @@ package com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects;
  * Load-response caliber model of one olive variety, fitted from real Viora harvest observations.
  *
  * <p>Model: {@code ln W = intercept - beta x ln L}, where {@code W} is the mean fruit weight in grams and
- * {@code L} the residual crop load in fruits per meter. It is only valid inside the observed load range.</p>
+ * {@code L} the residual crop load in fruits per shoot. It is only valid inside the observed load range.</p>
  *
  * @param variety            olive variety the model belongs to
  * @param intercept          fitted intercept {@code a}
@@ -47,21 +47,21 @@ public record VarietyCaliberModel(
     /**
      * Tells whether a residual load lies inside the range observed during calibration.
      *
-     * @param residualFruitsPerMeter residual load to evaluate
+     * @param residualFruitsPerShoot residual load to evaluate
      * @return {@code true} when the model may be applied without extrapolating
      */
-    public boolean covers(double residualFruitsPerMeter) {
-        return residualFruitsPerMeter >= minResidualLoad && residualFruitsPerMeter <= maxResidualLoad;
+    public boolean covers(double residualFruitsPerShoot) {
+        return residualFruitsPerShoot >= minResidualLoad && residualFruitsPerShoot <= maxResidualLoad;
     }
 
     /**
      * Predicts the natural logarithm of the mean fruit weight.
      *
-     * @param residualFruitsPerMeter residual load, positive
+     * @param residualFruitsPerShoot residual load, positive
      * @return {@code ln W}
      */
-    public double predictLogWeight(double residualFruitsPerMeter) {
-        return intercept - beta * Math.log(residualFruitsPerMeter);
+    public double predictLogWeight(double residualFruitsPerShoot) {
+        return intercept - beta * Math.log(residualFruitsPerShoot);
     }
 
     /**
@@ -69,12 +69,12 @@ public record VarietyCaliberModel(
      *
      * <p>{@code t x s x sqrt(1 + 1/n + (ln L - meanLogLoad)^2 / Sxx)}</p>
      *
-     * @param residualFruitsPerMeter residual load, positive
+     * @param residualFruitsPerShoot residual load, positive
      * @param studentT               Student t quantile for {@code n - 2} degrees of freedom
      * @return half width of the interval around {@link #predictLogWeight(double)}
      */
-    public double predictionHalfWidth(double residualFruitsPerMeter, double studentT) {
-        double deviation = Math.log(residualFruitsPerMeter) - meanLogLoad;
+    public double predictionHalfWidth(double residualFruitsPerShoot, double studentT) {
+        double deviation = Math.log(residualFruitsPerShoot) - meanLogLoad;
         return studentT * residualStdError
                 * Math.sqrt(1.0 + 1.0 / observationCount + deviation * deviation / sumSquaresLogLoad);
     }

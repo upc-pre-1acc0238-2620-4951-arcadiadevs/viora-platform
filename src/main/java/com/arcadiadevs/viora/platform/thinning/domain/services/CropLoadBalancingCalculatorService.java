@@ -17,7 +17,7 @@ public final class CropLoadBalancingCalculatorService {
     /**
      * Creates the calculator with a calibrated target fruit density.
      *
-     * @param targetThreshold calibrated target fruits per linear canopy meter
+     * @param targetThreshold calibrated target fruits per shoot
      */
     public CropLoadBalancingCalculatorService(double targetThreshold) {
         if (!Double.isFinite(targetThreshold) || targetThreshold <= 0.0) {
@@ -29,28 +29,28 @@ public final class CropLoadBalancingCalculatorService {
     /**
      * Calculates the recommended sustainable crop load.
      *
-     * @param currentFruitsPerMeter current measured fruit density per meter
+     * @param currentFruitsPerShoot current measured fruits per shoot
      * @param bbi                     historical Biennial Bearing Index in [0, 1]
      * @param windowClosesOn          latest recommended thinning date
      * @return sustainable crop load recommendation
      */
     public SustainableCropLoad calculate(
-            double currentFruitsPerMeter,
+            double currentFruitsPerShoot,
             double bbi,
             LocalDate windowClosesOn
     ) {
-        if (!Double.isFinite(currentFruitsPerMeter) || currentFruitsPerMeter < 0.0) {
-            throw new IllegalArgumentException("thinning.current_fruits_per_meter.invalid");
+        if (!Double.isFinite(currentFruitsPerShoot) || currentFruitsPerShoot < 0.0) {
+            throw new IllegalArgumentException("thinning.current_fruits_per_shoot.invalid");
         }
         if (!Double.isFinite(bbi) || bbi < 0.0 || bbi > 1.0) {
             throw new IllegalArgumentException("thinning.bbi.invalid_range");
         }
 
-        if (currentFruitsPerMeter == 0.0) {
+        if (currentFruitsPerShoot == 0.0) {
             return new SustainableCropLoad(targetThreshold, 0.0, windowClosesOn);
         }
 
-        double rawRemoval = ((currentFruitsPerMeter - targetThreshold) / currentFruitsPerMeter)
+        double rawRemoval = ((currentFruitsPerShoot - targetThreshold) / currentFruitsPerShoot)
                 * 100.0
                 * (1.0 + 0.3 * bbi);
         double removalPercentage = Math.max(0.0, Math.min(100.0, rawRemoval));
@@ -66,7 +66,7 @@ public final class CropLoadBalancingCalculatorService {
     /**
      * Returns the calibrated target threshold used by this calculator.
      *
-     * @return target fruits per meter
+     * @return target fruits per shoot
      */
     public double targetThreshold() {
         return targetThreshold;

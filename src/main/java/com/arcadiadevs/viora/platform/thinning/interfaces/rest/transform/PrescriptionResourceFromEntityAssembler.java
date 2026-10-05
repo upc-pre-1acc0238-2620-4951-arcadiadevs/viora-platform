@@ -35,7 +35,7 @@ public final class PrescriptionResourceFromEntityAssembler {
                 snapshot.id().prescriptionId(),
                 snapshot.plotId().plotId(),
                 snapshot.campaignYear().value(),
-                load == null ? null : load.targetFruitsPerMeter(),
+                load == null ? null : load.targetFruitsPerShoot(),
                 load == null ? null : load.percentageToRemove(),
                 snapshot.status().name(),
                 closesOn,

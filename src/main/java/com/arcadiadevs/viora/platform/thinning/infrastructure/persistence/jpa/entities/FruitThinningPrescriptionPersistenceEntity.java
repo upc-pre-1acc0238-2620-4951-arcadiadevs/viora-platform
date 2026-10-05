@@ -35,7 +35,7 @@ public class FruitThinningPrescriptionPersistenceEntity {
     private Long observedPlotRevision;
 
     @Column(name = "target_fruits_m")
-    private Double targetFruitsPerMeter;
+    private Double targetFruitsPerShoot;
 
     @Column(name = "percentage_remove")
     private Double percentageToRemove;
@@ -121,12 +121,12 @@ public class FruitThinningPrescriptionPersistenceEntity {
         this.observedPlotRevision = observedPlotRevision;
     }
 
-    public Double getTargetFruitsPerMeter() {
-        return targetFruitsPerMeter;
+    public Double getTargetFruitsPerShoot() {
+        return targetFruitsPerShoot;
     }
 
-    public void setTargetFruitsPerMeter(Double targetFruitsPerMeter) {
-        this.targetFruitsPerMeter = targetFruitsPerMeter;
+    public void setTargetFruitsPerShoot(Double targetFruitsPerShoot) {
+        this.targetFruitsPerShoot = targetFruitsPerShoot;
     }
 
     public Double getPercentageToRemove() {

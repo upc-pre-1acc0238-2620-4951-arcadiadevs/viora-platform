@@ -11,7 +11,7 @@ import java.time.LocalDate;
  * @param id                   prescription UUID
  * @param plotId               plot UUID
  * @param campaignYear        agricultural campaign year
- * @param targetFruitsPerMeter recommended sustainable fruit density
+ * @param targetFruitsPerShoot recommended sustainable fruit density
  * @param percentageToRemove   recommended removal percentage
  * @param status               prescription lifecycle status
  * @param windowClosesOn       latest recommended intervention date
@@ -29,8 +29,8 @@ public record PrescriptionResource(
         @Schema(description = "Agricultural campaign year", example = "2026")
         Integer campaignYear,
 
-        @Schema(description = "Recommended sustainable fruit density per canopy meter", example = "8.5")
-        Double targetFruitsPerMeter,
+        @Schema(description = "Recommended sustainable fruits per shoot", example = "8.5")
+        Double targetFruitsPerShoot,
 
         @Schema(description = "Recommended percentage of fruits to remove", example = "28.25")
         Double percentageToRemove,

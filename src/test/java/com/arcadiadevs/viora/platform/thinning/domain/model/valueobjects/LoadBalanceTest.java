@@ -19,10 +19,10 @@ class LoadBalanceTest {
     void computesResidualLoadDeltaRatioAndState(double pre, double removal, double residual, double delta,
             double ratio, LoadState state) {
         var balance = LoadBalance.of(pre, removal, 30.0);
-        assertEquals(pre, balance.preThinningFruitsPerMeter());
-        assertEquals(residual, balance.residualFruitsPerMeter(), 1e-9);
-        assertEquals(30.0, balance.targetFruitsPerMeter());
-        assertEquals(delta, balance.deltaFruitsPerMeter(), 1e-9);
+        assertEquals(pre, balance.preThinningFruitsPerShoot());
+        assertEquals(residual, balance.residualFruitsPerShoot(), 1e-9);
+        assertEquals(30.0, balance.targetFruitsPerShoot());
+        assertEquals(delta, balance.deltaFruitsPerShoot(), 1e-9);
         assertEquals(ratio, balance.loadRatio(), 1e-9);
         assertEquals(state, balance.loadState());
     }
@@ -45,8 +45,8 @@ class LoadBalanceTest {
     @Test
     void keepsATinyResidualLoadInsteadOfRoundingItToZero() {
         var balance = LoadBalance.of(42, 99.999, 30);
-        assertTrue(balance.residualFruitsPerMeter() > 0.0);
-        assertEquals(42 * (1 - 99.999 / 100), balance.residualFruitsPerMeter());
+        assertTrue(balance.residualFruitsPerShoot() > 0.0);
+        assertEquals(42 * (1 - 99.999 / 100), balance.residualFruitsPerShoot());
     }
 
     @ParameterizedTest

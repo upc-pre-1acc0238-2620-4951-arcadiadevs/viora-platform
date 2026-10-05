@@ -45,12 +45,12 @@ public class CampaignHarvestSettledEventHandler {
                 .map(prescription -> prescription.snapshot().executionConfirmation())
                 .filter(evidence -> evidence.timeliness() == ExecutionTimeliness.OPTIMAL)
                 .filter(evidence -> evidence.loadBalance() != null
-                        && evidence.loadBalance().residualFruitsPerMeter() > 0.0);
+                        && evidence.loadBalance().residualFruitsPerShoot() > 0.0);
         if (confirmation.isEmpty()) {
             return;
         }
         externalOrchardService.findPlotVariety(plotId).ifPresent(variety ->
                 observationRepository.save(new CaliberCalibrationObservation(plotId, campaignYear, variety,
-                        confirmation.get().loadBalance().residualFruitsPerMeter(), event.commercialFruitsPerKg())));
+                        confirmation.get().loadBalance().residualFruitsPerShoot(), event.commercialFruitsPerKg())));
     }
 }

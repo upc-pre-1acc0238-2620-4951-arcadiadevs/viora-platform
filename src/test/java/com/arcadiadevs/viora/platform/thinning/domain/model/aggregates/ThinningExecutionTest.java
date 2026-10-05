@@ -38,10 +38,10 @@ class ThinningExecutionTest {
         assertEquals(25.0, event.removalPercentage());
         assertEquals(timeliness.name(), event.timeliness());
         var balance = confirmation.loadBalance();
-        assertEquals(SAMPLED_FRUITS_PER_METER, balance.preThinningFruitsPerMeter());
-        assertEquals(31.5, balance.residualFruitsPerMeter());
-        assertEquals(TARGET_FRUITS_PER_METER, balance.targetFruitsPerMeter());
-        assertEquals(1.5, balance.deltaFruitsPerMeter());
+        assertEquals(SAMPLED_FRUITS_PER_SHOOT, balance.preThinningFruitsPerShoot());
+        assertEquals(6.3, balance.residualFruitsPerShoot(), 1e-9);
+        assertEquals(TARGET_FRUITS_PER_SHOOT, balance.targetFruitsPerShoot());
+        assertEquals(0.3, balance.deltaFruitsPerShoot(), 1e-9);
         assertEquals(1.05, balance.loadRatio(), 1e-12);
         assertEquals(LoadState.MODERATE_OVERLOAD, balance.loadState());
         assertEquals(timeliness == ExecutionTimeliness.LATE
@@ -55,7 +55,7 @@ class ThinningExecutionTest {
         var calibration = CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA"));
         prescription.confirmExecution(CUTOFF, 420, 25, 4, null, calibration, CLOCK);
         var projection = prescription.snapshot().executionConfirmation().caliberProjection();
-        // Residual 31.5 fruits/m: W = 10 x (31.5/30)^-0.6 = 9.71 g -> 103.0 fruits/kg
+        // Residual 6.3 fruits/shoot: W = 10 x (6.3/6)^-0.6 = 9.71 g -> 103.0 fruits/kg
         assertEquals(CaliberProjectionStatus.ESTIMATED, projection.status());
         assertEquals(103.0, projection.mostLikelyFruitsPerKg(), 0.05);
         assertEquals("101/110", projection.mostLikelySizeGrade());
@@ -77,7 +77,7 @@ class ThinningExecutionTest {
         prescription.confirmExecution(CUTOFF, 900, 100, 4, null,
                 CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA")), CLOCK);
         var confirmation = prescription.snapshot().executionConfirmation();
-        assertEquals(0.0, confirmation.loadBalance().residualFruitsPerMeter());
+        assertEquals(0.0, confirmation.loadBalance().residualFruitsPerShoot());
         assertEquals(CaliberProjectionStatus.NOT_APPLICABLE, confirmation.caliberProjection().status());
     }
 
