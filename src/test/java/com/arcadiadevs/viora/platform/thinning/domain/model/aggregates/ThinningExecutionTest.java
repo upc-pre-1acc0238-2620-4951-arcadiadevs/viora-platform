@@ -11,6 +11,37 @@ import static com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThinningExecutionTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-09-01", "2026-09-14", "2026-09-23"})
+    void rejectsExecutionBeforeBloomOrOpeningWithoutCreatingEvidence(LocalDate date) {
+        var prescription = windowedPrescription();
+        var before = prescription.snapshot();
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> prescription.confirmExecution(date, 10, 25, 2, null, CLOCK));
+        assertEquals("thinning.execution.before_window", error.getMessage());
+        assertEquals(before, prescription.snapshot());
+        assertTrue(prescription.domainEvents().isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2026-09-24,OPTIMAL", "2026-09-25,OPTIMAL", "2026-09-26,LATE"})
+    void acceptsOpeningAndClosingBoundariesAndLateEvidence(LocalDate date, ExecutionTimeliness expected) {
+        var prescription = windowedPrescription();
+        prescription.confirmExecution(date, 10, 25, 2, null, CLOCK);
+        assertEquals(expected, prescription.snapshot().executionConfirmation().timeliness());
+    }
+
+    private FruitThinningPrescription windowedPrescription() {
+        var prescription = com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.representative(
+                com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.newPlot());
+        prescription.recordFullBloom(LocalDate.of(2026, 9, 10), CLOCK);
+        prescription.determineSustainableCropLoad(
+                new com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancingCalculatorService(0.4),
+                LocalDate.of(2026, 9, 24), CUTOFF, "test-1", "SYNTHETIC_DEMO");
+        prescription.clearDomainEvents();
+        return prescription;
+    }
+
     private static final LocalDate CUTOFF = LocalDate.of(2026, 9, 25);
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
 
@@ -38,10 +69,10 @@ class ThinningExecutionTest {
         assertEquals(25.0, event.removalPercentage());
         assertEquals(timeliness.name(), event.timeliness());
         var balance = confirmation.loadBalance();
-        assertEquals(SAMPLED_FRUITS_PER_METER, balance.preThinningFruitsPerMeter());
-        assertEquals(31.5, balance.residualFruitsPerMeter());
-        assertEquals(TARGET_FRUITS_PER_METER, balance.targetFruitsPerMeter());
-        assertEquals(1.5, balance.deltaFruitsPerMeter());
+        assertEquals(SAMPLED_FRUITS_PER_SHOOT, balance.preThinningFruitsPerShoot());
+        assertEquals(6.3, balance.residualFruitsPerShoot(), 1e-9);
+        assertEquals(TARGET_FRUITS_PER_SHOOT, balance.targetFruitsPerShoot());
+        assertEquals(0.3, balance.deltaFruitsPerShoot(), 1e-9);
         assertEquals(1.05, balance.loadRatio(), 1e-12);
         assertEquals(LoadState.MODERATE_OVERLOAD, balance.loadState());
         assertEquals(timeliness == ExecutionTimeliness.LATE
@@ -55,7 +86,7 @@ class ThinningExecutionTest {
         var calibration = CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA"));
         prescription.confirmExecution(CUTOFF, 420, 25, 4, null, calibration, CLOCK);
         var projection = prescription.snapshot().executionConfirmation().caliberProjection();
-        // Residual 31.5 fruits/m: W = 10 x (31.5/30)^-0.6 = 9.71 g -> 103.0 fruits/kg
+        // Residual 6.3 fruits/shoot: W = 10 x (6.3/6)^-0.6 = 9.71 g -> 103.0 fruits/kg
         assertEquals(CaliberProjectionStatus.ESTIMATED, projection.status());
         assertEquals(103.0, projection.mostLikelyFruitsPerKg(), 0.05);
         assertEquals("101/110", projection.mostLikelySizeGrade());
@@ -77,7 +108,7 @@ class ThinningExecutionTest {
         prescription.confirmExecution(CUTOFF, 900, 100, 4, null,
                 CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA")), CLOCK);
         var confirmation = prescription.snapshot().executionConfirmation();
-        assertEquals(0.0, confirmation.loadBalance().residualFruitsPerMeter());
+        assertEquals(0.0, confirmation.loadBalance().residualFruitsPerShoot());
         assertEquals(CaliberProjectionStatus.NOT_APPLICABLE, confirmation.caliberProjection().status());
     }
 

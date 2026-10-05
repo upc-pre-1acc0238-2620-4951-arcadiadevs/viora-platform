@@ -35,9 +35,9 @@ public final class ExecutionConfirmationResourceFromEntityAssembler {
             return null;
         }
         // Domain values keep full precision; they are rounded only here, for display
-        return new LoadBalanceResource(round(balance.preThinningFruitsPerMeter(), 2),
-                round(balance.residualFruitsPerMeter(), 2), round(balance.targetFruitsPerMeter(), 2),
-                round(balance.deltaFruitsPerMeter(), 2), round(balance.loadRatio(), 3),
+        return new LoadBalanceResource(round(balance.preThinningFruitsPerShoot(), 3),
+                round(balance.residualFruitsPerShoot(), 3), round(balance.targetFruitsPerShoot(), 3),
+                round(balance.deltaFruitsPerShoot(), 3), round(balance.loadRatio(), 3),
                 balance.loadState().name());
     }
 

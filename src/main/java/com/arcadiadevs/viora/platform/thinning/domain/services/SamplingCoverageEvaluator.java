@@ -141,14 +141,15 @@ public final class SamplingCoverageEvaluator {
     }
 
     /**
-     * Computes the average fruit set density per linear canopy meter based on shoots.
+     * Computes the mean fruits per sampled shoot: all counted fruits over all counted shoots.
      *
-     * <p>Standard agronomic conversion for olive: 1 representative shoot is approximately 0.20 m (20 cm) of canopy length.</p>
+     * <p>This is the load the producer actually counts. No shoot length is assumed: converting to
+     * fruits per meter would need the real length of the sampled shoots, which is not measured.</p>
      *
      * @param rounds the sampling rounds
-     * @return mean fruits per linear meter (rounded to 2 decimal places)
+     * @return mean fruits per shoot (full precision; only the REST layer rounds)
      */
-    public static double computeMeanFruitsPerMeter(List<SamplingRound> rounds) {
+    public static double computeMeanFruitsPerShoot(List<SamplingRound> rounds) {
         if (rounds == null || rounds.isEmpty()) {
             return 0.0;
         }
@@ -160,22 +161,16 @@ public final class SamplingCoverageEvaluator {
                 totalShoots += record.shootFruitCount().shootCount();
             }
         }
-        if (totalShoots == 0) {
-            return 0.0;
-        }
-        // fruits per shoot / 0.20m canopy length = fruits per meter
-        double fruitsPerShoot = (double) totalFruits / totalShoots;
-        double fruitsPerMeter = fruitsPerShoot / 0.20;
-        return Math.round(fruitsPerMeter * 100.0) / 100.0;
+        return totalShoots == 0 ? 0.0 : (double) totalFruits / totalShoots;
     }
 
     /**
-     * Computes the average fruit set density per linear canopy meter based on shoots from snapshots.
+     * Computes the mean fruits per sampled shoot from round snapshots.
      *
      * @param roundSnapshots the sampling round snapshots
-     * @return mean fruits per linear meter (rounded to 2 decimal places)
+     * @return mean fruits per shoot (full precision; only the REST layer rounds)
      */
-    public static double computeMeanFruitsPerMeterFromSnapshots(List<SamplingRoundSnapshot> roundSnapshots) {
+    public static double computeMeanFruitsPerShootFromSnapshots(List<SamplingRoundSnapshot> roundSnapshots) {
         if (roundSnapshots == null || roundSnapshots.isEmpty()) {
             return 0.0;
         }
@@ -187,11 +182,6 @@ public final class SamplingCoverageEvaluator {
                 totalShoots += record.shootFruitCount().shootCount();
             }
         }
-        if (totalShoots == 0) {
-            return 0.0;
-        }
-        double fruitsPerShoot = (double) totalFruits / totalShoots;
-        double fruitsPerMeter = fruitsPerShoot / 0.20;
-        return Math.round(fruitsPerMeter * 100.0) / 100.0;
+        return totalShoots == 0 ? 0.0 : (double) totalFruits / totalShoots;
     }
 }

@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SamplingCoverageEvaluatorTest {
 
     @Test
-    @DisplayName("Should correctly evaluate statistical representativeness and mean fruits per meter")
+    @DisplayName("Should correctly evaluate statistical representativeness and mean fruits per shoot")
     void shouldEvaluateRepresentativenessAndDensity() {
         var actorId = new UserId(UUID.randomUUID().toString());
 
@@ -35,8 +35,8 @@ class SamplingCoverageEvaluatorTest {
         assertThat(SamplingCoverageEvaluator.treesNeeded(rounds)).isEqualTo(2);
         assertThat(SamplingCoverageEvaluator.countTotalShoots(rounds)).isEqualTo(30);
 
-        // 300 fruits / 30 shoots = 10 fruits/shoot -> 10 / 0.20m = 50.0 fruits/meter
-        assertThat(SamplingCoverageEvaluator.computeMeanFruitsPerMeter(rounds)).isEqualTo(50.0);
+        // 300 fruits / 30 shoots = 10 fruits per shoot
+        assertThat(SamplingCoverageEvaluator.computeMeanFruitsPerShoot(rounds)).isEqualTo(10.0);
 
         // Round 2: 2 more trees -> total 5 trees
         List<TreeSamplingRecord> round2Trees = List.of(

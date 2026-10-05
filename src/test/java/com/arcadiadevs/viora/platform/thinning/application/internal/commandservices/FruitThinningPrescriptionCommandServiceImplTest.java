@@ -1,5 +1,11 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.commandservices;
 
+import java.time.ZoneOffset;
+import java.time.Instant;
+import java.time.Clock;
+import com.arcadiadevs.viora.platform.thinning.domain.model.commands.EvaluateThinningPrescriptionCommand;
+import com.arcadiadevs.viora.platform.thinning.domain.model.commands.RecordFullBloomCommand;
+import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.ThinningPrescriptionIssuer;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
@@ -27,6 +33,28 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class FruitThinningPrescriptionCommandServiceImplTest {
+    @Test
+    void rejectsBloomCorrectionWhenReissueIsUnavailableWithoutMutatingTheOriginal() {
+        var plot = com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.newPlot();
+        var original = com.arcadiadevs.viora.platform.thinning.PrescriptionTestData.representative(plot);
+        original.recordFullBloom(LocalDate.of(2026, 10, 15), clock);
+        original.determineSustainableCropLoad(
+                new com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancingCalculatorService(0.4),
+                LocalDate.of(2026, 10, 29), LocalDate.of(2026, 12, 3), "test-1", "SYNTHETIC_DEMO");
+        original.clearDomainEvents();
+        var before = original.snapshot();
+        when(externalOrchardService.existsActivePlot(plot)).thenReturn(true);
+        when(prescriptionRepository.findByPlotIdAndCampaignYear(plot, new CampaignYear(2026)))
+                .thenReturn(Optional.of(original));
+
+        var result = commandService.handle(new RecordFullBloomCommand(plot.plotId(), 2026, LocalDate.of(2026, 10, 20)));
+
+        assertThat(result).isInstanceOf(Result.Failure.class);
+        assertThat(original.snapshot()).isEqualTo(before);
+        verify(prescriptionRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
+    }
+
 
     @Mock
     private FruitThinningPrescriptionRepository prescriptionRepository;
@@ -37,6 +65,11 @@ class FruitThinningPrescriptionCommandServiceImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private ThinningPrescriptionIssuer issuer;
+
+    private final Clock clock = Clock.fixed(Instant.parse("2026-11-01T12:00:00Z"), ZoneOffset.UTC);
+
     private FruitThinningPrescriptionCommandServiceImpl commandService;
 
     @BeforeEach
@@ -44,7 +77,9 @@ class FruitThinningPrescriptionCommandServiceImplTest {
         commandService = new FruitThinningPrescriptionCommandServiceImpl(
                 prescriptionRepository,
                 externalOrchardService,
-                eventPublisher
+                eventPublisher,
+                issuer,
+                clock
         );
     }
 
@@ -106,6 +141,67 @@ class FruitThinningPrescriptionCommandServiceImplTest {
         var result = commandService.handle(command);
 
         assertThat(result).isInstanceOf(Result.Failure.class);
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Records the full bloom, creates the prescription if needed and tries to issue it")
+    void shouldRecordTheFullBloom() {
+        String plotIdStr = UUID.randomUUID().toString();
+        var plotId = new PlotId(plotIdStr);
+        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(prescriptionRepository.findByPlotIdAndCampaignYear(plotId, new CampaignYear(2026)))
+                .thenReturn(Optional.empty());
+        when(prescriptionRepository.save(any(FruitThinningPrescription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = commandService.handle(new RecordFullBloomCommand(plotIdStr, 2026, LocalDate.of(2026, 10, 15)));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
+        var saved = (FruitThinningPrescription) ((Result.Success<?, ?>) result).value();
+        assertThat(saved.snapshot().fullBloomOn()).isEqualTo(LocalDate.of(2026, 10, 15));
+        verify(issuer).issueIfReady(any(FruitThinningPrescription.class), org.mockito.ArgumentMatchers.eq(true));
+    }
+
+    @Test
+    @DisplayName("Rejects a future full bloom without saving anything")
+    void shouldRejectAFutureFullBloom() {
+        String plotIdStr = UUID.randomUUID().toString();
+        var plotId = new PlotId(plotIdStr);
+        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(prescriptionRepository.findByPlotIdAndCampaignYear(plotId, new CampaignYear(2026)))
+                .thenReturn(Optional.empty());
+
+        var result = commandService.handle(new RecordFullBloomCommand(plotIdStr, 2026, LocalDate.of(2026, 11, 2)));
+
+        assertThat(result).isInstanceOf(Result.Failure.class);
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Does not record the full bloom of a plot that is not active")
+    void shouldNotRecordForAnUnknownPlot() {
+        String plotIdStr = UUID.randomUUID().toString();
+        when(externalOrchardService.existsActivePlot(new PlotId(plotIdStr))).thenReturn(false);
+
+        var result = commandService.handle(new RecordFullBloomCommand(plotIdStr, 2026, LocalDate.of(2026, 10, 15)));
+
+        assertThat(result).isInstanceOf(Result.Failure.class);
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Evaluating saves the prescription only when it was issued")
+    void shouldSaveOnlyWhenIssued() {
+        var plotId = new PlotId(UUID.randomUUID().toString());
+        var prescription = FruitThinningPrescription.createForPlot(plotId, new CampaignYear(2026), 1L);
+        when(prescriptionRepository.findByPlotIdAndCampaignYear(plotId, new CampaignYear(2026)))
+                .thenReturn(Optional.of(prescription));
+        when(issuer.issueIfReady(prescription, false)).thenReturn(false);
+
+        var result = commandService.handle(new EvaluateThinningPrescriptionCommand(plotId.plotId(), 2026));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
         verify(prescriptionRepository, never()).save(any());
     }
 }

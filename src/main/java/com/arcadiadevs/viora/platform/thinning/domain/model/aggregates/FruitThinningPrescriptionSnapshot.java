@@ -22,6 +22,7 @@ import java.util.List;
  * @param samplingRounds        list of conducted sampling rounds
  * @param executionConfirmation optional execution confirmation record
  * @param revision              optimistic concurrency version counter
+ * @param fullBloomOn           observed full bloom date of the campaign, if recorded
  */
 public record FruitThinningPrescriptionSnapshot(
         PrescriptionId id,
@@ -33,13 +34,33 @@ public record FruitThinningPrescriptionSnapshot(
         Instant issuedAt,
         List<SamplingRoundSnapshot> samplingRounds,
         ExecutionConfirmationSnapshot executionConfirmation,
-        Long revision
+        Long revision,
+        java.time.LocalDate fullBloomOn
 ) {
     /**
      * Compact constructor creating an immutable defensive copy of the sampling rounds list.
      */
     public FruitThinningPrescriptionSnapshot {
         samplingRounds = (samplingRounds == null) ? List.of() : List.copyOf(samplingRounds);
+    }
+
+    /**
+     * Backward-compatible constructor for call sites that know nothing about the full bloom date.
+     */
+    public FruitThinningPrescriptionSnapshot(
+            PrescriptionId id,
+            PlotId plotId,
+            CampaignYear campaignYear,
+            Long observedPlotRevision,
+            PrescriptionStatus status,
+            SustainableCropLoad sustainableLoad,
+            Instant issuedAt,
+            List<SamplingRoundSnapshot> samplingRounds,
+            ExecutionConfirmationSnapshot executionConfirmation,
+            Long revision
+    ) {
+        this(id, plotId, campaignYear, observedPlotRevision, status, sustainableLoad,
+                issuedAt, samplingRounds, executionConfirmation, revision, null);
     }
 
     /**
@@ -57,6 +78,6 @@ public record FruitThinningPrescriptionSnapshot(
             Long revision
     ) {
         this(id, plotId, campaignYear, observedPlotRevision, status, sustainableLoad,
-                null, samplingRounds, executionConfirmation, revision);
+                null, samplingRounds, executionConfirmation, revision, null);
     }
 }

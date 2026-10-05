@@ -46,8 +46,8 @@ public final class CaliberModelFittingService {
             return CaliberCalibration.uncalibrated(variety, n);
         }
         long plots = data.stream().map(CaliberCalibrationObservation::plotId).distinct().count();
-        double minLoad = data.stream().mapToDouble(CaliberCalibrationObservation::residualFruitsPerMeter).min().orElseThrow();
-        double maxLoad = data.stream().mapToDouble(CaliberCalibrationObservation::residualFruitsPerMeter).max().orElseThrow();
+        double minLoad = data.stream().mapToDouble(CaliberCalibrationObservation::residualFruitsPerShoot).min().orElseThrow();
+        double maxLoad = data.stream().mapToDouble(CaliberCalibrationObservation::residualFruitsPerShoot).max().orElseThrow();
         if (plots < MIN_PLOTS || maxLoad < MIN_LOAD_SPREAD * minLoad) {
             return CaliberCalibration.uncalibrated(variety, n);
         }
@@ -57,7 +57,7 @@ public final class CaliberModelFittingService {
         double meanX = 0.0;
         double meanY = 0.0;
         for (int i = 0; i < n; i++) {
-            x[i] = Math.log(data.get(i).residualFruitsPerMeter());
+            x[i] = Math.log(data.get(i).residualFruitsPerShoot());
             y[i] = Math.log(data.get(i).fruitWeightGrams());
             meanX += x[i] / n;
             meanY += y[i] / n;

@@ -32,7 +32,7 @@ public final class SamplingSummaryResourceFromEntityAssembler {
 
         int uniqueTrees = SamplingCoverageEvaluator.countUniqueEvaluatedTreesFromSnapshots(rounds);
         int totalShoots = SamplingCoverageEvaluator.countTotalShootsFromSnapshots(rounds);
-        double meanFruits = SamplingCoverageEvaluator.computeMeanFruitsPerMeterFromSnapshots(rounds);
+        double meanFruits = SamplingCoverageEvaluator.computeMeanFruitsPerShootFromSnapshots(rounds);
         boolean isRepresentative = SamplingCoverageEvaluator.isRepresentativeFromSnapshots(rounds);
         int needed = SamplingCoverageEvaluator.treesNeededFromSnapshots(rounds);
 
@@ -41,9 +41,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 snapshot.campaignYear().value(),
                 uniqueTrees,
                 totalShoots,
-                meanFruits,
+                ThinningRounding.load(meanFruits),
                 isRepresentative,
-                needed
+                needed,
+                ThinningRounding.LOAD_UNIT
         );
     }
 
@@ -62,9 +63,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
-                summary.meanFruitsPerMeter(),
+                ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
-                summary.treesNeeded()
+                summary.treesNeeded(),
+                ThinningRounding.LOAD_UNIT
         );
     }
 
@@ -87,9 +89,10 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
-                summary.meanFruitsPerMeter(),
+                ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
                 summary.treesNeeded(),
+                ThinningRounding.LOAD_UNIT,
                 trees
         );
     }
