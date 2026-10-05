@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -12,7 +13,7 @@ import java.time.LocalDate;
  * @param treeTag         physical tree identifier
  * @param shootCount      evaluated shoot count
  * @param fruitSetCount   observed set-fruit count
- * @param trunkDiameterMm trunk diameter in millimeters
+ * @param trunkDiameterMm trunk diameter in millimeters (optional)
  * @param samplingDate    field sampling date
  */
 @Schema(name = "SamplingTreeResource", description = "Detailed tree observation within a field sampling round")
@@ -30,8 +31,8 @@ public record SamplingTreeResource(
         @Schema(description = "Number of set fruits", example = "120")
         Integer fruitSetCount,
 
-        @Schema(description = "Trunk diameter in millimeters", example = "165.5")
-        Double trunkDiameterMm,
+        @Schema(description = "Trunk diameter in millimeters (optional)", example = "165.5", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
+        @Nullable Double trunkDiameterMm,
 
         @Schema(description = "Date when the observation was recorded", example = "2026-09-28")
         LocalDate samplingDate

@@ -32,6 +32,7 @@ public final class SamplingSummaryResourceFromEntityAssembler {
 
         int uniqueTrees = SamplingCoverageEvaluator.countUniqueEvaluatedTreesFromSnapshots(rounds);
         int totalShoots = SamplingCoverageEvaluator.countTotalShootsFromSnapshots(rounds);
+        int totalFruits = SamplingCoverageEvaluator.countTotalFruitsFromSnapshots(rounds);
         double meanFruits = SamplingCoverageEvaluator.computeMeanFruitsPerShootFromSnapshots(rounds);
         boolean isRepresentative = SamplingCoverageEvaluator.isRepresentativeFromSnapshots(rounds);
         int needed = SamplingCoverageEvaluator.treesNeededFromSnapshots(rounds);
@@ -41,6 +42,7 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 snapshot.campaignYear().value(),
                 uniqueTrees,
                 totalShoots,
+                totalFruits,
                 ThinningRounding.load(meanFruits),
                 isRepresentative,
                 needed,
@@ -63,6 +65,7 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
+                summary.sampledFruitSetCount(),
                 ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
                 summary.treesNeeded(),
@@ -89,6 +92,7 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 summary.campaignYear().value(),
                 summary.sampledTreesCount(),
                 summary.sampledShootsCount(),
+                summary.sampledFruitSetCount(),
                 ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
                 summary.treesNeeded(),
