@@ -17,6 +17,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.repositories.ThinningExe
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.NoTransactionException;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +25,9 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.Clock;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Settles a campaign: verifies the plot and its owner, loads or opens the plot report, freezes the thinning
@@ -37,6 +40,9 @@ import java.util.Map;
 @Service
 @Transactional
 public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCommandService {
+    private static final String IDEMPOTENCY_CONSTRAINT = "uq_settlement_producer_idempotency";
+    private static final String RECEIPT_CONSTRAINT = "uq_settlement_producer_receipt";
+
     private final AgronomicReportRepository reportRepository;
     private final ThinningExecutionRecordRepository thinningRecordRepository;
     private final ReceiptCounterRepository receiptCounterRepository;
@@ -93,21 +99,20 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
         var campaignYear = new CampaignYear(command.campaignYear());
         var idempotencyKey = IdempotencyKey.of(command.idempotencyKey());
         // The replay check comes before anything that consumes a receipt number: a replay has no side effects.
-        if (idempotencyKey.isPresent()) {
-            var replay = settledHarvestRepository
-                    .findByProducerIdAndIdempotencyKey(new UserId(command.actorId()), idempotencyKey);
-            if (replay.isPresent()) {
-                var stored = replay.get();
-                if (!stored.plotId().equals(plotId) || !stored.campaignYear().equals(campaignYear)) {
-                    return Result.failure(ApplicationError.businessRuleViolation("settlement",
-                            "settlement.idempotency_key.reused"));
-                }
-                return Result.success(SettlementOutcome.replayed(stored));
-            }
+        var replay = replayOf(owner.get(), plotId, campaignYear, idempotencyKey);
+        if (replay.isPresent()) {
+            return replay.get();
         }
 
         var report = reportRepository.findByPlotIdForUpdate(plotId)
                 .orElseGet(() -> AgronomicReport.createForPlot(plotId, owner.get()));
+        // Asked again now that the plot is locked: a request with the same key that was in flight at the same time
+        // has just committed while this one waited for the lock, and it is a replay of that settlement, not a
+        // conflict with it.
+        replay = replayOf(owner.get(), plotId, campaignYear, idempotencyKey);
+        if (replay.isPresent()) {
+            return replay.get();
+        }
         if (report.settlementOf(campaignYear).isPresent()) {
             // Ruled out before the receipt number is consumed: a repeated settlement must not burn a number.
             return Result.failure(conflictWithExistingSettlement(report, campaignYear,
@@ -137,11 +142,76 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
             rollBack();
             return Result.failure(conflictWithExistingSettlement(report, campaignYear, exception.getMessage()));
         }
-        reportRepository.save(report);
+        try {
+            reportRepository.save(report);
+        } catch (DataIntegrityViolationException exception) {
+            return failureOfViolated(exception);
+        }
         // Projections listening with BEFORE_COMMIT join this transaction: a failure rolls the settlement back.
         report.domainEvents().forEach(publisher::publishEvent);
         report.clearDomainEvents();
         return Result.success(SettlementOutcome.created(settlement));
+    }
+
+    /**
+     * Looks for the settlement the idempotency key was already used for, and answers the request from it.
+     *
+     * @return empty when there is no key or it was never used, a replay when it settled this very plot and
+     *         campaign, a failure when it settled another plot or campaign of the producer
+     */
+    private Optional<Result<SettlementOutcome, ApplicationError>> replayOf(UserId producerId, PlotId plotId,
+            CampaignYear campaignYear, IdempotencyKey idempotencyKey) {
+        if (!idempotencyKey.isPresent()) {
+            return Optional.empty();
+        }
+        return settledHarvestRepository.findByProducerIdAndIdempotencyKey(producerId, idempotencyKey).map(stored -> {
+            if (!stored.plotId().equals(plotId) || !stored.campaignYear().equals(campaignYear)) {
+                return Result.failure(keyReused());
+            }
+            return Result.success(SettlementOutcome.replayed(stored));
+        });
+    }
+
+    private static ApplicationError keyReused() {
+        return ApplicationError.businessRuleViolation("settlement", "settlement.idempotency_key.reused");
+    }
+
+    /**
+     * Translates the unique constraints of a settlement that lost a race, rolling the transaction back so the
+     * receipt number it had consumed is released.
+     *
+     * <ul>
+     *   <li>{@value #IDEMPOTENCY_CONSTRAINT}: the same key reached two different plots at once. The plot lock cannot
+     *       serialize those, so the loser meets the constraint instead of the replay lookup. Settling one plot can
+     *       never be a replay of settling another, so this is the key being reused.</li>
+     *   <li>{@value #RECEIPT_CONSTRAINT}: a receipt number was handed out twice. The counter is caught up with the
+     *       stored numbers before it allocates, so this should not happen; if it does it is a server fault to
+     *       retry, never a conflict of the producer. It is not retried here because Postgres leaves the
+     *       transaction unusable after a violation, so a retry needs a new request.</li>
+     * </ul>
+     *
+     * <p>Any other violation (for example a campaign settled by a concurrent request on a brand new report) is
+     * rethrown untouched and keeps being a generic conflict.</p>
+     */
+    private Result<SettlementOutcome, ApplicationError> failureOfViolated(DataIntegrityViolationException exception) {
+        if (violates(exception, IDEMPOTENCY_CONSTRAINT)) {
+            rollBack();
+            return Result.failure(keyReused());
+        }
+        if (violates(exception, RECEIPT_CONSTRAINT)) {
+            rollBack();
+            return Result.failure(ApplicationError.unexpected("settlement", "settlement.receipt_number.unavailable"));
+        }
+        throw exception;
+    }
+
+    private static boolean violates(Throwable exception, String constraint) {
+        for (var cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && cause.getMessage().toLowerCase(Locale.ROOT).contains(constraint)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

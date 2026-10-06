@@ -496,6 +496,57 @@ class HarvestSettlementControllerIntegrationTest {
         assertEquals(1, lastSequenceOf(REJECTED_YEAR));
     }
 
+    @Test
+    void theLoserOfTwoConcurrentRequestsWithTheSameKeyReplaysTheWinner() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        Callable<org.springframework.mock.web.MockHttpServletResponse> request = () -> {
+            ready.countDown();
+            assertTrue(start.await(10, TimeUnit.SECONDS));
+            return postSettlement(plotId, "race-key", settleBody(RACE_YEAR, null, null)).andReturn().getResponse();
+        };
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(request);
+            var second = executor.submit(request);
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+            var responses = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+            var statuses = new ArrayList<>(responses.stream().map(r -> r.getStatus()).toList());
+            Collections.sort(statuses);
+            assertEquals(List.of(200, 201), statuses);
+            assertEquals(JsonPath.<String>read(responses.get(0).getContentAsString(), "$.id"),
+                    JsonPath.<String>read(responses.get(1).getContentAsString(), "$.id"));
+        }
+        assertEquals(1, settlementsOf(plotId));
+        assertEquals(1, lastSequenceOf(RACE_YEAR), "only the winner consumed a receipt number");
+    }
+
+    @Test
+    void theSameKeyOnTwoPlotsAtOnceSettlesOneAndRejectsTheOtherWithAnUnprocessableKey() throws Exception {
+        var plots = List.of(createPlot("CRIOLLA"), createPlot("SEVILLANA"));
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var futures = plots.stream().map(plot -> executor.submit(() -> {
+                ready.countDown();
+                assertTrue(start.await(10, TimeUnit.SECONDS));
+                return postSettlement(plot, "shared-race-key", settleBody(SHARED_KEY_RACE_YEAR, null, null))
+                        .andReturn().getResponse().getStatus();
+            })).toList();
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+            var statuses = new ArrayList<Integer>();
+            for (var future : futures) {
+                statuses.add(future.get(20, TimeUnit.SECONDS));
+            }
+            Collections.sort(statuses);
+            assertEquals(List.of(201, 422), statuses);
+        }
+        assertEquals(1, settlementsOf(plots.get(0)) + settlementsOf(plots.get(1)));
+        assertEquals(1, lastSequenceOf(SHARED_KEY_RACE_YEAR));
+    }
+
     // --- helpers of the receipt contract ---
 
     private ResultActions settleWith(String plotId, String idempotencyKey, int year, Double fruitsPerKg,

@@ -17,6 +17,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.repositories.ThinningExe
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -299,6 +300,73 @@ class HarvestSettlementCommandServiceImplTest {
         assertEquals("settlement.idempotency_key.reused", error.details());
         verifyNoInteractions(publisher, reports, counterInitializer);
         verifyNoInteractions(counters);
+    }
+
+    @Test
+    void replaysAfterLockingThePlotWhenTheSameKeyCommittedWhileWaitingForTheLock() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        var stored = settlementOf(plotId, 2026, 1);
+        // The first lookup runs before the lock and finds nothing; by the time the lock is granted the winner of the
+        // race has committed, so the second lookup finds its settlement.
+        when(settledHarvests.findByProducerIdAndIdempotencyKey(new UserId(owner), IdempotencyKey.of("key-a")))
+                .thenReturn(Optional.empty(), Optional.of(stored));
+
+        var outcome = service.handle(commandOf(plotId, owner, 2026, "key-a")).success().orElseThrow();
+
+        assertFalse(outcome.created());
+        assertEquals(stored.id(), outcome.settlement().id());
+        verify(reports).findByPlotIdForUpdate(new PlotId(plotId));
+        verify(reports, never()).save(any());
+        verifyNoInteractions(publisher, counterInitializer, counters);
+    }
+
+    @Test
+    void rejectsAKeyThatTheWinnerOfTheRaceUsedForAnotherCampaign() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        when(settledHarvests.findByProducerIdAndIdempotencyKey(any(), any()))
+                .thenReturn(Optional.empty(), Optional.of(settlementOf(plotId, 2027, 1)));
+
+        var error = service.handle(commandOf(plotId, owner, 2026, "key-a")).failure().orElseThrow();
+
+        assertEquals("settlement.idempotency_key.reused", error.details());
+        verifyNoInteractions(publisher, counterInitializer, counters);
+    }
+
+    @Test
+    void theIdempotencyConstraintLostInARaceIsAReusedKeyNotAConflict() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        doThrow(violationOf("uq_settlement_producer_idempotency")).when(reports).save(any());
+
+        var error = service.handle(commandOf(plotId, owner, 2026, "key-a")).failure().orElseThrow();
+
+        assertEquals("BUSINESS_RULE_VIOLATION", error.code());
+        assertEquals("settlement.idempotency_key.reused", error.details());
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void theReceiptConstraintIsAnUnexpectedRetryableFailureNotAConflict() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        doThrow(violationOf("UQ_SETTLEMENT_PRODUCER_RECEIPT_INDEX_4")).when(reports).save(any());
+
+        var error = service.handle(command).failure().orElseThrow();
+
+        assertEquals("UNEXPECTED_ERROR", error.code());
+        assertEquals("settlement.receipt_number.unavailable", error.details());
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void anyOtherConstraintKeepsBeingRethrown() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        doThrow(violationOf("uq_settlement_report_campaign")).when(reports).save(any());
+
+        assertThrows(DataIntegrityViolationException.class, () -> service.handle(command));
+    }
+
+    private static DataIntegrityViolationException violationOf(String constraint) {
+        return new DataIntegrityViolationException("could not execute statement",
+                new IllegalStateException("violates unique constraint \"" + constraint + "\""));
     }
 
     // --- the conflict of an already settled campaign ---
