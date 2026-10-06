@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform;
 
+import com.arcadiadevs.viora.platform.settlement.application.acl.CommercialSizeGradeQueryService;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.StabilizationTrendCurve;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.ThinningBalance;
@@ -7,18 +8,44 @@ import com.arcadiadevs.viora.platform.settlement.domain.services.StabilizationCu
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.HarvestSettlementResource;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.StabilizationCurveResource;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.ThinningBalanceResource;
+import org.springframework.stereotype.Component;
 
-/** Maps a settlement voucher to the public response; values are rounded only here, for display. */
-public final class HarvestSettlementResourceFromEntityAssembler {
-    private HarvestSettlementResourceFromEntityAssembler() { }
+/**
+ * Maps a settlement voucher to the public response; values are rounded only here, for display.
+ *
+ * <p>The commercial size grade of the settled caliber is owned by Thinning, so it is read through the published
+ * application port instead of importing anything from that context. An absent caliber stays absent.</p>
+ */
+@Component
+public class HarvestSettlementResourceFromEntityAssembler {
+    private final CommercialSizeGradeQueryService commercialSizeGradeQueryService;
 
-    public static HarvestSettlementResource toResource(HarvestSettlementSnapshot settlement) {
+    /**
+     * Constructs the assembler.
+     *
+     * @param commercialSizeGradeQueryService port naming the commercial size grade of a caliber
+     */
+    public HarvestSettlementResourceFromEntityAssembler(CommercialSizeGradeQueryService commercialSizeGradeQueryService) {
+        this.commercialSizeGradeQueryService = commercialSizeGradeQueryService;
+    }
+
+    /**
+     * Maps a settlement voucher to its public response.
+     *
+     * @param settlement the settlement to render
+     * @return the public resource of the settlement
+     */
+    public HarvestSettlementResource toResource(HarvestSettlementSnapshot settlement) {
         return new HarvestSettlementResource(settlement.id().settlementId(), settlement.reportId().reportId(),
                 settlement.plotId().plotId(), settlement.campaignYear().value(),
                 settlement.greenOlivesWeight().kilograms(), settlement.blackOlivesWeight().kilograms(),
                 settlement.totalHarvestWeight().kilograms(), settlement.commercialFruitsPerKg(), settlement.notes(),
                 settlement.status().name(), settlement.settledAt(),
-                toResource(settlement.thinningBalance()), toResource(settlement.trendCurve()));
+                toResource(settlement.thinningBalance()), toResource(settlement.trendCurve()),
+                settlement.receiptNumber() == null ? null : settlement.receiptNumber().value(),
+                settlement.weighedOn() == null ? null : settlement.weighedOn().value(),
+                settlement.millTicketNumber() == null ? null : settlement.millTicketNumber().value(),
+                commercialSizeGradeQueryService.gradeOf(settlement.commercialFruitsPerKg()).orElse(null));
     }
 
     private static ThinningBalanceResource toResource(ThinningBalance balance) {
