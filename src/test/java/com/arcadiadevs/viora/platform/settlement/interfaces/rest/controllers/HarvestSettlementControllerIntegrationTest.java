@@ -476,6 +476,26 @@ class HarvestSettlementControllerIntegrationTest {
         assertEquals(4, lastSequenceOf(SEEDED_COUNTER_YEAR));
     }
 
+    @Test
+    void aRejectedRequestDoesNotConsumeAReceiptNumber() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        var future = LocalDate.now(ZoneOffset.UTC).plusDays(1);
+
+        postSettlement(plotId, null, "{\"campaignYear\":%d,\"greenOlivesKg\":0,\"blackOlivesKg\":0,\"weighedOn\":\"%s\"}"
+                .formatted(REJECTED_YEAR, WEIGHED_ON)).andExpect(status().isBadRequest());
+        settleWith(plotId, null, REJECTED_YEAR, -1.0, null).andExpect(status().isBadRequest());
+        postSettlement(plotId, null, "{\"campaignYear\":%d,\"greenOlivesKg\":7000,\"blackOlivesKg\":0,\"notes\":\"%s\",\"weighedOn\":\"%s\"}"
+                .formatted(REJECTED_YEAR, "n".repeat(1001), WEIGHED_ON)).andExpect(status().isBadRequest());
+        settleWith(plotId, null, REJECTED_YEAR, null, "x".repeat(31)).andExpect(status().isBadRequest());
+        postSettlement(plotId, null, "{\"campaignYear\":%d,\"greenOlivesKg\":7000,\"blackOlivesKg\":0,\"weighedOn\":\"%s\"}"
+                .formatted(REJECTED_YEAR, future)).andExpect(status().isBadRequest());
+        assertEquals(0, settlementsOf(plotId));
+
+        settleWith(plotId, null, REJECTED_YEAR, null, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.receiptNumber").value("VR-37-0001"));
+        assertEquals(1, lastSequenceOf(REJECTED_YEAR));
+    }
+
     // --- helpers of the receipt contract ---
 
     private ResultActions settleWith(String plotId, String idempotencyKey, int year, Double fruitsPerKg,

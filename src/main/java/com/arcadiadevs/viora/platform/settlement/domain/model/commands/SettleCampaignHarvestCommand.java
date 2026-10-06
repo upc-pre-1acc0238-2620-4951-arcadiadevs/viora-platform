@@ -37,14 +37,8 @@ public record SettleCampaignHarvestCommand(String plotId, String actorId, Intege
         plotId = new PlotId(plotId).plotId();
         actorId = new UserId(actorId).userId();
         new CampaignYear(campaignYear);
-        HarvestSettlement.calculateTotalWeight(new OliveWeight(greenOlivesKg), new OliveWeight(blackOlivesKg));
-        if (commercialFruitsPerKg != null
-                && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0)) {
-            throw new IllegalArgumentException("settlement.fruits_per_kg.invalid");
-        }
-        if (notes != null && notes.length() > HarvestSettlement.MAX_NOTES_LENGTH) {
-            throw new IllegalArgumentException("settlement.notes.too_long");
-        }
+        HarvestSettlement.validateFigures(new OliveWeight(greenOlivesKg), new OliveWeight(blackOlivesKg),
+                commercialFruitsPerKg, notes);
         millTicketNumber = MillTicketNumber.of(millTicketNumber).value();
         idempotencyKey = IdempotencyKey.of(idempotencyKey).value();
     }

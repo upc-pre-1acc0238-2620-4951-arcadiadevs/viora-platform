@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.settlement.application.internal.outboundse
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.AgronomicReport;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.commands.SettleCampaignHarvestCommand;
+import com.arcadiadevs.viora.platform.settlement.domain.model.entities.HarvestSettlement;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.ReceiptCounterRepository;
@@ -17,7 +18,9 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.NoTransactionException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.Clock;
 import java.util.LinkedHashMap;
@@ -116,17 +119,22 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
 
         HarvestSettlementSnapshot settlement;
         try {
-            // The weighing date is judged before the counter is touched, so a rejected weighing date does not
-            // consume a receipt number.
+            // Everything that can reject the request is judged before the counter is touched, so a rejected
+            // request never consumes a receipt number.
             var weighedOn = WeighingDate.of(command.weighedOn(), clock);
+            var green = new OliveWeight(command.greenOlivesKg());
+            var black = new OliveWeight(command.blackOlivesKg());
+            var millTicketNumber = MillTicketNumber.of(command.millTicketNumber());
+            HarvestSettlement.validateFigures(green, black, command.commercialFruitsPerKg(), command.notes());
             var receiptNumber = nextReceiptNumber(owner.get(), campaignYear);
-            settlement = report.settleCampaign(campaignYear, new OliveWeight(command.greenOlivesKg()),
-                    new OliveWeight(command.blackOlivesKg()), command.commercialFruitsPerKg(), command.notes(),
-                    balance, history, receiptNumber, weighedOn, MillTicketNumber.of(command.millTicketNumber()),
-                    idempotencyKey, clock);
+            settlement = report.settleCampaign(campaignYear, green, black, command.commercialFruitsPerKg(),
+                    command.notes(), balance, history, receiptNumber, weighedOn, millTicketNumber, idempotencyKey,
+                    clock);
         } catch (IllegalArgumentException exception) {
+            rollBack();
             return Result.failure(ApplicationError.validationError("settlement", exception.getMessage()));
         } catch (IllegalStateException exception) {
+            rollBack();
             return Result.failure(conflictWithExistingSettlement(report, campaignYear, exception.getMessage()));
         }
         reportRepository.save(report);
@@ -134,6 +142,18 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
         report.domainEvents().forEach(publisher::publishEvent);
         report.clearDomainEvents();
         return Result.success(SettlementOutcome.created(settlement));
+    }
+
+    /**
+     * Marks the running transaction to roll back, so a failure that returns a {@link Result} instead of throwing still
+     * undoes whatever it had already written, above all the receipt number it consumed.
+     */
+    private static void rollBack() {
+        try {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        } catch (NoTransactionException ignored) {
+            // Not running inside a transaction (a plain unit test): there is nothing to roll back.
+        }
     }
 
     /**

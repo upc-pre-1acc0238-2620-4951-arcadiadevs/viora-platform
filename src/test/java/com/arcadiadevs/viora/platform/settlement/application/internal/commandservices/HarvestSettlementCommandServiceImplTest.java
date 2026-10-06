@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.Agronom
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.ReceiptCounter;
 import com.arcadiadevs.viora.platform.settlement.domain.model.commands.SettleCampaignHarvestCommand;
+import com.arcadiadevs.viora.platform.settlement.domain.model.entities.HarvestSettlement;
 import com.arcadiadevs.viora.platform.settlement.domain.model.events.CampaignHarvestSettledEvent;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
@@ -220,6 +221,35 @@ class HarvestSettlementCommandServiceImplTest {
         var settlement = service.handle(command).success().orElseThrow().settlement();
 
         assertEquals("VR-26-0008", settlement.receiptNumber().value());
+    }
+
+    @Test
+    void aRejectedWeighingDateDoesNotOpenOrMoveTheCounter() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        var future = new SettleCampaignHarvestCommand(plotId, owner, 2026, 8200.0, 6050.0, null, null,
+                LocalDate.of(2026, 10, 3), null, null);
+
+        var error = service.handle(future).failure().orElseThrow();
+
+        assertEquals("VALIDATION_ERROR", error.code());
+        assertEquals("settlement.weighed_on.future", error.details());
+        verifyNoInteractions(counterInitializer, counters, publisher);
+        verify(reports, never()).save(any());
+        // The next valid settlement still gets the first number.
+        assertEquals("VR-26-0001",
+                service.handle(command).success().orElseThrow().settlement().receiptNumber().value());
+    }
+
+    @Test
+    void validatesTheFiguresBeforeAllocatingAReceiptNumber() {
+        assertThrows(IllegalArgumentException.class, () -> HarvestSettlement.validateFigures(
+                new OliveWeight(0.0), new OliveWeight(0.0), null, null));
+        assertThrows(IllegalArgumentException.class, () -> HarvestSettlement.validateFigures(
+                new OliveWeight(1.0), new OliveWeight(0.0), 0.0, null));
+        assertThrows(IllegalArgumentException.class, () -> HarvestSettlement.validateFigures(
+                new OliveWeight(1.0), new OliveWeight(0.0), null, "n".repeat(1001)));
+        assertEquals(1.0, HarvestSettlement.validateFigures(new OliveWeight(1.0), new OliveWeight(0.0), 105.0, "ok")
+                .kilograms());
     }
 
     // --- idempotent replay ---

@@ -35,6 +35,33 @@ public final class HarvestSettlement {
     }
 
     /**
+     * Checks the figures of a settlement that decide whether it can be registered at all: the weights, the caliber
+     * and the notes.
+     *
+     * <p>{@link #create} runs exactly these checks. Exposing them lets a caller that has to consume something
+     * scarce before registering (a receipt number) reject an invalid request first instead of burning the number.</p>
+     *
+     * @param green                 green olives delivered
+     * @param black                 black olives delivered
+     * @param commercialFruitsPerKg optional caliber of the delivered olives
+     * @param notes                 optional notes
+     * @return the strictly positive total weight
+     * @throws IllegalArgumentException if the weights do not add up to a positive total, or if the caliber or the
+     *                                  notes are invalid
+     */
+    public static OliveWeight validateFigures(OliveWeight green, OliveWeight black, Double commercialFruitsPerKg,
+            String notes) {
+        if (commercialFruitsPerKg != null
+                && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0)) {
+            throw new IllegalArgumentException("settlement.fruits_per_kg.invalid");
+        }
+        if (notes != null && notes.length() > MAX_NOTES_LENGTH) {
+            throw new IllegalArgumentException("settlement.notes.too_long");
+        }
+        return calculateTotalWeight(green, black);
+    }
+
+    /**
      * Registers a settlement of one campaign, freezing its receipt and weighing data with the rest of the voucher.
      *
      * @param reportId             parent agronomic report
@@ -64,14 +91,7 @@ public final class HarvestSettlement {
                 || trendCurve == null || settledAt == null || receiptNumber == null || weighedOn == null) {
             throw new IllegalArgumentException("settlement.reference.null");
         }
-        if (commercialFruitsPerKg != null
-                && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0)) {
-            throw new IllegalArgumentException("settlement.fruits_per_kg.invalid");
-        }
-        if (notes != null && notes.length() > MAX_NOTES_LENGTH) {
-            throw new IllegalArgumentException("settlement.notes.too_long");
-        }
-        var total = calculateTotalWeight(green, black);
+        var total = validateFigures(green, black, commercialFruitsPerKg, notes);
         return new HarvestSettlement(new HarvestSettlementSnapshot(new SettlementId(), reportId, plotId,
                 campaignYear, green, black, total, commercialFruitsPerKg, notes, SettlementStatus.SETTLED,
                 settledAt, thinningBalance, trendCurve, receiptNumber, weighedOn, millTicketNumber,
