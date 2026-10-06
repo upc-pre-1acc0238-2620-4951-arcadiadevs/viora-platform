@@ -1,0 +1,212 @@
+-- =============================================================================================
+-- US29 · Backfill of the harvest settlement receipt contract
+-- File:    scripts/sql/2026-10-05-us29-settlement-receipt-backfill.sql
+-- Target:  PostgreSQL. Do NOT run against H2 (the test/dev database): this script uses
+--          DO blocks, split_part() and the ~ regex operator, none of which H2 understands.
+--
+-- WHEN TO RUN
+--   Once, before the first deploy of `feature/settlement-settle-contract-us29`, or immediately
+--   after it while the application is NOT settling anything. It is safe to run more than once:
+--   every statement only touches rows that are still missing the value.
+--
+-- WHY IT IS NEEDED
+--   The project manages its schema with Hibernate `spring.jpa.hibernate.ddl-auto=update` (there is
+--   no Flyway and no Liquibase). That ADDS the new columns and the two new unique constraints to
+--   `harvest_settlements`, but it never fills the rows that already exist. After the update, every
+--   settlement stored before this change has:
+--       producer_id     NULL   (the owner only lived on the parent report)
+--       receipt_number  NULL   (receipt numbers did not exist)
+--       weighed_on      NULL   (the weighing date was not recorded)
+--   This script reconstructs those three columns for those rows.
+--
+-- WHAT IT DOES NOT TOUCH
+--   mill_ticket_number and idempotency_key stay NULL. They did not exist before this change and
+--   there is nothing to reconstruct: no mill ticket can be invented, and a legacy settlement has no
+--   idempotency key, so it cannot be replayed. That is why `producer_id`, `receipt_number` and
+--   `weighed_on` are declared nullable in the entity and NOT NULL is only safe once this has run.
+--
+-- SAFETY
+--   The whole script is one transaction: if any statement fails, nothing is applied. It takes no
+--   lock other than the row locks of the rows it updates, so keep it short and run it while the
+--   application is not writing settlements.
+--
+-- AFTER IT HAS RUN EVERYWHERE
+--   `producer_id`, `receipt_number` and `weighed_on` can be tightened to NOT NULL, and that is a
+--   separate, explicit migration. Do not do it here.
+-- =============================================================================================
+
+BEGIN;
+
+-- ---------------------------------------------------------------------------------------------
+-- 0. Preflight. Fail loudly and early instead of half-applying the backfill.
+-- ---------------------------------------------------------------------------------------------
+DO $$
+BEGIN
+    IF to_regclass('harvest_settlements') IS NULL THEN
+        RAISE EXCEPTION
+            'harvest_settlements does not exist. Deploy the application once with ddl-auto=update so the '
+            'new columns exist, then run this script again.';
+    END IF;
+    IF to_regclass('agronomic_reports') IS NULL THEN
+        RAISE EXCEPTION 'agronomic_reports does not exist; this script cannot find the owner of a settlement.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'harvest_settlements' AND column_name = 'producer_id') THEN
+        RAISE EXCEPTION
+            'harvest_settlements.producer_id is missing. Run the application once with ddl-auto=update '
+            'so the column exists, then run this script again.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'harvest_settlements' AND column_name = 'receipt_number') THEN
+        RAISE EXCEPTION 'harvest_settlements.receipt_number is missing; run the deploy first.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'harvest_settlements' AND column_name = 'weighed_on') THEN
+        RAISE EXCEPTION 'harvest_settlements.weighed_on is missing; run the deploy first.';
+    END IF;
+END
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 1. Before: what is still missing. These are the numbers to compare with the ones in section 5.
+-- ---------------------------------------------------------------------------------------------
+SELECT count(*)                                        AS settlements_total,
+       count(*) FILTER (WHERE producer_id IS NULL)      AS missing_producer_id,
+       count(*) FILTER (WHERE receipt_number IS NULL)   AS missing_receipt_number,
+       count(*) FILTER (WHERE weighed_on IS NULL)       AS missing_weighed_on,
+       count(*) FILTER (WHERE mill_ticket_number IS NULL) AS without_mill_ticket,
+       count(*) FILTER (WHERE idempotency_key IS NULL)   AS without_idempotency_key
+FROM harvest_settlements;
+
+-- ---------------------------------------------------------------------------------------------
+-- 2. producer_id, copied from the parent report.
+--
+--    Every settlement has a NOT NULL report_id with a foreign key to agronomic_reports, and
+--    agronomic_reports.producer_id is NOT NULL, so the join always finds an owner. The
+--    `r.producer_id IS NOT NULL` guard is belt and braces, not a case that happens in practice.
+--    The UPDATE also does not touch rows that already carry a producer.
+-- ---------------------------------------------------------------------------------------------
+UPDATE harvest_settlements s
+SET producer_id = r.producer_id
+FROM agronomic_reports r
+WHERE s.report_id = r.id
+  AND s.producer_id IS NULL
+  AND r.producer_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------------------------
+-- 3. weighed_on, the UTC calendar date of settled_at.
+--
+--    `settled_at` is an Instant, stored by Hibernate as `timestamp(6) with time zone`. Casting it
+--    straight to a date would use the time zone of the database session, so a settlement at
+--    2026-11-04T00:30Z would be filed as 2026-11-03 in America/Argentina. `AT TIME ZONE 'UTC'`
+--    converts the instant to a UTC wall-clock timestamp first, which is what the application
+--    means: the weighing date is judged against LocalDate.now() on the injected UTC clock.
+--
+--    This is a reconstruction, not the real weighing date: nobody recorded it before this change.
+--    The date the campaign was settled is the closest truthful value, and it is what the server
+--    would have stored had the field existed.
+-- ---------------------------------------------------------------------------------------------
+UPDATE harvest_settlements
+SET weighed_on = (settled_at AT TIME ZONE 'UTC')::date
+WHERE weighed_on IS NULL
+  AND settled_at IS NOT NULL;
+
+-- ---------------------------------------------------------------------------------------------
+-- 4. receipt_number, reconstructed as the server numbers it.
+--
+--    The server guarantees VR-{yy}-{nnnn}: yy is the last two digits of the campaign year and
+--    nnnn is a 1-based sequence per PRODUCER AND CAMPAIGN YEAR, allocated from a locked counter.
+--    The order inside a campaign is not recorded anywhere, so this reconstruction orders by
+--    settled_at (with id as the tiebreaker, so two settlements stamped in the same microsecond
+--    still get distinct numbers and the script is deterministic).
+--
+--    This is a one-time reconstruction of an invariant, not new information: no document, no
+--    receipt and no mill ever printed these numbers, so nothing downstream can contradict them.
+--    `lpad(..., 4, '0')` pads to four digits and lets longer numbers grow, exactly like
+--    ReceiptNumber.of, which formats "%04d" and caps the sequence at 999999 so the longest value
+--    is "VR-26-999999", the twelve characters the receipt_number column holds. Sequences are
+--    counted per producer and campaign, so a producer would have to settle a million plots in one
+--    campaign to reach the cap.
+--
+--    The sequence continues after the highest number already present in the same producer and
+--    campaign. That matters if the application was already running when this script was started:
+--    the numbers it handed out are the real ones, and the reconstruction must not repeat them,
+--    even though it cannot know their order relative to the older settlements. When the script
+--    runs before the deploy (the recommended order) nothing is numbered yet and the offset is 0,
+--    so the numbering is exactly chronological.
+-- ---------------------------------------------------------------------------------------------
+DO $$
+DECLARE
+    overflowing_rows bigint;
+BEGIN
+    WITH ranked AS (
+        SELECT s.producer_id,
+               s.campaign_year,
+               row_number() OVER (PARTITION BY s.producer_id, s.campaign_year
+                                  ORDER BY s.settled_at, s.id) AS position_in_campaign,
+               coalesce((SELECT max(split_part(existing.receipt_number, '-', 3)::int)
+                         FROM harvest_settlements existing
+                         WHERE existing.producer_id = s.producer_id
+                           AND existing.campaign_year = s.campaign_year
+                           AND existing.receipt_number ~ '^VR-[0-9]{2}-[0-9]{4,6}$'), 0) AS already_used
+        FROM harvest_settlements s
+        WHERE s.producer_id IS NOT NULL
+          AND s.receipt_number IS NULL
+    )
+    SELECT count(*) INTO overflowing_rows
+    FROM ranked
+    WHERE already_used + position_in_campaign > 999999;
+
+    IF overflowing_rows > 0 THEN
+        -- One string literal on purpose: PL/pgSQL does not concatenate adjacent literals the way SQL does.
+        RAISE EXCEPTION '% settlement(s) of one producer and campaign would need a receipt sequence above 999999, which does not fit the receipt_number column and is rejected by ReceiptNumber. Backfill them by hand or split the campaign before retrying.', overflowing_rows;
+    END IF;
+END
+$$;
+
+WITH ranked AS (
+    SELECT s.id,
+           s.campaign_year,
+           row_number() OVER (PARTITION BY s.producer_id, s.campaign_year
+                              ORDER BY s.settled_at, s.id) AS position_in_campaign,
+           coalesce((SELECT max(split_part(existing.receipt_number, '-', 3)::int)
+                     FROM harvest_settlements existing
+                     WHERE existing.producer_id = s.producer_id
+                       AND existing.campaign_year = s.campaign_year
+                       AND existing.receipt_number ~ '^VR-[0-9]{2}-[0-9]{4,6}$'), 0) AS already_used
+    FROM harvest_settlements s
+    WHERE s.producer_id IS NOT NULL
+      AND s.receipt_number IS NULL
+)
+UPDATE harvest_settlements s
+SET receipt_number = 'VR-'
+                    || lpad(right(ranked.campaign_year::text, 2), 2, '0')
+                    || '-'
+                    || lpad((ranked.already_used + ranked.position_in_campaign)::text, 4, '0')
+FROM ranked
+WHERE s.id = ranked.id
+  AND s.receipt_number IS NULL;
+
+-- ---------------------------------------------------------------------------------------------
+-- 5. After: the same counts as in section 1. The operator checks these, nothing else.
+--    Expect missing_producer_id, missing_receipt_number and missing_weighed_on to be 0, and
+--    without_mill_ticket / without_idempotency_key to be unchanged: they were never in scope.
+-- ---------------------------------------------------------------------------------------------
+SELECT count(*)                                        AS settlements_total,
+       count(*) FILTER (WHERE producer_id IS NULL)      AS missing_producer_id,
+       count(*) FILTER (WHERE receipt_number IS NULL)   AS missing_receipt_number,
+       count(*) FILTER (WHERE weighed_on IS NULL)       AS missing_weighed_on,
+       count(*) FILTER (WHERE mill_ticket_number IS NULL) AS without_mill_ticket,
+       count(*) FILTER (WHERE idempotency_key IS NULL)   AS without_idempotency_key
+FROM harvest_settlements;
+
+-- The reconstructed numbers, read the way a producer would: per producer and campaign, in order.
+SELECT s.producer_id,
+       s.campaign_year,
+       s.receipt_number,
+       s.weighed_on,
+       s.settled_at
+FROM harvest_settlements s
+ORDER BY s.producer_id, s.campaign_year, s.settled_at, s.id;
+
+COMMIT;
