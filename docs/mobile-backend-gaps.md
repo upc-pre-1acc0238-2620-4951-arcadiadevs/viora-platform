@@ -1,7 +1,7 @@
 # Brechas del backend para las historias de la app Android (Productor)
 
 - **Última actualización:** 2026-10-05
-- **Backend revisado:** `develop` (el aclareo ya salió publicado como 0.32.0) más el cambio pendiente de `feature/settlement-settle-contract-us29` (cambios desde la 0.21.0 en la sección 4)
+- **Backend revisado:** `develop` en la etiqueta **0.33.0** (cambios desde la 0.21.0 en la sección 4)
 - **Fuentes:** reporte (US y escenarios BDD), mockups de Figma (`Viora202602_Mobile_App`, sección App Productor · Kotlin) y el código del backend
 - **Para qué sirve:** que cada desarrollador sepa qué le falta al backend para completar las historias que tiene asignadas en la app, antes de empezar la pantalla, y dar seguimiento a los endpoints que requiere la app (sección 3).
 
