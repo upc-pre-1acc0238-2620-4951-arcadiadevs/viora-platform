@@ -5,9 +5,13 @@
 --          DO blocks, split_part() and the ~ regex operator, none of which H2 understands.
 --
 -- WHEN TO RUN
---   Once, before the first deploy of `feature/settlement-settle-contract-us29`, or immediately
---   after it while the application is NOT settling anything. It is safe to run more than once:
---   every statement only touches rows that are still missing the value.
+--   Deploy `feature/settlement-settle-contract-us29` FIRST: the new columns, the two unique
+--   constraints and the `harvest_receipt_counters` table only exist after the application has
+--   started once with `ddl-auto=update` (section 0 fails loudly if they do not). Then run this
+--   script once. It is idempotent: it can be run again, and it is safe if the application already
+--   settled something in between, because every statement only touches rows that are still
+--   missing the value and the counters are never lowered. Even so, keep it short and avoid
+--   running it while settlements are being written.
 --
 -- WHY IT IS NEEDED
 --   The project manages its schema with Hibernate `spring.jpa.hibernate.ddl-auto=update` (there is
@@ -134,11 +138,11 @@ WHERE weighed_on IS NULL
 --    campaign to reach the cap.
 --
 --    The sequence continues after the highest number already present in the same producer and
---    campaign. That matters if the application was already running when this script was started:
---    the numbers it handed out are the real ones, and the reconstruction must not repeat them,
---    even though it cannot know their order relative to the older settlements. When the script
---    runs before the deploy (the recommended order) nothing is numbered yet and the offset is 0,
---    so the numbering is exactly chronological.
+--    campaign. That matters because the application is already running when this script is
+--    started (it creates the columns): any number it handed out in the meantime is the real one,
+--    and the reconstruction must not repeat it, even though it cannot know its order relative to
+--    the older settlements. When nothing was settled since the deploy the offset is 0, so the
+--    numbering is exactly chronological.
 -- ---------------------------------------------------------------------------------------------
 DO $$
 DECLARE
