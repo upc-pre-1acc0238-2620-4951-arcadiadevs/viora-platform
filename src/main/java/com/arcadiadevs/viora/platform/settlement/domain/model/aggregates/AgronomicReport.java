@@ -34,6 +34,12 @@ import java.util.UUID;
  */
 public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport> {
 
+    /**
+     * Message key of the rule that a campaign can only be settled once. Exposed so a caller can rule the conflict
+     * out before doing work that would have to be undone, such as consuming a receipt number.
+     */
+    public static final String CAMPAIGN_ALREADY_SETTLED = "settlement.campaign.already_settled";
+
     private final ReportId id;
     private final PlotId plotId;
     private final UserId producerId;
@@ -85,17 +91,22 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
      * @param notes                 optional notes
      * @param thinningBalance       balance against the thinning prescription of the campaign
      * @param historicalYields      Phenology history of the plot (total kg per campaign)
+     * @param receiptNumber         official receipt number allocated to this settlement
+     * @param weighedOn             date the delivered olives were weighed
+     * @param millTicketNumber      optional ticket number of the receiving mill
+     * @param idempotencyKey        optional key the settlement is registered with
      * @param clock                 clock stamping the settlement
      * @return the new settlement
      */
     public HarvestSettlementSnapshot settleCampaign(CampaignYear campaignYear, OliveWeight green, OliveWeight black,
             Double commercialFruitsPerKg, String notes, ThinningBalance thinningBalance,
-            SortedMap<Integer, Double> historicalYields, Clock clock) {
+            SortedMap<Integer, Double> historicalYields, ReceiptNumber receiptNumber, WeighingDate weighedOn,
+            MillTicketNumber millTicketNumber, IdempotencyKey idempotencyKey, Clock clock) {
         if (campaignYear == null) {
             throw new IllegalArgumentException("settlement.campaign_year.null");
         }
         if (settlementOf(campaignYear).isPresent()) {
-            throw new IllegalStateException("settlement.campaign.already_settled");
+            throw new IllegalStateException(CAMPAIGN_ALREADY_SETTLED);
         }
         var total = HarvestSettlement.calculateTotalWeight(green, black);
 
@@ -105,7 +116,8 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
         var curve = StabilizationCurveCalculatorService.computeCurve(historicalYields, settledYields);
 
         var settlement = HarvestSettlement.create(id, plotId, campaignYear, green, black, commercialFruitsPerKg,
-                notes, thinningBalance, curve, clock.instant()).snapshot();
+                notes, receiptNumber, weighedOn, millTicketNumber, idempotencyKey, thinningBalance, curve,
+                clock.instant()).snapshot();
         settlements.add(settlement);
         registerDomainEvent(new CampaignHarvestSettledEvent(UUID.randomUUID().toString(), id.reportId(),
                 settlement.id().settlementId(), plotId.plotId(), campaignYear.value(),

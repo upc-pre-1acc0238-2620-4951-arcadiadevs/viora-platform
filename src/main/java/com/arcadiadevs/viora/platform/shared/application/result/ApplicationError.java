@@ -3,19 +3,46 @@ package com.arcadiadevs.viora.platform.shared.application.result;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * Standard error representation used within the application layer.
  * Encapsulates an error code, a descriptive message, and optional context details.
  *
- * @param code    the unique machine-readable error code
- * @param message human-readable error description
- * @param details optional detailed context or reasons for the failure
+ * <p>An error may also carry extra machine readable properties, which the REST layer copies onto the RFC 7807
+ * problem detail. They let a failure answer what the client needs to recover, for example the settlement that is
+ * already registered when a campaign is settled twice, without inventing a new error code for every situation.</p>
+ *
+ * @param code       the unique machine-readable error code
+ * @param message    human-readable error description
+ * @param details    optional detailed context or reasons for the failure
+ * @param properties extra machine-readable context copied onto the problem detail; empty by default
  */
 @NullMarked
 public record ApplicationError(
         String code,
         String message,
-        @Nullable String details) {
+        @Nullable String details,
+        Map<String, Object> properties) {
+
+    /**
+     * Normalizes the properties so callers never have to pass an empty map explicitly.
+     */
+    public ApplicationError {
+        properties = properties == null ? Collections.emptyMap() : Map.copyOf(properties);
+    }
+
+    /**
+     * Creates an ApplicationError with code, message and details, and no extra properties.
+     *
+     * @param code    the unique error code
+     * @param message human-readable error description
+     * @param details optional detailed context or reasons for the failure
+     */
+    public ApplicationError(String code, String message, @Nullable String details) {
+        this(code, message, details, Collections.emptyMap());
+    }
 
     /**
      * Creates an ApplicationError with code and message only.
@@ -24,7 +51,7 @@ public record ApplicationError(
      * @param message human-readable error description
      */
     public ApplicationError(String code, String message) {
-        this(code, message, null);
+        this(code, message, null, Collections.emptyMap());
     }
 
     /**
@@ -81,6 +108,24 @@ public record ApplicationError(
                 "%s_CONFLICT".formatted(resource.toUpperCase()),
                 "Conflict with %s".formatted(resource),
                 reason);
+    }
+
+    /**
+     * Creates a conflict error that also tells the client what already exists, so it can recover without a second
+     * call.
+     *
+     * @param resource   the name of the conflicting resource
+     * @param reason     the explanation of the conflict
+     * @param properties extra machine-readable context copied onto the problem detail, such as the record that is
+     *                   already registered
+     * @return an {@link ApplicationError} configured for conflict conditions, with the extra context
+     */
+    public static ApplicationError conflict(String resource, String reason, Map<String, Object> properties) {
+        return new ApplicationError(
+                "%s_CONFLICT".formatted(resource.toUpperCase()),
+                "Conflict with %s".formatted(resource),
+                reason,
+                properties);
     }
 
     /**

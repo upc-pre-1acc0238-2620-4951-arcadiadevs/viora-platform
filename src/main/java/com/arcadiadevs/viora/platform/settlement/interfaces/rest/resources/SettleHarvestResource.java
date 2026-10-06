@@ -3,6 +3,8 @@ package com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
+import java.time.LocalDate;
+
 /** Formal weighing of the delivered harvest of a campaign. */
 @Schema(description = "Harvest settlement input; weights in kilograms, at least one of them positive")
 public record SettleHarvestResource(
@@ -20,5 +22,14 @@ public record SettleHarvestResource(
         Double commercialFruitsPerKg,
         @Size(max = 1000, message = "{settlement.notes.too_long}")
         @Schema(description = "Optional notes, up to 1000 characters", example = "Campaign weights verified.")
-        String notes) {
+        String notes,
+        @NotNull(message = "{settlement.weighed_on.null}")
+        @Schema(description = "Date the delivered olives were weighed. It cannot be in the future.",
+                example = "2026-11-18") LocalDate weighedOn,
+        // No @Size here: it would count the surrounding spaces. MillTicketNumber trims first and then enforces the
+        // 30 characters, so a value that fits once trimmed is accepted.
+        @Schema(description = "Optional ticket number of the mill that received the olives, up to 30 characters "
+                + "once trimmed. It is the weighbridge ticket the mill prints on delivery.", example = "MT-88213",
+                maxLength = 30, nullable = true)
+        String millTicketNumber) {
 }

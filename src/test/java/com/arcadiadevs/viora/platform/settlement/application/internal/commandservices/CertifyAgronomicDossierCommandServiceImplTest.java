@@ -28,6 +28,9 @@ import static org.mockito.Mockito.*;
 
 class CertifyAgronomicDossierCommandServiceImplTest {
     private static final Clock SETTLEMENT_CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
+    /** Fixed weighing date of the fixtures, in the past of every campaign these tests settle. */
+    private static final WeighingDate WEIGHED_ON =
+            WeighingDate.of(java.time.LocalDate.of(2026, 1, 15), SETTLEMENT_CLOCK);
     private static final Clock CERTIFICATION_CLOCK = Clock.fixed(Instant.parse("2026-10-03T09:30:00Z"), ZoneOffset.UTC);
     private final AgronomicReportRepository reports = mock(AgronomicReportRepository.class);
     private final CertifiedDossierDocumentRepository documents = mock(CertifiedDossierDocumentRepository.class);
@@ -52,7 +55,8 @@ class CertifyAgronomicDossierCommandServiceImplTest {
     private AgronomicReport reportWithSettlement(int year, java.util.SortedMap<Integer, Double> history) {
         var report = AgronomicReport.createForPlot(new PlotId(plotId), new UserId(owner));
         report.settleCampaign(new CampaignYear(year), new OliveWeight(1000.0), new OliveWeight(0.0), null, null,
-                ThinningBalance.notRecorded(), history, SETTLEMENT_CLOCK);
+                ThinningBalance.notRecorded(), history, ReceiptNumber.of(new CampaignYear(year), year - 2000),
+                WEIGHED_ON, null, null, SETTLEMENT_CLOCK);
         report.clearDomainEvents();
         return report;
     }
@@ -61,8 +65,10 @@ class CertifyAgronomicDossierCommandServiceImplTest {
         var report = AgronomicReport.createForPlot(new PlotId(plotId), new UserId(owner));
         double[] kilograms = {1000.0, 3000.0, 1500.0};
         for (int i = 0; i < kilograms.length; i++) {
-            report.settleCampaign(new CampaignYear(2026 + i), new OliveWeight(kilograms[i]), new OliveWeight(0.0), null,
-                    null, ThinningBalance.notRecorded(), new TreeMap<>(), SETTLEMENT_CLOCK);
+            report.settleCampaign(new CampaignYear(2026 + i), new OliveWeight(kilograms[i]), new OliveWeight(0.0),
+                    null, null, ThinningBalance.notRecorded(), new TreeMap<>(),
+                    ReceiptNumber.of(new CampaignYear(2026 + i), i + 1),
+                    WEIGHED_ON, null, null, SETTLEMENT_CLOCK);
         }
         report.clearDomainEvents();
         return report;
