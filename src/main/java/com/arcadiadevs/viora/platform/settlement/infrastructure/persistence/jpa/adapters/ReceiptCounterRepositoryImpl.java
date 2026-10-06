@@ -21,7 +21,8 @@ public class ReceiptCounterRepositoryImpl implements ReceiptCounterRepository {
     private final boolean postgres;
 
     /**
-     * Constructs the adapter, resolving once which of the two supported dialects the database speaks.
+     * Constructs the adapter, resolving once which of the two supported dialects the database speaks. The
+     * connection used for the probe is returned to the pool before the constructor ends.
      *
      * @param persistenceRepository Spring Data repository of the counter rows
      * @param dataSource           the application data source, read once for its product name
@@ -30,7 +31,9 @@ public class ReceiptCounterRepositoryImpl implements ReceiptCounterRepository {
     public ReceiptCounterRepositoryImpl(ReceiptCounterPersistenceRepository persistenceRepository, DataSource dataSource)
             throws SQLException {
         this.persistenceRepository = persistenceRepository;
-        this.postgres = "postgresql".equalsIgnoreCase(dataSource.getConnection().getMetaData().getDatabaseProductName());
+        try (var connection = dataSource.getConnection()) {
+            this.postgres = "postgresql".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        }
     }
 
     @Override

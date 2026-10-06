@@ -20,7 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  * counter untouched, so nothing is ever violated and nothing has to be swallowed. It runs in the caller's
  * transaction on purpose: a {@link Propagation#REQUIRES_NEW} one would need a second pooled connection while the
  * settlement still holds the first, and the pool is deliberately capped (see {@code DB_MAX_POOL_SIZE}), which would
- * starve as soon as two settlements ran at the same time.</p>
+ * starve as soon as two settlements ran at the same time. {@link Propagation#REQUIRED} therefore only joins the
+ * transaction of the settlement: the counter row is opened with it, and committed or rolled back with it, so it
+ * provides no isolation of its own.</p>
+ *
+ * <p>The counter is opened at sequence zero. Bringing it up to the receipt numbers already issued is not done here
+ * but by the settlement, once it holds the lock of the row.</p>
  */
 @Component
 public class ReceiptCounterInitializer {
