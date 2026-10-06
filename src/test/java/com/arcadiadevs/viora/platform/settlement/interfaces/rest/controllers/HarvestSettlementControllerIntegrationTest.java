@@ -78,6 +78,7 @@ class HarvestSettlementControllerIntegrationTest {
     private static final int RACE_YEAR = 2038;
     private static final int SHARED_KEY_RACE_YEAR = 2039;
     private static final int TRIMMED_TICKET_YEAR = 2040;
+    private static final int PRIOR_YEAR = 2041;
     /** Caliber of the settled tests, and the IOC grade it maps to, computed by the scale that owns it. */
     private static final double CALIBER = 105.0;
     private static final String CALIBER_GRADE = CommercialSizeScale.gradeOf(CALIBER);
@@ -499,6 +500,10 @@ class HarvestSettlementControllerIntegrationTest {
     @Test
     void theLoserOfTwoConcurrentRequestsWithTheSameKeyReplaysTheWinner() throws Exception {
         var plotId = createPlot("CRIOLLA");
+        // The plot already closed another campaign, so its report exists and is the row both requests queue on.
+        // (The very first settlement of a plot has no report to lock yet: that race is decided by the unique plot
+        // reference of the report and is a plain conflict, which a retry of the same key turns into a replay.)
+        settleWith(plotId, null, PRIOR_YEAR, null, null).andExpect(status().isCreated());
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         Callable<org.springframework.mock.web.MockHttpServletResponse> request = () -> {
@@ -518,7 +523,7 @@ class HarvestSettlementControllerIntegrationTest {
             assertEquals(JsonPath.<String>read(responses.get(0).getContentAsString(), "$.id"),
                     JsonPath.<String>read(responses.get(1).getContentAsString(), "$.id"));
         }
-        assertEquals(1, settlementsOf(plotId));
+        assertEquals(2, settlementsOf(plotId), "the earlier campaign and the one both requests asked for");
         assertEquals(1, lastSequenceOf(RACE_YEAR), "only the winner consumed a receipt number");
     }
 
@@ -545,6 +550,17 @@ class HarvestSettlementControllerIntegrationTest {
         }
         assertEquals(1, settlementsOf(plots.get(0)) + settlementsOf(plots.get(1)));
         assertEquals(1, lastSequenceOf(SHARED_KEY_RACE_YEAR));
+    }
+
+    @Test
+    void aMillTicketThatFitsOnceTrimmedIsAcceptedAndStoredTrimmed() throws Exception {
+        var plotId = createPlot("ARBEQUINA");
+        var padded = "  " + "T".repeat(30) + "  ";
+
+        settleWith(plotId, null, TRIMMED_TICKET_YEAR, null, padded).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.millTicketNumber").value("T".repeat(30)));
+
+        assertEquals("T".repeat(30), settlementRow(plotId, TRIMMED_TICKET_YEAR).get("mill_ticket_number"));
     }
 
     // --- helpers of the receipt contract ---

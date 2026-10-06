@@ -26,9 +26,10 @@ public record SettleHarvestResource(
         @NotNull(message = "{settlement.weighed_on.null}")
         @Schema(description = "Date the delivered olives were weighed. It cannot be in the future.",
                 example = "2026-11-18") LocalDate weighedOn,
-        @Size(max = 30, message = "{settlement.mill_ticket.too_long}")
-        @Schema(description = "Optional ticket number of the mill that received the olives, up to 30 characters. "
-                + "It is the weighbridge ticket the mill prints on delivery.", example = "MT-88213",
-                nullable = true)
+        // No @Size here: it would count the surrounding spaces. MillTicketNumber trims first and then enforces the
+        // 30 characters, so a value that fits once trimmed is accepted.
+        @Schema(description = "Optional ticket number of the mill that received the olives, up to 30 characters "
+                + "once trimmed. It is the weighbridge ticket the mill prints on delivery.", example = "MT-88213",
+                maxLength = 30, nullable = true)
         String millTicketNumber) {
 }
