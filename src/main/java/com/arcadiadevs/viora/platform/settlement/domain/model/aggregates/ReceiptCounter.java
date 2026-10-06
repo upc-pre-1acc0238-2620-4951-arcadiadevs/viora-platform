@@ -59,6 +59,21 @@ public final class ReceiptCounter {
     }
 
     /**
+     * Moves the counter up to the highest sequence already issued in the settlements, never down.
+     *
+     * <p>The counter is the source of truth for new numbers, but receipt numbers also exist outside of it: rows
+     * numbered by a backfill, or by a counter that was lost or opened empty. Catching up before consuming a number
+     * guarantees a number that is already on a receipt is never handed out again.</p>
+     *
+     * @param highestIssuedSequence highest sequence found in the stored receipt numbers, zero when there are none
+     */
+    public void catchUpTo(int highestIssuedSequence) {
+        if (highestIssuedSequence > lastSequence) {
+            lastSequence = highestIssuedSequence;
+        }
+    }
+
+    /**
      * Consumes the next number of the counter.
      *
      * <p>Must be called while the counter row is locked, so two settlements of the same producer and campaign never

@@ -73,6 +73,11 @@ class HarvestSettlementControllerIntegrationTest {
     private static final int REUSED_KEY_YEAR = 2033;
     private static final int GETS_YEAR = 2034;
     private static final int BLANK_TICKET_YEAR = 2035;
+    private static final int SEEDED_COUNTER_YEAR = 2036;
+    private static final int REJECTED_YEAR = 2037;
+    private static final int RACE_YEAR = 2038;
+    private static final int SHARED_KEY_RACE_YEAR = 2039;
+    private static final int TRIMMED_TICKET_YEAR = 2040;
     /** Caliber of the settled tests, and the IOC grade it maps to, computed by the scale that owns it. */
     private static final double CALIBER = 105.0;
     private static final String CALIBER_GRADE = CommercialSizeScale.gradeOf(CALIBER);
@@ -445,6 +450,30 @@ class HarvestSettlementControllerIntegrationTest {
         var row = settlementRow(plotId, BLANK_TICKET_YEAR);
         assertNull(row.get("mill_ticket_number"), "a blank ticket is not stored as an empty string");
         assertEquals("VR-35-0001", row.get("receipt_number"));
+    }
+
+    @Test
+    void aMissingOrEmptyCounterContinuesAfterTheReceiptNumbersAlreadyIssued() throws Exception {
+        var first = createPlot("CRIOLLA");
+        var second = createPlot("SEVILLANA");
+        var third = createPlot("MANZANILLA");
+        var fourth = createPlot("ARBEQUINA");
+        settleWith(first, null, SEEDED_COUNTER_YEAR, null, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.receiptNumber").value("VR-36-0001"));
+        settleWith(second, null, SEEDED_COUNTER_YEAR, null, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.receiptNumber").value("VR-36-0002"));
+
+        // Backfilled rows: numbers exist on the settlements, but the counter is gone.
+        jdbc.update("delete from harvest_receipt_counters where campaign_year = ?", SEEDED_COUNTER_YEAR);
+        settleWith(third, null, SEEDED_COUNTER_YEAR, null, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.receiptNumber").value("VR-36-0003"));
+
+        // Or opened empty after the numbers were written.
+        jdbc.update("update harvest_receipt_counters set last_sequence = 0 where campaign_year = ?",
+                SEEDED_COUNTER_YEAR);
+        settleWith(fourth, null, SEEDED_COUNTER_YEAR, null, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.receiptNumber").value("VR-36-0004"));
+        assertEquals(4, lastSequenceOf(SEEDED_COUNTER_YEAR));
     }
 
     // --- helpers of the receipt contract ---

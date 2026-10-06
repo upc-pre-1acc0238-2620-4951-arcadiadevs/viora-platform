@@ -199,6 +199,29 @@ class HarvestSettlementCommandServiceImplTest {
         order.verify(counters).save(any());
     }
 
+    @Test
+    void continuesAfterTheReceiptNumbersAlreadyIssuedWhenTheCounterIsEmpty() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        // Two settlements already carry 0001 and 0002, but the counter row starts at zero.
+        when(settledHarvests.findHighestReceiptSequence(new UserId(owner), new CampaignYear(2026))).thenReturn(2);
+
+        var settlement = service.handle(command).success().orElseThrow().settlement();
+
+        assertEquals("VR-26-0003", settlement.receiptNumber().value());
+        assertEquals(3, counterOf(owner, 2026).lastSequence());
+    }
+
+    @Test
+    void neverLowersACounterThatIsAheadOfTheStoredReceiptNumbers() {
+        when(orchard.findActivePlotOwner(any())).thenReturn(Optional.of(new UserId(owner)));
+        counterRows.put(owner + "/2026", ReceiptCounter.reconstitute(new UserId(owner), new CampaignYear(2026), 7));
+        when(settledHarvests.findHighestReceiptSequence(any(), any())).thenReturn(2);
+
+        var settlement = service.handle(command).success().orElseThrow().settlement();
+
+        assertEquals("VR-26-0008", settlement.receiptNumber().value());
+    }
+
     // --- idempotent replay ---
 
     @Test

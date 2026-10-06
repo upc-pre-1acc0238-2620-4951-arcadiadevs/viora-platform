@@ -136,11 +136,18 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
         return Result.success(SettlementOutcome.created(settlement));
     }
 
-    /** Opens the counter of the producer and campaign, then locks it so the sequence is consumed exactly once. */
+    /**
+     * Opens the counter of the producer and campaign, locks it and catches it up with the receipt numbers already
+     * issued, so the sequence is consumed exactly once and a number already printed on a receipt is never reused.
+     *
+     * <p>The catch-up covers settlements numbered outside of the counter: legacy rows numbered by the backfill, or a
+     * counter that was opened empty after the numbers had been written.</p>
+     */
     private ReceiptNumber nextReceiptNumber(UserId producerId, CampaignYear campaignYear) {
         receiptCounterInitializer.ensureExists(producerId, campaignYear);
         var counter = receiptCounterRepository.findByProducerIdAndCampaignYearForUpdate(producerId, campaignYear)
                 .orElseThrow(() -> new IllegalStateException("settlement.receipt_counter.missing"));
+        counter.catchUpTo(settledHarvestRepository.findHighestReceiptSequence(producerId, campaignYear));
         var receiptNumber = counter.nextReceiptNumber();
         receiptCounterRepository.save(counter);
         return receiptNumber;

@@ -47,6 +47,11 @@ BEGIN
             'harvest_settlements does not exist. Deploy the application once with ddl-auto=update so the '
             'new columns exist, then run this script again.';
     END IF;
+    IF to_regclass('harvest_receipt_counters') IS NULL THEN
+        RAISE EXCEPTION
+            'harvest_receipt_counters does not exist. Deploy the application once with ddl-auto=update so the '
+            'table exists, then run this script again.';
+    END IF;
     IF to_regclass('agronomic_reports') IS NULL THEN
         RAISE EXCEPTION 'agronomic_reports does not exist; this script cannot find the owner of a settlement.';
     END IF;
@@ -188,6 +193,34 @@ WHERE s.id = ranked.id
   AND s.receipt_number IS NULL;
 
 -- ---------------------------------------------------------------------------------------------
+-- 4b. harvest_receipt_counters, seeded from the receipt numbers that now exist.
+--
+--    The application hands out the next number from the counter of the producer and campaign year,
+--    and opens a missing counter at 0. Without this step the first new settlement of a producer
+--    whose legacy rows were numbered above would be offered VR-yy-0001 again, which the unique
+--    constraint uq_settlement_producer_receipt rejects. The application also catches the counter up
+--    with the stored numbers before it allocates one, so this seeding is the primary fix and that
+--    catch-up the safety net.
+--
+--    One counter per (producer, campaign year), holding the highest sequence of that pair's receipt
+--    numbers. An existing counter is never lowered: GREATEST keeps whatever the application already
+--    handed out, so running this again (or after the application settled something) changes nothing
+--    it should not. It runs in the same transaction as the numbering above.
+--    gen_random_uuid() is built into PostgreSQL 13 and later.
+-- ---------------------------------------------------------------------------------------------
+INSERT INTO harvest_receipt_counters (id, producer_id, campaign_year, last_sequence)
+SELECT gen_random_uuid(),
+       s.producer_id,
+       s.campaign_year,
+       max(split_part(s.receipt_number, '-', 3)::int)
+FROM harvest_settlements s
+WHERE s.producer_id IS NOT NULL
+  AND s.receipt_number ~ '^VR-[0-9]{2}-[0-9]{4,6}$'
+GROUP BY s.producer_id, s.campaign_year
+ON CONFLICT (producer_id, campaign_year) DO UPDATE
+SET last_sequence = GREATEST(harvest_receipt_counters.last_sequence, EXCLUDED.last_sequence);
+
+-- ---------------------------------------------------------------------------------------------
 -- 5. After: the same counts as in section 1. The operator checks these, nothing else.
 --    Expect missing_producer_id, missing_receipt_number and missing_weighed_on to be 0, and
 --    without_mill_ticket / without_idempotency_key to be unchanged: they were never in scope.
@@ -199,6 +232,19 @@ SELECT count(*)                                        AS settlements_total,
        count(*) FILTER (WHERE mill_ticket_number IS NULL) AS without_mill_ticket,
        count(*) FILTER (WHERE idempotency_key IS NULL)   AS without_idempotency_key
 FROM harvest_settlements;
+
+-- The seeded counters: last_sequence must equal the highest receipt sequence of each producer and campaign.
+SELECT c.producer_id,
+       c.campaign_year,
+       c.last_sequence,
+       max(split_part(s.receipt_number, '-', 3)::int) AS highest_receipt_sequence
+FROM harvest_receipt_counters c
+LEFT JOIN harvest_settlements s
+       ON s.producer_id = c.producer_id
+      AND s.campaign_year = c.campaign_year
+      AND s.receipt_number ~ '^VR-[0-9]{2}-[0-9]{4,6}$'
+GROUP BY c.producer_id, c.campaign_year, c.last_sequence
+ORDER BY c.producer_id, c.campaign_year;
 
 -- The reconstructed numbers, read the way a producer would: per producer and campaign, in order.
 SELECT s.producer_id,

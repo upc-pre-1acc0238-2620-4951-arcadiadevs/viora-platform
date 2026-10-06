@@ -32,4 +32,19 @@ public interface SettledHarvestPersistenceRepository
             + "where r.producerId = :producerId and s.idempotencyKey = :idempotencyKey")
     Optional<HarvestSettlementPersistenceEntity> findByProducerIdAndIdempotencyKey(
             @Param("producerId") UUID producerId, @Param("idempotencyKey") String idempotencyKey);
+
+    /**
+     * Finds the highest sequence of the receipt numbers a producer holds in a campaign year. A receipt number reads
+     * {@code VR-yy-nnnn}, so its sequence starts at the seventh character, and rows without a receipt number
+     * (settlements written before the receipt contract and not yet backfilled) are ignored.
+     *
+     * @param producerId   producer that owns the settlements
+     * @param campaignYear campaign the receipt numbers belong to
+     * @return the highest sequence, null when no settlement of the pair carries a receipt number
+     */
+    @Query("select max(cast(substring(s.receiptNumber, 7) as integer)) from HarvestSettlementPersistenceEntity s "
+            + "join s.report r where r.producerId = :producerId and s.campaignYear = :campaignYear "
+            + "and s.receiptNumber is not null")
+    Integer findHighestReceiptSequence(@Param("producerId") UUID producerId,
+            @Param("campaignYear") Integer campaignYear);
 }

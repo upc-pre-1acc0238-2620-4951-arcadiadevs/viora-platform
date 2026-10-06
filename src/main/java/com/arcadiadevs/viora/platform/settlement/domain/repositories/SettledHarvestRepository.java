@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.settlement.domain.repositories;
 
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
+import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.IdempotencyKey;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.UserId;
 
@@ -27,4 +28,14 @@ public interface SettledHarvestRepository {
      */
     Optional<HarvestSettlementSnapshot> findByProducerIdAndIdempotencyKey(UserId producerId,
             IdempotencyKey idempotencyKey);
+
+    /**
+     * Finds the highest receipt sequence already issued to a producer within a campaign year, across all of their
+     * plots.
+     *
+     * @param producerId   producer that owns the settlements
+     * @param campaignYear campaign the receipt numbers belong to
+     * @return the highest sequence found, zero when no settlement of the pair carries a receipt number
+     */
+    int findHighestReceiptSequence(UserId producerId, CampaignYear campaignYear);
 }
