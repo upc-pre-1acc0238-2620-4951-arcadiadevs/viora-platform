@@ -19,6 +19,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class HarvestSettlementQueryServiceImplTest {
+    private static final java.time.Clock CLOCK =
+            java.time.Clock.fixed(java.time.Instant.parse("2026-10-02T12:00:00Z"), java.time.ZoneOffset.UTC);
     private final AgronomicReportRepository reports = mock(AgronomicReportRepository.class);
     private final ExternalOrchardService orchard = mock(ExternalOrchardService.class);
     private final HarvestSettlementQueryServiceImpl service = new HarvestSettlementQueryServiceImpl(reports, orchard);
@@ -110,7 +112,10 @@ class HarvestSettlementQueryServiceImplTest {
         var report = AgronomicReport.createForPlot(new PlotId(plotId), new UserId(owner));
         for (int campaignYear : campaignYears) {
             report.settleCampaign(new CampaignYear(campaignYear), new OliveWeight(100.0), new OliveWeight(0.0), null,
-                    null, ThinningBalance.notRecorded(), new TreeMap<>(), java.time.Clock.systemUTC());
+                    null, ThinningBalance.notRecorded(), new TreeMap<>(),
+                    ReceiptNumber.of(new CampaignYear(campaignYear), campaignYear - 2000),
+                    WeighingDate.of(java.time.LocalDate.of(campaignYear, 1, 15), CLOCK), null, null,
+                    java.time.Clock.systemUTC());
         }
         report.clearDomainEvents();
         return report;

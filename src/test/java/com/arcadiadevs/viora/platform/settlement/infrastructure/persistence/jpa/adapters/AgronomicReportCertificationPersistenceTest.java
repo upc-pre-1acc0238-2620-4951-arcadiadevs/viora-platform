@@ -33,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class AgronomicReportCertificationPersistenceTest {
     private static final Clock SETTLEMENT_CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
+    /** Fixed weighing date of the fixtures, in the past of every campaign these tests settle. */
+    private static final WeighingDate WEIGHED_ON =
+            WeighingDate.of(java.time.LocalDate.of(2026, 1, 15), SETTLEMENT_CLOCK);
     private static final Clock FIRST_CLOCK = Clock.fixed(Instant.parse("2026-10-03T09:30:00.123456Z"), ZoneOffset.UTC);
     private static final Clock SECOND_CLOCK = Clock.fixed(Instant.parse("2027-10-04T10:00:00Z"), ZoneOffset.UTC);
     @Autowired AgronomicReportRepository repository;
@@ -52,7 +55,9 @@ class AgronomicReportCertificationPersistenceTest {
 
     private void settle(AgronomicReport report, int year) {
         report.settleCampaign(new CampaignYear(year), new OliveWeight(100.0 * year), new OliveWeight(50.0), null,
-                null, ThinningBalance.notRecorded(), new TreeMap<>(), SETTLEMENT_CLOCK);
+                null, ThinningBalance.notRecorded(), new TreeMap<>(),
+                ReceiptNumber.of(new CampaignYear(year), year - 2000),
+                WEIGHED_ON, null, null, SETTLEMENT_CLOCK);
     }
 
     private void settleThreeConsecutive(AgronomicReport report) {
