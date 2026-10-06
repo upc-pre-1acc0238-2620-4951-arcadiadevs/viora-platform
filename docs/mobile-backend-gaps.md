@@ -1,7 +1,7 @@
 # Brechas del backend para las historias de la app Android (Productor)
 
-- **Última actualización:** 2026-10-04
-- **Backend revisado:** `develop` en la etiqueta **0.26.0** más el cambio pendiente de `feature/bbi-thresholds-campaign-year-range` (cambios desde la 0.21.0 en la sección 4)
+- **Última actualización:** 2026-10-05
+- **Backend revisado:** `develop` (el aclareo ya salió publicado como 0.32.0) más el cambio pendiente de `feature/settlement-settle-contract-us29` (cambios desde la 0.21.0 en la sección 4)
 - **Fuentes:** reporte (US y escenarios BDD), mockups de Figma (`Viora202602_Mobile_App`, sección App Productor · Kotlin) y el código del backend
 - **Para qué sirve:** que cada desarrollador sepa qué le falta al backend para completar las historias que tiene asignadas en la app, antes de empezar la pantalla, y dar seguimiento a los endpoints que requiere la app (sección 3).
 
@@ -30,7 +30,7 @@
 | **US26** Carga frutal sostenible | Victor | P61 | 🟡 La prescripción trae `targetFruitsPerShoot`, `percentageToRemove` y `loadUnit` (frutos por brote) | Estado óptima / moderada / sobrecarga antes de aclarear y rendimiento potencial (t/ha estimadas y sostenibles). **No hay fórmula de rendimiento definida**: es una decisión de producto; la propuesta es mostrar el rendimiento potencial solo con peso de fruto calibrado. P61 pasa a frutos por brote, la unidad que el productor cuenta | M y decisión | Victor y el equipo |
 | **US27** Prescripción de aclareo | Victor | P60, P61 | ✅ `GET /plots/{id}/thinning-prescriptions` (porcentaje, `windowOpensOn`, `windowClosesOn`, `windowBasis`, `profileVersion`, `profileStatus`, `windowOpen`, estado y `blockers`) y `PUT /plots/{id}/thinning-prescriptions/full-bloom` | 🟡 La prescripción solo se emite con un **perfil técnico aprobado** de la variedad y la **plena floración** registrada; si falta algo, `blockers` lo dice (ver ADR-004) | S | Victor |
 | **US28** Confirmar el aclareo | Victor | P62, P63 | ✅ `POST /thinning-prescriptions/{id}/execution-confirmations` (carga resultante y proyección de calibre) | — | — | — |
-| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` y ✅ `GET /plots/{id}/harvest-settlements` + `GET /plots/{id}/harvest-settlements/{campaignYear}` (todas las liquidaciones, de la campaña más reciente a la más antigua, y la de una campaña) | — | — | Jahat |
+| **US29** Cierre de campaña | Jahat | P70–P73 | ✅ `POST /plots/{id}/harvest-settlements` y ✅ `GET /plots/{id}/harvest-settlements` + `GET /plots/{id}/harvest-settlements/{campaignYear}` (todas las liquidaciones, de la campaña más reciente a la más antigua, y la de una campaña). La liquidación guarda y devuelve `receiptNumber`, `weighedOn` y `millTicketNumber`, y la respuesta agrega `commercialSizeGrade` derivado del calibre. El `POST` acepta `weighedOn` y `millTicketNumber`, y una cabecera opcional `Idempotency-Key` | ✅ Contrato de recibo cerrado (0.33.0): la fecha de pesaje es obligatoria, el ticket de molina y la clave de idempotencia son opcionales, y el reintento sin conexión con la misma `Idempotency-Key` devuelve la liquidación original en lugar de crear una segunda | — | Jahat |
 
 ## 2. Lo que necesita el Home (armazón de Victor)
 
@@ -90,8 +90,8 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 |---|---|---|
 | `POST/GET /plots/{id}/harvest-records`, `GET .../metrics?name=BBI` | US20 | ✅ el BBI usa las bandas del diseño (`REGULAR` < 0.20, `MODERATE_ALTERNATION` 0.20–0.40, `SEVERE_ALTERNATION` > 0.40) y la cosecha solo se registra de 2000 al año en curso |
 | `PUT` y `DELETE /plots/{id}/harvest-records/{recordId}` | US21 | ✅ (el DELETE llegó en la 0.22.0) |
-| `POST /plots/{id}/harvest-settlements` | US29 | ✅ |
-| Consultar liquidaciones hechas (`GET /plots/{id}/harvest-settlements` y `GET /plots/{id}/harvest-settlements/{campaignYear}`) | US29 | ✅ los dos endpoints; queda pendiente la asignación dentro del equipo mobile |
+| `POST /plots/{id}/harvest-settlements` | US29 | ✅ devuelve `receiptNumber`, `weighedOn`, `millTicketNumber` y `commercialSizeGrade`; el cuerpo exige `weighedOn` y acepta `millTicketNumber`, y la cabecera opcional `Idempotency-Key` hace seguro el reintento |
+| Consultar liquidaciones hechas (`GET /plots/{id}/harvest-settlements` y `GET /plots/{id}/harvest-settlements/{campaignYear}`) | US29 | ✅ los dos endpoints, con los mismos campos de recibo, pesaje, ticket y grado de calibre; queda pendiente la asignación dentro del equipo mobile |
 | `POST /plots/{id}/certifications` (dossier) | fuera de las 4 pestañas del productor | ✅ |
 
 ## 4. Cambios del backend desde la 0.21.0 (para actualizar el reporte)
@@ -106,6 +106,9 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | 0.24.0 | igual | Corrección: las respuestas de PUT y DELETE devolvían la `revision` anterior | US10, US11 |
 | 0.27.0 | `feature/bbi-thresholds-campaign-year-range` | Bandas del BBI alineadas con el diseño de "¿Qué es el BBI?" | US20 |
 | 0.27.0 | igual | El año de campaña que se registra va de 2000 al año en curso | US20 |
+| 0.33.0 | `feature/settlement-settle-contract-us29` | `POST /plots/{plotId}/harvest-settlements` acepta `weighedOn` y `millTicketNumber`, y la cabecera `Idempotency-Key` | US29 |
+| 0.33.0 | igual | Las liquidaciones devuelven `receiptNumber`, `weighedOn`, `millTicketNumber` y `commercialSizeGrade` | US29 |
+| 0.33.0 | igual | El 409 de una campaña ya liquidada agrega `existingSettlement`, y una clave de idempotencia reutilizada da 422 | US29 |
 
 **0.22.0**
 1. **`DELETE /api/v1/plots/{plotId}/harvest-records/{recordId}`** (US21, escenario 2): quita el registro, recalcula el BBI y la clasificación sobre las campañas válidas que quedan, y deja volver a registrar esa campaña. `If-Match` opcional. Respuesta 200 con `MessageResource` (no 204); también 400 (UUID o `If-Match` inválido), 404 y 412.
@@ -131,6 +134,12 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 13. **`PUT /api/v1/plots/{plotId}/thinning-prescriptions/full-bloom`** (`{ "campaignYear": 2026, "observedOn": "2026-10-15" }`): registra la plena floración observada (no futura, dentro del año de la campaña). La ventana (`windowOpensOn`, `windowClosesOn`) se cuenta desde ella. Volver a llamarlo corrige la fecha y recalcula la prescripción emitida.
 14. **`blockers` en `PrescriptionResource`:** lo que impide emitirla (`SAMPLING_NOT_REPRESENTATIVE`, `TARGET_NOT_CONFIGURED`, `FULL_BLOOM_MISSING`). El `GET` sin `status` devuelve la prescripción en el estado en que esté; con `status=ACTIVE` solo la emitida.
 
+**0.33.0**
+15. **`POST /api/v1/plots/{plotId}/harvest-settlements` con recibo y fecha de pesaje** (US29): el cuerpo ahora **exige** `weighedOn`, la fecha en que se pesó la aceituna, que no puede estar en el futuro (mientras no exista, la app puede enviar la fecha de liquidación), y acepta `millTicketNumber` opcional, el ticket de la báscula de la molina, de hasta 30 caracteres. Antes no se registraba ninguno de los dos datos. La respuesta del `POST` y de los dos `GET` suma cuatro campos: `receiptNumber` (con el formato `VR-26-0001`: los dos últimos dígitos de la campaña y un consecutivo **por productor y campaña**, no por lote), `weighedOn`, `millTicketNumber` y `commercialSizeGrade`, que es el grado de la escala del COI deducido de `commercialFruitsPerKg` (105 frutos por kilo → `101/110`; null si la liquidación no trae calibre). `commercialSizeGrade` solo se lee: la app no lo envía.
+16. **`Idempotency-Key` en el `POST` de liquidaciones** (US29): cabecera opcional de hasta 64 caracteres. Repetirla con el mismo lote y la misma campaña devuelve la liquidación original con **200** en lugar de crear una segunda, así que un reintento tras quedarse sin conexión no duplica la cosecha ni gasta otro número de recibo. Reutilizarla para otro lote u otra campaña del mismo productor se rechaza con **422** y el código `BUSINESS_RULE_VIOLATION`. Sin la cabecera nada cambia: liquidar dos veces la misma campaña sigue dando 409.
+17. **El 409 de una campaña ya liquidada dice cuál es** (US29): el `ProblemDetail` conserva el código `HARVESTSETTLEMENT_CONFLICT` y agrega la propiedad `existingSettlement` con `campaignYear`, `totalYieldKg`, `receiptNumber` y `weighedOn` de la liquidación que ya está registrada, para que la app pueda conciliar lo que envió con lo guardado sin volver a consultar.
+18. **Mensajes de error nuevos** (US29), todos como `detail` ya traducido: `settlement.weighed_on.null` y `settlement.weighed_on.future` (400), `settlement.mill_ticket.too_long` y `settlement.idempotency_key.too_long` (400), `settlement.idempotency_key.reused` (422) y `settlement.receipt_number.invalid` / `settlement.receipt_number.sequence.invalid` (400, solo por datos ya persistidos que no se pueden leer).
+
 **Para el reporte**
 - Baja de lote: `DELETE /plots/{id}?reason=` da 200 con `MessageResource`; la restauración es un `POST .../restore` aparte.
 - Agregar `variety` al contrato `UpdatePlot` y los estados `ACTIVE | REMOVED_SOFT_DELETE` a `PlotResource`.
@@ -154,3 +163,4 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 - ¿Qué **perfil técnico** (carga objetivo en frutos por brote y ventana) se aprueba por variedad? No hay valor en el reporte ni en la literatura revisada para Tacna; lo debe aportar un técnico (ver ADR-004). Hasta entonces la app muestra qué falta.
 - ¿Quién registra la **plena floración** de cada lote y campaña? El endpoint existe; falta la pantalla de la app (todavía sin diseño en Figma) y un técnico o productor que lo observe.
 - El **modelo de grados-día (GDD)** queda para después de la entrega: requiere fecha de plena floración, histórico de temperatura por lote y una temperatura base validada (ver ADR-004).
+- ¿Qué muestran las liquidaciones **anteriores a la 0.33.0**? Hasta que corra `scripts/sql/2026-10-05-us29-settlement-receipt-backfill.sql` (una vez, después de desplegar: las columnas y la tabla `harvest_receipt_counters` las crea `ddl-auto=update` al arrancar la app, y el script falla de forma explícita si todavía no existen; es idempotente, así que repetirlo es seguro, y además siembra los contadores de recibos para que el próximo recibo continúe tras los reconstruidos) esas liquidaciones no tienen `millTicketNumber` (null) y su `receiptNumber` es una reconstrucción por orden de liquidación, no un documento que haya impreso la molina. La app debe tolerar el null y no suponer que el recibo existió. Después del backfill, ¿se estrechan `producer_id`, `receipt_number` y `weighed_on` a NOT NULL?

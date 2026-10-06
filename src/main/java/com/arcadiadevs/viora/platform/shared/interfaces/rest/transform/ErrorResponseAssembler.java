@@ -57,6 +57,9 @@ public final class ErrorResponseAssembler {
         problemDetail.setInstance(resolveCurrentRequestUri());
         problemDetail.setProperty("timestamp", Instant.now().toString());
         problemDetail.setProperty("code", error.code());
+        // Extra context of the error, such as the settlement that is already registered on a conflict. It is
+        // copied last so an error can never overwrite the timestamp and the code of the problem detail.
+        error.properties().forEach(problemDetail::setProperty);
         return problemDetail;
     }
 

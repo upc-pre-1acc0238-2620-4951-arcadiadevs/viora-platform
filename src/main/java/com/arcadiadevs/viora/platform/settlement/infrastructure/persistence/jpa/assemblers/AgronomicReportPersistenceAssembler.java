@@ -72,6 +72,8 @@ public final class AgronomicReportPersistenceAssembler {
         var entity = new HarvestSettlementPersistenceEntity();
         entity.setId(UUID.fromString(snapshot.id().settlementId()));
         entity.setReport(parent);
+        // Denormalized so a settlement can be reached by producer without walking the report.
+        entity.setProducerId(parent.getProducerId());
         entity.setCampaignYear(snapshot.campaignYear().value());
         entity.setGreenOlivesKg(snapshot.greenOlivesWeight().kilograms());
         entity.setBlackOlivesKg(snapshot.blackOlivesWeight().kilograms());
@@ -80,6 +82,11 @@ public final class AgronomicReportPersistenceAssembler {
         entity.setNotes(snapshot.notes());
         entity.setStatus(snapshot.status().name());
         entity.setSettledAt(snapshot.settledAt());
+        // Null receipt and weighing data only on rows persisted before the receipt contract existed.
+        entity.setReceiptNumber(snapshot.receiptNumber() == null ? null : snapshot.receiptNumber().value());
+        entity.setWeighedOn(snapshot.weighedOn() == null ? null : snapshot.weighedOn().value());
+        entity.setMillTicketNumber(snapshot.millTicketNumber() == null ? null : snapshot.millTicketNumber().value());
+        entity.setIdempotencyKey(snapshot.idempotencyKey() == null ? null : snapshot.idempotencyKey().value());
 
         var balance = snapshot.thinningBalance();
         entity.setThinningStatus(balance.status().name());
@@ -102,7 +109,16 @@ public final class AgronomicReportPersistenceAssembler {
         return entity;
     }
 
-    private static HarvestSettlementSnapshot toSnapshot(ReportId reportId, PlotId plotId,
+    /**
+     * Maps a settlement entity to the domain. Public because a settlement is also read on its own, without its
+     * report aggregate, by the idempotent replay of a settlement.
+     *
+     * @param reportId  parent agronomic report
+     * @param plotId    settled plot, carried by the parent report
+     * @param entity    the persisted settlement
+     * @return the settlement snapshot
+     */
+    public static HarvestSettlementSnapshot toSnapshot(ReportId reportId, PlotId plotId,
             HarvestSettlementPersistenceEntity entity) {
         var balance = new ThinningBalance(ThinningComplianceStatus.valueOf(entity.getThinningStatus()),
                 entity.getThinningExecutedDate(), entity.getPrescribedRemovalPercentage(),
@@ -112,11 +128,25 @@ public final class AgronomicReportPersistenceAssembler {
                 entity.getBaselineAlternationIndex(), entity.getManagedAlternationIndex(),
                 entity.getAmplitudeReductionRate(), entity.getStabilizationTargetAchieved(),
                 entity.getInterannualVarianceKg2(), entity.getCoefficientOfVariation());
+        var campaignYear = new CampaignYear(entity.getCampaignYear());
         return new HarvestSettlementSnapshot(new SettlementId(entity.getId().toString()), reportId, plotId,
-                new CampaignYear(entity.getCampaignYear()), new OliveWeight(entity.getGreenOlivesKg()),
+                campaignYear, new OliveWeight(entity.getGreenOlivesKg()),
                 new OliveWeight(entity.getBlackOlivesKg()), new OliveWeight(entity.getTotalYieldKg()),
                 entity.getCommercialFruitsPerKg(), entity.getNotes(), SettlementStatus.valueOf(entity.getStatus()),
-                entity.getSettledAt(), balance, curve);
+                entity.getSettledAt(), balance, curve, toReceiptNumber(entity, campaignYear),
+                toWeighingDate(entity), MillTicketNumber.of(entity.getMillTicketNumber()),
+                IdempotencyKey.of(entity.getIdempotencyKey()));
+    }
+
+    /** Legacy rows predate the receipt number; they read back without one until the backfill has run. */
+    private static ReceiptNumber toReceiptNumber(HarvestSettlementPersistenceEntity entity,
+            CampaignYear campaignYear) {
+        return entity.getReceiptNumber() == null ? null : ReceiptNumber.parse(entity.getReceiptNumber(), campaignYear);
+    }
+
+    /** Legacy rows predate the weighing date; they read back without one until the backfill has run. */
+    private static WeighingDate toWeighingDate(HarvestSettlementPersistenceEntity entity) {
+        return entity.getWeighedOn() == null ? null : new WeighingDate(entity.getWeighedOn());
     }
 
     private static DossierCertificationPersistenceEntity toEntity(AgronomicReportPersistenceEntity parent,

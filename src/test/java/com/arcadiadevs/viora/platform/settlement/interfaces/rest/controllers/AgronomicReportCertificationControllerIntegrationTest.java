@@ -29,6 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -71,6 +73,8 @@ class AgronomicReportCertificationControllerIntegrationTest {
     private final CryptographicHashService hashService = new CryptographicHashService();
     private MockMvc mvc;
     private TransactionTemplate transactions;
+    /** Weighing date the settlements carry: yesterday, so it is never in the future whenever the suite runs. */
+    private static final LocalDate WEIGHED_ON = LocalDate.now(ZoneOffset.UTC).minusDays(1);
 
     @BeforeEach
     void setUp() {
@@ -374,8 +378,8 @@ class AgronomicReportCertificationControllerIntegrationTest {
     private ResultActions settle(String plotId, int year, double green, double black) throws Exception {
         return mvc.perform(post("/api/v1/plots/" + plotId + "/harvest-settlements")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"campaignYear\":%d,\"greenOlivesKg\":%s,\"blackOlivesKg\":%s}".formatted(year, green,
-                        black)));
+                .content("{\"campaignYear\":%d,\"greenOlivesKg\":%s,\"blackOlivesKg\":%s,\"weighedOn\":\"%s\"}"
+                        .formatted(year, green, black, WEIGHED_ON)));
     }
 
     private String createPlot(String variety) throws Exception {

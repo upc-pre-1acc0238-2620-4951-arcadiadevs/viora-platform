@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class OpenPdfAgronomicDossierAdapterTest {
     private static final Instant CERTIFIED_AT = Instant.parse("2026-10-03T09:30:00Z");
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
+    /** Fixed weighing date of the fixtures, in the past of every campaign these tests settle. */
+    private static final WeighingDate WEIGHED_ON = WeighingDate.of(LocalDate.of(2026, 1, 15), CLOCK);
     private final OpenPdfAgronomicDossierAdapter adapter = new OpenPdfAgronomicDossierAdapter();
     private final PlotId plotId = new PlotId(UUID.randomUUID().toString());
     private final UserId producer = new UserId(UUID.randomUUID().toString());
@@ -52,7 +54,9 @@ class OpenPdfAgronomicDossierAdapterTest {
         HarvestSettlementSnapshot last = null;
         for (int i = 0; i < kilograms.length; i++) {
             last = report.settleCampaign(new CampaignYear(2026 + i), new OliveWeight(kilograms[i]),
-                    new OliveWeight(0.0), fruitsPerKg, null, balance, history, CLOCK);
+                    new OliveWeight(0.0), fruitsPerKg, null, balance, history,
+                    ReceiptNumber.of(new CampaignYear(2026 + i), i + 1),
+                    WEIGHED_ON, null, null, CLOCK);
         }
         return new AgronomicDossierContent(report.snapshot().id(), plotId, producer, last.campaignYear(),
                 last, new CertifierIdentity("Ing. Sánchez Núñez", "49120"),

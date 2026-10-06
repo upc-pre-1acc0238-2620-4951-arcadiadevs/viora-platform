@@ -29,20 +29,34 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgronomicReportTest {
+    private static final int MIN_YEAR = 2000;
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-02T12:00:00Z"), ZoneOffset.UTC);
+    /** Fixed weighing date of the fixtures, in the past of every campaign these tests settle. */
+    private static final WeighingDate WEIGHED_ON = WeighingDate.of(LocalDate.of(2026, 1, 15), CLOCK);
     private final PlotId plotId = new PlotId(UUID.randomUUID().toString());
     private final UserId producer = new UserId(UUID.randomUUID().toString());
 
     private HarvestSettlementSnapshot settle(AgronomicReport report, int year, double green, double black) {
         return report.settleCampaign(new CampaignYear(year), new OliveWeight(green), new OliveWeight(black),
-                null, null, ThinningBalance.notRecorded(), new TreeMap<>(), CLOCK);
+                null, null, ThinningBalance.notRecorded(), new TreeMap<>(), receipt(year, year - MIN_YEAR), weighedOn(year),
+                null, null, CLOCK);
+    }
+
+    /** Receipt data the domain now requires from every settlement. */
+    private static ReceiptNumber receipt(int year, int sequence) {
+        return ReceiptNumber.of(new CampaignYear(year), sequence);
+    }
+
+    private static WeighingDate weighedOn(int year) {
+        return WEIGHED_ON;
     }
 
     @Test
     void settlesACampaignWithItsTotalAndPublishesTheEvent() {
         var report = AgronomicReport.createForPlot(plotId, producer);
         var settlement = report.settleCampaign(new CampaignYear(2026), new OliveWeight(8200.0),
-                new OliveWeight(6050.0), 105.0, "Weights verified", ThinningBalance.notRecorded(), new TreeMap<>(), CLOCK);
+                new OliveWeight(6050.0), 105.0, "Weights verified", ThinningBalance.notRecorded(), new TreeMap<>(),
+                receipt(2026, 1), weighedOn(2026), null, null, CLOCK);
         assertEquals(14250.0, settlement.totalHarvestWeight().kilograms());
         assertEquals(SettlementStatus.SETTLED, settlement.status());
         assertEquals(CLOCK.instant(), settlement.settledAt());
@@ -84,7 +98,8 @@ class AgronomicReportTest {
                 2026, LocalDate.of(2026, 1, 10), 30.0, 25.0, true);
         var report = AgronomicReport.createForPlot(plotId, producer);
         var settlement = report.settleCampaign(new CampaignYear(2026), new OliveWeight(8200.0), new OliveWeight(0.0),
-                null, null, ThinningBalance.of(record), new TreeMap<>(), CLOCK);
+                null, null, ThinningBalance.of(record), new TreeMap<>(), receipt(2026, 2), weighedOn(2026), null, null,
+                CLOCK);
         var balance = settlement.thinningBalance();
         assertEquals(ThinningComplianceStatus.EXECUTED_ON_TIME, balance.status());
         assertEquals(30.0, balance.prescribedRemovalPercentage());
@@ -125,10 +140,11 @@ class AgronomicReportTest {
     void rejectsInvalidCaliberAndOverlongNotes() {
         var report = AgronomicReport.createForPlot(plotId, producer);
         assertThrows(IllegalArgumentException.class, () -> report.settleCampaign(new CampaignYear(2026),
-                new OliveWeight(1.0), new OliveWeight(1.0), 0.0, null, ThinningBalance.notRecorded(), new TreeMap<>(), CLOCK));
+                new OliveWeight(1.0), new OliveWeight(1.0), 0.0, null, ThinningBalance.notRecorded(), new TreeMap<>(),
+                receipt(2026, 3), weighedOn(2026), null, null, CLOCK));
         assertThrows(IllegalArgumentException.class, () -> report.settleCampaign(new CampaignYear(2026),
                 new OliveWeight(1.0), new OliveWeight(1.0), null, "x".repeat(1001), ThinningBalance.notRecorded(),
-                new TreeMap<>(), CLOCK));
+                new TreeMap<>(), receipt(2026, 4), weighedOn(2026), null, null, CLOCK));
         assertTrue(report.snapshot().settlements().isEmpty());
     }
 
@@ -159,7 +175,8 @@ class AgronomicReportTest {
 
     private void settleWithHistory(AgronomicReport report, int year, double kilograms) {
         report.settleCampaign(new CampaignYear(year), new OliveWeight(kilograms), new OliveWeight(0.0), null, null,
-                ThinningBalance.notRecorded(), history(), CLOCK);
+                ThinningBalance.notRecorded(), history(), receipt(year, year - MIN_YEAR), weighedOn(year), null, null,
+                CLOCK);
     }
 
     /** Settles three consecutive campaigns (2026-2028) so that 2028 has a managed alternation index. */
