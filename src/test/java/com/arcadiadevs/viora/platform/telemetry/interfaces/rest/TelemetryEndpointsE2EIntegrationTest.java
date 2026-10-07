@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.telemetry.interfaces.rest;
 
+import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.meteo.HourlyWeatherProvider;
+import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.meteo.HourlyWeatherProvider.HourlyWeatherObservation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,14 +10,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,6 +43,10 @@ class TelemetryEndpointsE2EIntegrationTest {
     @Autowired
     private WebApplicationContext webApplicationContext;
 
+    /** Open-Meteo stays out of the tests: the virtual node gets the last three completed hours. */
+    @MockitoBean
+    private HourlyWeatherProvider hourlyWeatherProvider;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private MockMvc mockMvc;
@@ -41,6 +55,13 @@ class TelemetryEndpointsE2EIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+
+        var currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS);
+        when(hourlyWeatherProvider.fetchPastHours(anyDouble(), anyDouble(), anyInt())).thenReturn(List.of(
+                new HourlyWeatherObservation(currentHour.minus(Duration.ofHours(3)), 16.5, 84.0, 20.6, 0.0),
+                new HourlyWeatherObservation(currentHour.minus(Duration.ofHours(2)), 18.0, 78.0, 20.6, 95.0),
+                new HourlyWeatherObservation(currentHour.minus(Duration.ofHours(1)), 21.5, 63.0, 20.7, 476.0)
+        ));
 
         // 1. Create a persistent plot in the live DB to instrument
         String plotPayload = """
@@ -176,11 +197,15 @@ class TelemetryEndpointsE2EIntegrationTest {
         mockMvc.perform(delete("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId))
                 .andExpect(status().isConflict());
 
-        // 10. GET: Query telemetry series for the active plot (initially returns 200 OK empty list)
+        // 10. GET: Query telemetry series for the active plot (the virtual node fills the observed hours)
         mockMvc.perform(get("/api/v1/plots/{plotId}/telemetries", plotId)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[2].temperature", is(21.5)))
+                .andExpect(jsonPath("$[2].humidity", is(63.0)))
+                .andExpect(jsonPath("$[2].soilMoisture", is(20.7)))
+                .andExpect(jsonPath("$[2].solarRadiation", is(476.0)));
 
         // 11. GET: Query telemetry series for a non-existent plot should fail with 404 ProblemDetail
         mockMvc.perform(get("/api/v1/plots/{plotId}/telemetries", UUID.randomUUID())
@@ -188,5 +213,16 @@ class TelemetryEndpointsE2EIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status", is(404)))
                 .andExpect(jsonPath("$.title", is("Not Found")));
+    }
+
+    @Test
+    @DisplayName("Should answer 404, not 500, for a path that no endpoint serves")
+    void shouldReturnNotFoundForAnUnknownRoute() throws Exception {
+        mockMvc.perform(get("/api/v1/plots/{plotId}/thinning-events", plotId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status", is(404)))
+                .andExpect(jsonPath("$.code", is("ROUTE_NOT_FOUND")))
+                .andExpect(jsonPath("$.detail", containsString("/api/v1/plots/" + plotId + "/thinning-events")));
     }
 }

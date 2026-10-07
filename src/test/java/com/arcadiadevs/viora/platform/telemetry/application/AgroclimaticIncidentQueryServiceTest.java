@@ -5,7 +5,9 @@ import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundser
 import com.arcadiadevs.viora.platform.telemetry.application.internal.queryservices.AgroclimaticIncidentQueryServiceImpl;
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.AgroclimaticIncidentDetail;
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.AgroclimaticIncidentsSummary;
+import com.arcadiadevs.viora.platform.telemetry.application.queryservices.WeeklyTrendPoint;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.AgroclimaticIncident;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.HourlyTelemetryReadingSnapshot;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetAgroclimaticIncidentByIdQuery;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetAgroclimaticIncidentsQuery;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
@@ -108,5 +110,54 @@ class AgroclimaticIncidentQueryServiceTest {
         assertThat(detail.plotName()).isEqualTo("Lote Sur");
         assertThat(detail.plotVariety()).isEqualTo("CRIOLLA");
         assertThat(detail.weeklyTrend()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should draw one point per day with the hottest hour of each day for a heat wave")
+    void shouldKeepTheDailyPeakInTheWeeklyTrend() {
+        when(externalOrchardService.findPlotName(plotId)).thenReturn(Optional.of("Lote Sur"));
+        when(externalOrchardService.findPlotVariety(plotId)).thenReturn(Optional.of("CRIOLLA"));
+
+        var triggeredAt = Instant.parse("2026-10-07T19:00:00Z");
+        var incident = AgroclimaticIncident.raise(
+                plotId,
+                IncidentType.HEAT_WAVE,
+                IncidentSeverity.CRITICAL,
+                new ThresholdBreachInfo("temperatura_maxima", 34.0, 32.0, "°C"),
+                List.of(),
+                triggeredAt
+        );
+        var incidentId = incident.snapshot().id();
+
+        var readings = new java.util.ArrayList<HourlyTelemetryReadingSnapshot>();
+        for (int day = 6; day >= 0; day--) {
+            var peakHour = triggeredAt.minus(java.time.Duration.ofDays(day));
+            readings.add(reading(peakHour.minus(java.time.Duration.ofHours(10)), 15.0));
+            readings.add(reading(peakHour, 30.0 + day));
+            readings.add(reading(peakHour.minus(java.time.Duration.ofHours(1)), 25.0));
+        }
+        readings.sort(java.util.Comparator.comparing(reading -> reading.timestamp().timestamp()));
+
+        when(incidentRepository.findById(incidentId)).thenReturn(Optional.of(incident));
+        when(telemetrySeriesRepository.findReadingsByPlotIdAndDateRange(any(), any(), any())).thenReturn(readings);
+
+        var result = queryService.handle(new GetAgroclimaticIncidentByIdQuery(incidentId.incidentId()));
+
+        var trend = ((Result.Success<AgroclimaticIncidentDetail, ?>) result).value().weeklyTrend();
+        assertThat(trend).hasSize(7);
+        assertThat(trend).extracting(WeeklyTrendPoint::value).containsExactly(36.0, 35.0, 34.0, 33.0, 32.0, 31.0, 30.0);
+        assertThat(trend.get(6).timestamp()).isEqualTo(triggeredAt);
+    }
+
+    private static HourlyTelemetryReadingSnapshot reading(Instant timestamp, double celsius) {
+        return new HourlyTelemetryReadingSnapshot(
+                new HourlyReadingId(),
+                new ReadingTimestamp(timestamp),
+                new AmbientTemperature(celsius),
+                new RelativeHumidity(50.0),
+                new SoilMoisture(22.0),
+                new SolarRadiation(600.0),
+                null
+        );
     }
 }

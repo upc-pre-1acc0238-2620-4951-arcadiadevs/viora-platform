@@ -608,8 +608,9 @@ class HarvestSettlementControllerIntegrationTest {
                 Integer.class, campaignYear);
     }
 
+    /** The message in English, the language the API answers in when the request names none. */
     private static String message(String key) {
-        return ResourceBundle.getBundle("messages", Locale.getDefault()).getString(key);
+        return ResourceBundle.getBundle("messages", Locale.ENGLISH).getString(key);
     }
 
     private ResultActions settle(String plotId, int year, double green, double black, Double fruitsPerKg)

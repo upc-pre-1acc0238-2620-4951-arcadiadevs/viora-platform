@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.text.MessageFormat;
 import java.util.MissingResourceException;
@@ -220,6 +221,24 @@ public class GlobalExceptionHandler {
         var applicationError = ApplicationError.validationError(
                 resolveMessageOrDefault("validation.request.argument", "request-argument"),
                 detail
+        );
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles requests to a path that no endpoint serves, which would otherwise fall through to the
+     * generic handler and answer 500.
+     *
+     * @param ex the exception raised when no handler or static resource matches the path
+     * @return ProblemDetail response with NOT_FOUND status
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ProblemDetail> handleNoResourceFound(NoResourceFoundException ex) {
+        var resourcePath = ex.getResourcePath();
+        var path = resourcePath.startsWith("/") ? resourcePath : "/" + resourcePath;
+        var applicationError = ApplicationError.notFound(
+                "Route",
+                resolveMessageOrDefault("error.route.not-found", "No endpoint matches " + path + ".", path)
         );
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
