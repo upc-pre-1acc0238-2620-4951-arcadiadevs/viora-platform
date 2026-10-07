@@ -20,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.TreeMap;
 
 /**
  * Implementation of {@link AgroclimaticIncidentQueryService} orchestrating read queries for incidents.
@@ -28,6 +30,8 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 public class AgroclimaticIncidentQueryServiceImpl implements AgroclimaticIncidentQueryService {
+
+    private static final int TREND_DAYS = 7;
 
     private final AgroclimaticIncidentRepository incidentRepository;
     private final ExternalOrchardService externalOrchardService;
@@ -123,25 +127,52 @@ public class AgroclimaticIncidentQueryServiceImpl implements AgroclimaticInciden
         String plotName = externalOrchardService.findPlotName(plotId).orElse("Lote " + plotId.plotId().substring(0, 8));
         String plotVariety = externalOrchardService.findPlotVariety(plotId).orElse("SEVILLANA");
 
-        // Compute weekly trend
-        Instant start = snapshot.triggeredAt().minus(Duration.ofDays(6));
-        Instant end = snapshot.triggeredAt().plus(Duration.ofDays(1));
+        // Weekly trend: one point per day (the 24 h windows of the week up to the trigger)
+        Instant end = snapshot.triggeredAt();
+        Instant start = end.minus(Duration.ofDays(TREND_DAYS));
         List<HourlyTelemetryReadingSnapshot> readings = telemetrySeriesRepository.findReadingsByPlotIdAndDateRange(plotId, start, end);
 
         List<WeeklyTrendPoint> trendPoints = new ArrayList<>();
         Double threshold = snapshot.breachInfo().thresholdValue();
 
         if (readings != null && !readings.isEmpty()) {
-            for (HourlyTelemetryReadingSnapshot reading : readings) {
-                Double value = extractMetricValue(reading, snapshot.type());
-                trendPoints.add(new WeeklyTrendPoint(reading.timestamp().timestamp(), value, threshold));
-            }
-        } else {
+            trendPoints.addAll(dailyExtremes(readings, snapshot.type(), start, threshold));
+        }
+        if (trendPoints.isEmpty()) {
             // Synthesize single observation point at trigger time
             trendPoints.add(new WeeklyTrendPoint(snapshot.triggeredAt(), snapshot.breachInfo().currentValue(), threshold));
         }
 
         return Result.success(new AgroclimaticIncidentDetail(snapshot, plotName, plotVariety, trendPoints));
+    }
+
+    /**
+     * Keeps, for each 24 h window ending at the trigger, the reading that matters for the incident:
+     * the hottest hour for a heat wave, the coldest for a frost and the driest for hydric stress.
+     * The virtual node stores one reading per hour, and the app draws one point per day.
+     */
+    private List<WeeklyTrendPoint> dailyExtremes(
+            List<HourlyTelemetryReadingSnapshot> readings,
+            IncidentType type,
+            Instant start,
+            Double threshold
+    ) {
+        Comparator<HourlyTelemetryReadingSnapshot> byValue = Comparator.comparing(reading -> extractMetricValue(reading, type));
+        Comparator<HourlyTelemetryReadingSnapshot> worstFirst = type == IncidentType.HEAT_WAVE ? byValue.reversed() : byValue;
+
+        var byDay = new TreeMap<Long, HourlyTelemetryReadingSnapshot>();
+        for (HourlyTelemetryReadingSnapshot reading : readings) {
+            var timestamp = reading.timestamp().timestamp();
+            if (!timestamp.isAfter(start)) {
+                continue;
+            }
+            // Windows are (start + d days, start + d + 1 days], so a reading exactly at the trigger counts
+            long day = (Duration.between(start, timestamp).toMillis() - 1) / Duration.ofDays(1).toMillis();
+            byDay.merge(day, reading, (current, candidate) -> worstFirst.compare(candidate, current) < 0 ? candidate : current);
+        }
+        return byDay.values().stream()
+                .map(reading -> new WeeklyTrendPoint(reading.timestamp().timestamp(), extractMetricValue(reading, type), threshold))
+                .toList();
     }
 
     private Double extractMetricValue(HourlyTelemetryReadingSnapshot reading, IncidentType type) {
