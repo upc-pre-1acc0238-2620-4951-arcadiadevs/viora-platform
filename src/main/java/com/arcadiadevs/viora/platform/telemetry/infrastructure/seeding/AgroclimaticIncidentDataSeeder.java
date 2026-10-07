@@ -33,6 +33,7 @@ import java.util.List;
 public class AgroclimaticIncidentDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AgroclimaticIncidentDataSeeder.class);
+    private static final int AFTERNOON_PEAK_HOUR_UTC = 19;
 
     private final AgroclimaticIncidentRepository incidentRepository;
     private final TelemetrySeriesRepository telemetrySeriesRepository;
@@ -138,10 +139,16 @@ public class AgroclimaticIncidentDataSeeder implements ApplicationRunner {
                     .orElseGet(() -> TelemetrySeries.create(plotA, null));
 
             if (series.readings().isEmpty()) {
+                // The peaks sit at the hottest hour of the day (early afternoon in Peru), the last one
+                // not after now, so the hourly virtual node readings around them stay coherent
+                var lastPeak = now.truncatedTo(ChronoUnit.DAYS).plus(Duration.ofHours(AFTERNOON_PEAK_HOUR_UTC));
+                if (lastPeak.isAfter(now)) {
+                    lastPeak = lastPeak.minus(Duration.ofDays(1));
+                }
                 double[] dailyPeakTemperatures = {29.0, 30.0, 34.0, 31.0, 28.0, 27.0, 34.0};
                 for (int i = 0; i < dailyPeakTemperatures.length; i++) {
                     int daysAgo = (dailyPeakTemperatures.length - 1) - i;
-                    var readingTime = now.minus(Duration.ofHours(daysAgo * 24L)).plus(Duration.ofMinutes(5));
+                    var readingTime = lastPeak.minus(Duration.ofDays(daysAgo));
                     var reading = HourlyTelemetryReading.create(
                             new ReadingTimestamp(readingTime),
                             new AmbientTemperature(dailyPeakTemperatures[i]),

@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.telemetry.application;
 
+import com.arcadiadevs.viora.platform.telemetry.application.internal.commandservices.VirtualNodeTelemetrySimulator;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.queryservices.TelemetryQueryServiceImpl;
@@ -30,6 +31,9 @@ class TelemetryQueryServiceTest {
     @Mock
     private ExternalOrchardService externalOrchardService;
 
+    @Mock
+    private VirtualNodeTelemetrySimulator virtualNodeTelemetrySimulator;
+
     private TelemetryQueryServiceImpl telemetryQueryService;
 
     private final PlotId plotId = new PlotId();
@@ -38,7 +42,8 @@ class TelemetryQueryServiceTest {
     void setUp() {
         telemetryQueryService = new TelemetryQueryServiceImpl(
                 telemetrySeriesRepository,
-                externalOrchardService
+                externalOrchardService,
+                virtualNodeTelemetrySimulator
         );
     }
 
@@ -56,7 +61,7 @@ class TelemetryQueryServiceTest {
         assertThat(error.message()).contains(plotId.plotId());
 
         verify(externalOrchardService).existsActivePlot(plotId);
-        verifyNoInteractions(telemetrySeriesRepository);
+        verifyNoInteractions(telemetrySeriesRepository, virtualNodeTelemetrySimulator);
     }
 
     @Test
@@ -86,6 +91,7 @@ class TelemetryQueryServiceTest {
         assertThat(readings.get(0).temperature().celsius()).isEqualTo(24.0);
 
         verify(externalOrchardService).existsActivePlot(plotId);
+        verify(virtualNodeTelemetrySimulator).fillMissingHours(plotId);
         verify(telemetrySeriesRepository).findReadingsByPlotIdAndDateRange(plotId, null, null);
     }
 
