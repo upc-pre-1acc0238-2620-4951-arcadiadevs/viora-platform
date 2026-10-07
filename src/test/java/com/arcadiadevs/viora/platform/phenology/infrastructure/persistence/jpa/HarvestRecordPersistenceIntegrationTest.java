@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -297,14 +298,14 @@ class HarvestRecordPersistenceIntegrationTest {
 
     private String recordCampaign(String plotId, int campaignYear, double totalYieldKg, double greenKg, double blackKg)
             throws Exception {
-        var payload = """
+        var payload = String.format(Locale.ROOT, """
                 {
                   "campaignYear": %d,
                   "totalYieldKg": %.1f,
                   "greenKg": %.1f,
                   "blackKg": %.1f
                 }
-                """.formatted(campaignYear, totalYieldKg, greenKg, blackKg);
+                """, campaignYear, totalYieldKg, greenKg, blackKg);
 
         var body = mvc.perform(post("/api/v1/plots/{plotId}/harvest-records", plotId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -319,14 +320,14 @@ class HarvestRecordPersistenceIntegrationTest {
 
     private void rectifyCampaign(String plotId, String recordId, double totalYieldKg, double greenKg, double blackKg)
             throws Exception {
-        var payload = """
+        var payload = String.format(Locale.ROOT, """
                 {
                   "totalYieldKg": %.1f,
                   "greenKg": %.1f,
                   "blackKg": %.1f,
                   "notes": "Correction after field recalibration"
                 }
-                """.formatted(totalYieldKg, greenKg, blackKg);
+                """, totalYieldKg, greenKg, blackKg);
 
         mvc.perform(put("/api/v1/plots/{plotId}/harvest-records/{recordId}", plotId, recordId)
                         .contentType(MediaType.APPLICATION_JSON)
