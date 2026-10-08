@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 /**
  * Outbound ACL service used by the Phenology bounded context to interact with Orchard capabilities.
  *
@@ -35,5 +37,18 @@ public class ExternalOrchardService {
             return false;
         }
         return orchardContextFacade.existsActivePlot(plotId.plotId());
+    }
+
+    /**
+     * Retrieves the centroid of an active plot, where its weather is read.
+     *
+     * @param plotId the Phenology PlotId value object
+     * @return Optional containing [latitude, longitude], or empty if the plot is not found
+     */
+    public Optional<double[]> findPlotCentroid(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotCentroid(plotId.plotId());
     }
 }
