@@ -157,6 +157,20 @@ public record ApplicationError(
     }
 
     /**
+     * Creates an unavailable error when a resource depends on an external service that cannot be reached now.
+     *
+     * @param resource the resource that could not be produced (e.g. "chill-weather")
+     * @param reason   the reason why it is unavailable
+     * @return an {@link ApplicationError} mapped to 503 Service Unavailable
+     */
+    public static ApplicationError unavailable(String resource, String reason) {
+        return new ApplicationError(
+                "%s_UNAVAILABLE".formatted(resource.toUpperCase().replace('-', '_')),
+                "%s is temporarily unavailable".formatted(resource),
+                reason);
+    }
+
+    /**
      * Creates an unexpected error when an unanticipated exception or state occurs.
      *
      * @param context the context or component where the error occurred

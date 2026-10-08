@@ -5,15 +5,18 @@ package com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects;
  *
  * <p>State lifecycle:
  * <ul>
- *   <li>{@code IN_PROGRESS}: The plot is within the winter chilling period (June 1 - August 31 in Tacna)
- *       and cumulative chilling portions have not yet reached the varietal threshold (typically 27.0 portions).</li>
- *   <li>{@code COMPLETED}: The cumulative chilling portions have fulfilled or exceeded the varietal physiological requirement.</li>
- *   <li>{@code OFF_SEASON}: The current date or campaign evaluation is outside the active winter chilling window.</li>
+ *   <li>{@code IN_PROGRESS}: today is within the winter chilling period (June 1 - August 31) and the
+ *       accumulated portions have not reached the varietal threshold yet.</li>
+ *   <li>{@code HALTED}: same as {@code IN_PROGRESS}, but a warm spell is going on right now (daily maximum above
+ *       24 °C for more than 3 days in a row), so the cold that was building up is being lost.</li>
+ *   <li>{@code COMPLETED}: within the period, the accumulated portions already reached the threshold.</li>
+ *   <li>{@code OFF_SEASON}: today is outside the period; the metric then describes the last finished winter.</li>
  * </ul>
  * </p>
  */
 public enum ChillSeasonState {
     IN_PROGRESS,
+    HALTED,
     COMPLETED,
     OFF_SEASON
 }
