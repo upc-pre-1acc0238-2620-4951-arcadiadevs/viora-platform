@@ -50,7 +50,8 @@ public class PhenologyMetricController {
      * @param plotId     the UUID of the olive plot
      * @param metricName optional metric filter parameter (e.g., BBI, CHILLING)
      * @param name       optional alias filter parameter matching early specification
-     * @return 200 OK with list of metrics, 400 Bad Request on invalid arguments, or 404 Not Found if plot does not exist
+     * @return 200 OK with list of metrics, 400 Bad Request on invalid arguments, 404 Not Found if plot does not exist,
+     *         or 503 Service Unavailable when the weather for the chill cannot be read
      */
     @GetMapping
     @Operation(
@@ -73,7 +74,12 @@ public class PhenologyMetricController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Plot not found or inactive in orchard registry, or tracker not initialized",
+                    description = "Plot not found or inactive in orchard registry, or (BBI only) no harvest history yet",
+                    content = @Content(schema = @Schema(implementation = org.springframework.http.ProblemDetail.class))
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "The hourly temperatures of the plot could not be retrieved, so the chill was not evaluated",
                     content = @Content(schema = @Schema(implementation = org.springframework.http.ProblemDetail.class))
             )
     })
