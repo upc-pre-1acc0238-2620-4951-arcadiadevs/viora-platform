@@ -234,6 +234,7 @@ public final class ErrorResponseAssembler {
             case String s when s.endsWith("_PRECONDITION_FAILED") -> HttpStatus.PRECONDITION_FAILED;
             case "BUSINESS_RULE_VIOLATION" -> HttpStatus.UNPROCESSABLE_CONTENT;
             case String s when s.endsWith("_CONFLICT") -> HttpStatus.CONFLICT;
+            case String s when s.endsWith("_UNAVAILABLE") -> HttpStatus.SERVICE_UNAVAILABLE;
             case "UNEXPECTED_ERROR" -> HttpStatus.INTERNAL_SERVER_ERROR;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

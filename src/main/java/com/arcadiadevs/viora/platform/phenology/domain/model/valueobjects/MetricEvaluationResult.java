@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -35,7 +37,7 @@ public record MetricEvaluationResult(
         if (details == null) {
             details = Map.of();
         } else {
-            details = Map.copyOf(details);
+            details = Collections.unmodifiableMap(new LinkedHashMap<>(details));
         }
         if (evaluatedAt == null) {
             evaluatedAt = Instant.now();

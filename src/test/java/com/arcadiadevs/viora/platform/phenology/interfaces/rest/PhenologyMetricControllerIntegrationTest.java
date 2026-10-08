@@ -62,14 +62,14 @@ class PhenologyMetricControllerIntegrationTest {
         );
         var chillingResult = new MetricEvaluationResult(
                 MetricType.EREZ_CHILLING_PORTIONS,
-                28.5,
+                31.2,
                 "SATISFIED",
                 Map.of(
-                        "model", "Dynamic Erez-Fishman",
-                        "thresholdTarget", 27.0,
-                        "completionPercentage", 105.56,
+                        "model", "Dynamic Model (Fishman & Erez)",
+                        "thresholdTarget", 30.0,
+                        "completionPercentage", 104.0,
                         "seasonStart", "2026-06-01",
-                        "completionDate", "2026-08-18",
+                        "completionDate", "2026-08-12",
                         "idleDays", 0,
                         "seasonState", "COMPLETED"
                 ),
@@ -88,10 +88,10 @@ class PhenologyMetricControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].qualitativeCategory", is("MODERATE_ALTERNATION")))
                 .andExpect(jsonPath("$[0].details.formula", is("Hoblyn (1936)")))
                 .andExpect(jsonPath("$[1].metricName", is("EREZ_CHILLING_PORTIONS")))
-                .andExpect(jsonPath("$[1].value", is(28.5)))
+                .andExpect(jsonPath("$[1].value", is(31.2)))
                 .andExpect(jsonPath("$[1].qualitativeCategory", is("SATISFIED")))
                 .andExpect(jsonPath("$[1].details.seasonStart", is("2026-06-01")))
-                .andExpect(jsonPath("$[1].details.completionDate", is("2026-08-18")))
+                .andExpect(jsonPath("$[1].details.completionDate", is("2026-08-12")))
                 .andExpect(jsonPath("$[1].details.idleDays", is(0)))
                 .andExpect(jsonPath("$[1].details.seasonState", is("COMPLETED")));
     }
@@ -123,14 +123,14 @@ class PhenologyMetricControllerIntegrationTest {
     void shouldSupportNameAliasQueryParam() throws Exception {
         var chillingResult = new MetricEvaluationResult(
                 MetricType.EREZ_CHILLING_PORTIONS,
-                28.5,
+                31.2,
                 "SATISFIED",
                 Map.of(
-                        "model", "Dynamic Erez-Fishman",
-                        "thresholdTarget", 27.0,
-                        "completionPercentage", 105.56,
+                        "model", "Dynamic Model (Fishman & Erez)",
+                        "thresholdTarget", 30.0,
+                        "completionPercentage", 104.0,
                         "seasonStart", "2026-06-01",
-                        "completionDate", "2026-08-18",
+                        "completionDate", "2026-08-12",
                         "idleDays", 0,
                         "seasonState", "COMPLETED"
                 ),
@@ -147,7 +147,7 @@ class PhenologyMetricControllerIntegrationTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].metricName", is("EREZ_CHILLING_PORTIONS")))
                 .andExpect(jsonPath("$[0].details.seasonStart", is("2026-06-01")))
-                .andExpect(jsonPath("$[0].details.completionDate", is("2026-08-18")))
+                .andExpect(jsonPath("$[0].details.completionDate", is("2026-08-12")))
                 .andExpect(jsonPath("$[0].details.idleDays", is(0)))
                 .andExpect(jsonPath("$[0].details.seasonState", is("COMPLETED")));
     }
