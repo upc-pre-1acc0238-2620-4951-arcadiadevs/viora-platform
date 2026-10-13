@@ -39,6 +39,16 @@ public record PasswordResetToken(String token, Instant expiresAt) {
     }
 
     /**
+     * Convenience constructor creating a token wrapper for lookup or verification purposes,
+     * assigning an indefinite future expiration instant.
+     *
+     * @param token the cryptographically unique token string
+     */
+    public PasswordResetToken(String token) {
+        this(token, Instant.MAX);
+    }
+
+    /**
      * Checks if this token is currently expired against the provided clock.
      *
      * @param now current instant
