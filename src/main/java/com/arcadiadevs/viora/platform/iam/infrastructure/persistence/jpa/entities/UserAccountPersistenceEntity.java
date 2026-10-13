@@ -1,0 +1,37 @@
+package com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.entities;
+
+import com.arcadiadevs.viora.platform.shared.infrastructure.persistence.jpa.entities.AuditableAbstractPersistenceEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.Instant;
+
+/**
+ * JPA persistence entity mapping the {@code user_accounts} relational table.
+ */
+@Entity
+@Table(name = "user_accounts")
+@Getter
+@Setter
+@NoArgsConstructor
+public class UserAccountPersistenceEntity extends AuditableAbstractPersistenceEntity {
+
+    @Column(name = "email", nullable = false, unique = true)
+    private String email;
+
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
+
+    @Column(name = "role", nullable = false, length = 50)
+    private String role;
+
+    @Column(name = "reset_token", length = 100)
+    private String resetToken;
+
+    @Column(name = "reset_token_expires_at")
+    private Instant resetTokenExpiresAt;
+}
