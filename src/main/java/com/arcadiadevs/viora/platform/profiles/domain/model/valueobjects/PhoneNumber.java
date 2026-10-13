@@ -5,8 +5,7 @@ import java.util.regex.Pattern;
 /**
  * Pure Domain Value Object representing an international telephone number conforming to ITU-T E.164.
  *
- * <p>Enforces the standard E.164 invariant (+ followed by 7 to 15 decimal digits) with pure Java,
- * completely decoupled from infrastructure parsing libraries.</p>
+ * <p>Enforces the standard E.164 invariant (+ followed by 7 to 15 decimal digits).</p>
  *
  * @param value normalized E.164 phone string (e.g. {@code +51987654321})
  */
