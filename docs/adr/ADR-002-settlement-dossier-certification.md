@@ -99,7 +99,7 @@ La auditoría definía `byte[] renderPdf(AgronomicReport report, AuditorSignatur
 
 ## 8. Pendientes explícitos (no cumplidos aquí)
 
-- US30 **no** queda completa: falta el GET de descarga del PDF y la consulta de metadatos con negociación de contenido. El POST deja el contenido recuperable e inmutable para esa capacidad.
+- US30 **no** queda completa: falta el GET de descarga del PDF y la consulta de metadatos con negociación de contenido. El POST deja el contenido recuperable e inmutable para esa capacidad. **Resuelto para el productor en ADR-005 (2026-10-14):** expediente sellado, descarga con negociación de contenido y verificación por SHA-256.
 - `SettlementStatus.AUDITED` no se actualiza al certificar.
 - Procedencia real de los datos de frío (hoy simulados en otro contexto), sin incluirlos como medición certificada.
 - Titularidad/autorización por IAM (hoy no hay 403 en este endpoint).

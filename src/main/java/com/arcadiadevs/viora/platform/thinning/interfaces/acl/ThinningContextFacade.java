@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.acl;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 /**
@@ -20,4 +21,31 @@ public interface ThinningContextFacade {
      * @return Optional containing the grade label, or empty if the caliber is absent
      */
     Optional<String> findCommercialSizeGrade(Double fruitsPerKg);
+
+    /**
+     * Retrieves the crop load and the thinning prescription of a plot campaign, for the agronomic dossier.
+     *
+     * @param plotId       the plot identifier string (UUID)
+     * @param campaignYear the campaign year
+     * @return the plan of the campaign, or empty when the plot was never sampled that campaign
+     */
+    Optional<CampaignThinningPlan> findCampaignThinningPlan(String plotId, int campaignYear);
+
+    /**
+     * Crop load and prescription of a campaign, in fruits per sampled shoot. Every field is null when unknown.
+     *
+     * @param preThinningFruitsPerShoot mean load of the representative sampling, before thinning
+     * @param targetFruitsPerShoot      sustainable target of the issued prescription
+     * @param percentageToRemove        prescribed percentage of fruits to remove
+     * @param windowOpensOn             first recommended thinning date
+     * @param windowClosesOn            latest recommended thinning date
+     */
+    record CampaignThinningPlan(
+            Double preThinningFruitsPerShoot,
+            Double targetFruitsPerShoot,
+            Double percentageToRemove,
+            LocalDate windowOpensOn,
+            LocalDate windowClosesOn
+    ) {
+    }
 }
