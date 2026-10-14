@@ -1,12 +1,17 @@
 package com.arcadiadevs.viora.platform.phenology.application.acl;
 
+import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.acl.ExternalOrchardService;
+import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.weather.HourlyTemperatureProvider;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -18,9 +23,14 @@ import java.util.TreeMap;
 public class PhenologyContextFacadeImpl implements PhenologyContextFacade {
 
     private final HarvestRecordQueryService harvestRecordQueryService;
+    private final ExternalOrchardService externalOrchardService;
+    private final HourlyTemperatureProvider temperatureProvider;
 
-    public PhenologyContextFacadeImpl(HarvestRecordQueryService harvestRecordQueryService) {
+    public PhenologyContextFacadeImpl(HarvestRecordQueryService harvestRecordQueryService,
+            ExternalOrchardService externalOrchardService, HourlyTemperatureProvider temperatureProvider) {
         this.harvestRecordQueryService = harvestRecordQueryService;
+        this.externalOrchardService = externalOrchardService;
+        this.temperatureProvider = temperatureProvider;
     }
 
     @Override
@@ -36,6 +46,25 @@ public class PhenologyContextFacadeImpl implements PhenologyContextFacade {
             return Collections.unmodifiableSortedMap(yields);
         } catch (IllegalArgumentException ex) {
             // Malformed UUID or VO validation failure means plot has no history
+            return Collections.emptySortedMap();
+        }
+    }
+
+    @Override
+    public SortedMap<LocalDate, Double> findDailyMaxTemperatures(String plotId, LocalDate from, LocalDate to) {
+        if (plotId == null || plotId.isBlank() || from == null || to == null || to.isBefore(from)) {
+            return Collections.emptySortedMap();
+        }
+        try {
+            var centroid = externalOrchardService.findPlotCentroid(new PlotId(plotId));
+            if (centroid.isEmpty()) {
+                return Collections.emptySortedMap();
+            }
+            var hours = temperatureProvider.fetchHourlyTemperatures(centroid.get()[0], centroid.get()[1], from, to);
+            var maxima = new TreeMap<LocalDate, Double>();
+            hours.orElse(List.of()).forEach(hour -> maxima.merge(hour.hour().toLocalDate(), hour.celsius(), Math::max));
+            return Collections.unmodifiableSortedMap(maxima);
+        } catch (IllegalArgumentException ex) {
             return Collections.emptySortedMap();
         }
     }

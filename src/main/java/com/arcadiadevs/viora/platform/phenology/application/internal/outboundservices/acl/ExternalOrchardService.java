@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -50,5 +51,14 @@ public class ExternalOrchardService {
             return Optional.empty();
         }
         return orchardContextFacade.findPlotCentroid(plotId.plotId());
+    }
+
+    /**
+     * Lists every active plot of every producer, for the winter warmth monitor.
+     *
+     * @return identifiers of the active plots
+     */
+    public List<String> findAllActivePlotIds() {
+        return orchardContextFacade.findAllActivePlotIds();
     }
 }

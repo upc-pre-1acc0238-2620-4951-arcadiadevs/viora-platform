@@ -4,12 +4,14 @@ package com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects;
  * Enumeration representing the agroclimatic incident types originating within the Telemetry bounded context.
  *
  * <p>Strictly scoped to microclimatic and edaphic stresses evaluated
- * from probe readings and weather forecasts.</p>
+ * from probe readings and weather forecasts. {@link #WARM_WINTER} comes from the winter warmth evaluation of
+ * Phenology (US23): more than three consecutive days above 24 °C during the chill season.</p>
  */
 public enum IncidentType {
     HYDRIC_STRESS,
     HEAT_WAVE,
-    FROST_WARNING;
+    FROST_WARNING,
+    WARM_WINTER;
 
     /**
      * Parses an IncidentType from its string representation.
