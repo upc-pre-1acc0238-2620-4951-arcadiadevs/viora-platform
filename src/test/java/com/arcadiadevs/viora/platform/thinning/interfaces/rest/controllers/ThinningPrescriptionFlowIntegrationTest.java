@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasItem;
@@ -242,5 +243,105 @@ class ThinningPrescriptionFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blockers", empty()));
         assertEquals(campaign, Year.now().getValue());
+    }
+
+    private void recordHarvest(String plotId, int year, double kg) throws Exception {
+        var body = """
+                {"campaignYear":%d,"totalYieldKg":%s,"greenKg":%s,"blackKg":0.0}
+                """.formatted(year, kg, kg);
+        mvc.perform(post("/api/v1/plots/{id}/harvest-records", plotId).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+    }
+
+    private double areaOf(String plotId) throws Exception {
+        var response = mvc.perform(get("/api/v1/plots/{id}", plotId)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(response, "$.areaHa")).doubleValue();
+    }
+
+    @Test
+    @DisplayName("US26: before thinning the plan shows the load against the target, the sampling and the profile offsets")
+    void outlookShowsTheLoadBeforeThinning() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        sampleFiveTrees(plotId);
+
+        mvc.perform(get("/api/v1/plots/{id}/thinning-prescriptions", plotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentLoad.fruitsPerShoot").value(0.6))
+                .andExpect(jsonPath("$.currentLoad.targetFruitsPerShoot").value(0.4))
+                .andExpect(jsonPath("$.currentLoad.loadRatio").value(1.5))
+                .andExpect(jsonPath("$.currentLoad.loadState").value("SEVERE_OVERLOAD"))
+                .andExpect(jsonPath("$.sampledTrees").value(5))
+                .andExpect(jsonPath("$.treesNeeded").value(0))
+                .andExpect(jsonPath("$.lastSampledOn").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.windowOpensDaysAfterBloom").value(14))
+                .andExpect(jsonPath("$.windowClosesDaysAfterBloom").value(49))
+                .andExpect(jsonPath("$.yieldEstimate.status").value("INSUFFICIENT_HISTORY"))
+                .andExpect(jsonPath("$.yieldEstimate.harvestCampaigns").value(0))
+                .andExpect(jsonPath("$.yieldEstimate.requiredHarvestCampaigns").value(3))
+                .andExpect(jsonPath("$.yieldEstimate.sustainableKgPerHa").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("US26: without a representative sampling or a profile there is no current load")
+    void noCurrentLoadWithoutSamplingOrProfile() throws Exception {
+        var unsampled = createPlot("SEVILLANA");
+        mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", unsampled)
+                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(bloom)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentLoad").doesNotExist())
+                .andExpect(jsonPath("$.sampledTrees").value(0))
+                .andExpect(jsonPath("$.treesNeeded").value(5));
+
+        var withoutProfile = createPlot("CRIOLLA");
+        sampleFiveTrees(withoutProfile);
+        mvc.perform(get("/api/v1/plots/{id}/thinning-prescriptions", withoutProfile))
+                .andExpect(jsonPath("$.currentLoad").doesNotExist())
+                .andExpect(jsonPath("$.windowOpensDaysAfterBloom").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("US26: with three earlier harvests the yield is estimated from the plot history and the load")
+    void yieldComesFromTheHarvestHistory() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        recordHarvest(plotId, campaign - 3, 9000.0);
+        recordHarvest(plotId, campaign - 2, 7000.0);
+        recordHarvest(plotId, campaign - 1, 8000.0);
+        sampleFiveTrees(plotId);
+        double sustainable = 8000.0 / areaOf(plotId);
+
+        mvc.perform(get("/api/v1/plots/{id}/thinning-prescriptions", plotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.yieldEstimate.status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.yieldEstimate.harvestCampaigns").value(3))
+                .andExpect(jsonPath("$.yieldEstimate.sustainableKgPerHa", closeTo(sustainable, 0.06)))
+                .andExpect(jsonPath("$.yieldEstimate.estimatedKgPerHa", closeTo(sustainable * 1.5, 0.06)))
+                .andExpect(jsonPath("$.yieldEstimate.basis").value("FRUIT_COUNT_ONLY"));
+    }
+
+    @Test
+    @DisplayName("P63: the confirmation estimates the yield with the load left by the labor")
+    void confirmationEstimatesTheYieldAfterThinning() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        recordHarvest(plotId, campaign - 3, 9000.0);
+        recordHarvest(plotId, campaign - 2, 7000.0);
+        recordHarvest(plotId, campaign - 1, 8000.0);
+        sampleFiveTrees(plotId);
+        var issued = mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
+                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(bloom)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(issued, "$.id");
+        double sustainable = 8000.0 / areaOf(plotId);
+        var body = """
+                {"executedDate":"%s","actualRemovalPercentage":50.0,"removedKg":100.0,"laborCrewSize":2}
+                """.formatted(LocalDate.now(java.time.ZoneOffset.UTC));
+
+        mvc.perform(post("/api/v1/thinning-prescriptions/{id}/execution-confirmations", id)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loadBalance.residualFruitsPerShoot").value(0.3))
+                .andExpect(jsonPath("$.yieldEstimate.status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.yieldEstimate.estimatedKgPerHa", closeTo(sustainable * 0.75, 0.06)))
+                .andExpect(jsonPath("$.yieldEstimate.basis").value("FRUIT_COUNT_ONLY"));
     }
 }

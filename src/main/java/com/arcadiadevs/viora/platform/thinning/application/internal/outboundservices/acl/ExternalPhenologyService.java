@@ -1,48 +1,32 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.acl;
 
-import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
+import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
+import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.util.Optional;
+import java.util.Collections;
+import java.util.SortedMap;
 
-/**
- * Outbound ACL contract for phenology data consumed by the thinning context.
- *
- * <p>The current platform exposes BBI through Phenology metrics but does not yet publish a
- * dedicated cross-context contract for pit-hardening windows. Keeping this port inside Thinning
- * prevents the domain from importing Phenology aggregates and leaves that integration explicit.</p>
- */
-public interface ExternalPhenologyService {
+/** Outbound ACL used by Thinning to read the harvest history of a plot (sustainable yield of US26). */
+@Service("thinningExternalPhenologyService")
+public class ExternalPhenologyService {
 
-    /**
-     * Loads the phenology inputs required for a thinning prescription.
-     *
-     * @param plotId target plot identifier
-     * @param campaignYear target campaign year
-     * @return isolated phenology data, or empty when the provider has no sufficient data
-     */
-    Optional<PhenologyPrescriptionInputs> fetchPrescriptionInputs(PlotId plotId, CampaignYear campaignYear);
+    private final PhenologyContextFacade phenologyContextFacade;
+
+    public ExternalPhenologyService(PhenologyContextFacade phenologyContextFacade) {
+        this.phenologyContextFacade = phenologyContextFacade;
+    }
 
     /**
-     * Immutable ACL DTO containing only data relevant to Thinning.
+     * Returns the historical yields registered for a plot.
      *
-     * @param bbi             Biennial Bearing Index in [0, 1]
-     * @param windowOpensOn   beginning of the recommended intervention window
-     * @param windowClosesOn  end of the recommended intervention window
+     * @param plotId plot to read
+     * @return total kilograms per campaign year, ascending; empty without history
      */
-    record PhenologyPrescriptionInputs(
-            Double bbi,
-            LocalDate windowOpensOn,
-            LocalDate windowClosesOn
-    ) {
-        public PhenologyPrescriptionInputs {
-            if (bbi == null || !Double.isFinite(bbi) || bbi < 0.0 || bbi > 1.0) {
-                throw new IllegalArgumentException("thinning.bbi.invalid_range");
-            }
-            if (windowOpensOn != null && windowClosesOn != null && windowOpensOn.isAfter(windowClosesOn)) {
-                throw new IllegalArgumentException("thinning.phenology.window.invalid");
-            }
+    public SortedMap<Integer, Double> findHistoricalYields(PlotId plotId) {
+        if (plotId == null) {
+            return Collections.emptySortedMap();
         }
+        return phenologyContextFacade.findHistoricalYields(plotId.plotId());
     }
 }
