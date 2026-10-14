@@ -2,7 +2,6 @@ package com.arcadiadevs.viora.platform.iam.domain.repositories;
 
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
-import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordResetToken;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 
 import java.util.Optional;
@@ -45,22 +44,4 @@ public interface UserAccountRepository {
      * @return true if an account exists; false otherwise
      */
     boolean existsByEmail(EmailAddress email);
-
-    /**
-     * Finds a user account having the given active password reset token string.
-     *
-     * @param resetToken token string
-     * @return Optional containing the matching aggregate if found
-     */
-    Optional<UserAccount> findByResetToken(String resetToken);
-
-    /**
-     * Finds a user account having the given active password reset token value object.
-     *
-     * @param resetToken token value object
-     * @return Optional containing the matching aggregate if found
-     */
-    default Optional<UserAccount> findByResetToken(PasswordResetToken resetToken) {
-        return resetToken != null ? findByResetToken(resetToken.token()) : Optional.empty();
-    }
 }

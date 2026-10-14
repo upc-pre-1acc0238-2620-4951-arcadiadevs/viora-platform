@@ -9,10 +9,13 @@ package com.arcadiadevs.viora.platform.iam.application.internal.outboundservices
 public interface TransactionalEmailService {
 
     /**
-     * Sends an email with the ephemeral password recovery link/token.
+     * Sends an email with the 6-digit password recovery code.
+     *
+     * <p>Implementations may deliver asynchronously, so callers must not rely on the email being sent when the
+     * method returns.</p>
      *
      * @param recipientEmail destination email address
-     * @param resetToken ephemeral cryptographic recovery token
+     * @param resetToken     the 6-digit recovery code
      */
     void sendPasswordResetEmail(String recipientEmail, String resetToken);
 }

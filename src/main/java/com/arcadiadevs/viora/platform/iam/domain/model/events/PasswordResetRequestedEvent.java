@@ -3,19 +3,19 @@ package com.arcadiadevs.viora.platform.iam.domain.model.events;
 import java.time.Instant;
 
 /**
- * Domain event published when a password reset code is requested.
- * Consumed by asynchronous email notifications (e.g. Brevo).
+ * Domain event published when a password recovery code is issued for an account.
  *
- * @param userId the user identifier string
- * @param email the recipient email address
- * @param resetToken the plain 6-digit recovery code, only meant for delivery to the user
- * @param expiresAt token expiration instant
+ * <p>It records the fact only: the plain code never travels inside a domain event. The application service
+ * delivers the code to the user through the transactional email port.</p>
+ *
+ * @param userId     the user identifier string
+ * @param email      the account email address
+ * @param expiresAt  code expiration instant
  * @param occurredOn event timestamp
  */
 public record PasswordResetRequestedEvent(
         String userId,
         String email,
-        String resetToken,
         Instant expiresAt,
         Instant occurredOn
 ) {
@@ -25,9 +25,6 @@ public record PasswordResetRequestedEvent(
         }
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("user.event.email.null");
-        }
-        if (resetToken == null || resetToken.isBlank()) {
-            throw new IllegalArgumentException("user.event.reset_token.null");
         }
         if (expiresAt == null) {
             throw new IllegalArgumentException("user.event.expires_at.null");
