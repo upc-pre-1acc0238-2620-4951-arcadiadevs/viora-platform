@@ -19,6 +19,7 @@ import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -317,6 +318,36 @@ class ThinningPrescriptionFlowIntegrationTest {
                 .andExpect(jsonPath("$.yieldEstimate.sustainableKgPerHa", closeTo(sustainable, 0.06)))
                 .andExpect(jsonPath("$.yieldEstimate.estimatedKgPerHa", closeTo(sustainable * 1.5, 0.06)))
                 .andExpect(jsonPath("$.yieldEstimate.basis").value("FRUIT_COUNT_ONLY"));
+    }
+
+    @Test
+    @DisplayName("P60: the producer's prescriptions are listed and one can be read by its identifier")
+    void listsAndReadsByIdentifier() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        var unsampled = createPlot("SEVILLANA");
+        sampleFiveTrees(plotId);
+        mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
+                .contentType(MediaType.APPLICATION_JSON).content(fullBloom(bloom))).andExpect(status().isOk());
+
+        var list = mvc.perform(get("/api/v1/thinning-prescriptions").param("campaignYear", String.valueOf(campaign)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].plotId", hasItem(plotId)))
+                .andExpect(jsonPath("$[*].plotId", not(hasItem(unsampled))))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.<java.util.List<String>>read(list, "$[?(@.plotId == '%s')].id".formatted(plotId)).get(0);
+        assertEquals("PRESCRIBED",
+                JsonPath.<java.util.List<String>>read(list, "$[?(@.plotId == '%s')].status".formatted(plotId)).get(0));
+
+        mvc.perform(get("/api/v1/thinning-prescriptions/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plotId").value(plotId))
+                .andExpect(jsonPath("$.currentLoad.loadState").value("SEVERE_OVERLOAD"));
+        mvc.perform(get("/api/v1/thinning-prescriptions/{id}", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/thinning-prescriptions/{id}", "not-a-uuid"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/thinning-prescriptions").param("campaignYear", "1800"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
