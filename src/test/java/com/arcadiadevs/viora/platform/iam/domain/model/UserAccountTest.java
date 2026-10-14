@@ -5,6 +5,8 @@ import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordChangedEve
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetCompletedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetRequestedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountRegisteredEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordResetCodeHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 import org.junit.jupiter.api.DisplayName;
@@ -88,32 +90,49 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should successfully request reset token and emit PasswordResetRequestedEvent")
-    void shouldRequestPasswordReset() {
-        var account = UserAccount.register(email, hash, role);
-        account.clearDomainEvents();
+    @DisplayName("Should register with onboarding details and raise UserSignedUpWithProfileEvent")
+    void shouldRaiseSignedUpWithProfileEvent() {
+        var details = new OnboardingProfileDetails("Juan Perez", "PE", "+51987654321");
 
-        var token = account.requestPasswordReset();
+        var account = UserAccount.register(email, hash, role, details);
 
-        assertThat(token).isNotNull();
-        assertThat(token.token()).isNotBlank();
-        assertThat(account.snapshot().resetToken()).isNotNull();
-
-        assertThat(account.domainEvents()).hasSize(1);
-        var event = (PasswordResetRequestedEvent) account.domainEvents().iterator().next();
-        assertThat(event.resetToken()).isEqualTo(token.token());
-        assertThat(event.email()).isEqualTo(email.value());
+        assertThat(account.domainEvents()).hasSize(2);
+        var event = account.domainEvents().stream()
+                .filter(UserSignedUpWithProfileEvent.class::isInstance)
+                .map(UserSignedUpWithProfileEvent.class::cast)
+                .findFirst().orElseThrow();
+        assertThat(event.userId()).isEqualTo(account.snapshot().id().userId());
+        assertThat(event.fullName()).isEqualTo("Juan Perez");
+        assertThat(event.phoneNumber()).isEqualTo("+51987654321");
     }
 
     @Test
-    @DisplayName("Should successfully reset password with valid token and reject expired token")
-    void shouldResetPasswordWithValidToken() {
+    @DisplayName("Should store only the code hash and emit PasswordResetRequestedEvent without the code")
+    void shouldRequestPasswordReset() {
         var account = UserAccount.register(email, hash, role);
-        var token = account.requestPasswordReset();
         account.clearDomainEvents();
+        var now = Instant.now();
+
+        account.requestPasswordReset(HASHER.hash(CODE), now);
+
+        var token = account.snapshot().resetToken();
+        assertThat(token.codeHash()).isEqualTo(HASHER.hash(CODE));
+        assertThat(token.expiresAt()).isEqualTo(now.plus(15, ChronoUnit.MINUTES));
+        assertThat(token.failedAttempts()).isZero();
+
+        assertThat(account.domainEvents()).hasSize(1);
+        var event = (PasswordResetRequestedEvent) account.domainEvents().iterator().next();
+        assertThat(event.email()).isEqualTo(email.value());
+        assertThat(event.expiresAt()).isEqualTo(token.expiresAt());
+    }
+
+    @Test
+    @DisplayName("Should successfully reset password with the valid code")
+    void shouldResetPasswordWithValidToken() {
+        var account = accountWithActiveCode();
 
         var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
-        account.resetPassword(token.token(), newHash, Instant.now());
+        account.resetPassword(CODE, HASHER, newHash, Instant.now());
 
         assertThat(account.snapshot().passwordHash().value()).isEqualTo(newHash.value());
         assertThat(account.snapshot().resetToken()).isNull();
@@ -122,35 +141,91 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should reject expired password reset token")
+    @DisplayName("Should reject expired password reset code")
     void shouldRejectExpiredResetToken() {
-        var account = UserAccount.register(email, hash, role);
-        var token = account.requestPasswordReset();
+        var account = accountWithActiveCode();
 
         var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
         Instant future = Instant.now().plus(20, ChronoUnit.MINUTES);
 
-        assertThatThrownBy(() -> account.resetPassword(token.token(), newHash, future))
+        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, future))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("user.password_reset.token_expired");
     }
 
     @Test
-    @DisplayName("Should create PasswordResetToken via lookup constructor and support query instantiation")
-    void shouldCreatePasswordResetTokenAndQuery() {
-        var tokenVo = new PasswordResetToken("sample-lookup-token");
-        assertThat(tokenVo.token()).isEqualTo("sample-lookup-token");
-        assertThat(tokenVo.expiresAt()).isEqualTo(Instant.MAX);
-        assertThat(tokenVo.isExpired(Instant.now())).isFalse();
+    @DisplayName("Should reject a reset when no code was requested")
+    void shouldRejectResetWithoutActiveCode() {
+        var account = UserAccount.register(email, hash, role);
+        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
 
-        var queryFromVo = new com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByResetTokenQuery(tokenVo);
-        assertThat(queryFromVo.token()).isEqualTo(tokenVo);
+        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.password_reset.no_active_token");
+    }
 
-        var queryFromRaw = new com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByResetTokenQuery("raw-lookup-token");
-        assertThat(queryFromRaw.token().token()).isEqualTo("raw-lookup-token");
+    @Test
+    @DisplayName("Should count wrong codes and lock the token after the maximum attempts")
+    void shouldLockResetTokenAfterMaxFailedAttempts() {
+        var account = accountWithActiveCode();
+        var wrongCode = new PasswordResetCode("000000");
+        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
 
-        assertThatThrownBy(() -> new com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByResetTokenQuery((PasswordResetToken) null))
+        for (int attempt = 1; attempt <= PasswordResetToken.MAX_FAILED_ATTEMPTS; attempt++) {
+            assertThatThrownBy(() -> account.resetPassword(wrongCode, HASHER, newHash, Instant.now()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessage("user.password_reset.invalid_token");
+            assertThat(account.snapshot().resetToken().failedAttempts()).isEqualTo(attempt);
+        }
+
+        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.password_reset.attempts_exceeded");
+        assertThat(account.snapshot().passwordHash().value()).isEqualTo(hash.value());
+    }
+
+    @Test
+    @DisplayName("Should validate PasswordResetCode format and PasswordResetToken invariants")
+    void shouldValidateResetValueObjects() {
+        var now = Instant.now();
+
+        assertThat(new PasswordResetCode(" 012345 ").value()).isEqualTo("012345");
+        assertThatThrownBy(() -> new PasswordResetCode("12345"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("user.reset_token.null");
+                .hasMessage("user.reset_token.format");
+        assertThatThrownBy(() -> new PasswordResetCode("abcdef"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.reset_token.format");
+        assertThatThrownBy(() -> new PasswordResetToken(" ", now, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.reset_token.null_or_empty");
+        assertThatThrownBy(() -> new PasswordResetToken("hash", now, -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.reset_token.failed_attempts.negative");
+        assertThatThrownBy(() -> PasswordResetToken.issue("hash", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.clock.now.null");
+    }
+
+    private static final PasswordResetCode CODE = new PasswordResetCode("482913");
+
+    /** Deterministic stand-in for the Argon2 adapter: the domain only needs hash/matches semantics. */
+    private static final PasswordResetCodeHasher HASHER = new PasswordResetCodeHasher() {
+        @Override
+        public String hash(PasswordResetCode code) {
+            return "hashed:" + code.value();
+        }
+
+        @Override
+        public boolean matches(PasswordResetCode code, String codeHash) {
+            return hash(code).equals(codeHash);
+        }
+    };
+
+    private UserAccount accountWithActiveCode() {
+        var account = UserAccount.register(email, hash, role);
+        account.requestPasswordReset(HASHER.hash(CODE), Instant.now());
+        account.clearDomainEvents();
+        return account;
     }
 }

@@ -1,6 +1,6 @@
 package com.arcadiadevs.viora.platform.profiles.application.internal.eventhandlers;
 
-import com.arcadiadevs.viora.platform.iam.application.events.UserSignedUpWithProfileEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
 import com.arcadiadevs.viora.platform.profiles.application.commandservices.ProfileCommandService;
 import com.arcadiadevs.viora.platform.profiles.domain.model.commands.CreateProfileCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
@@ -9,6 +9,8 @@ import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRul
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +40,8 @@ class CreateProfileOnUserSignedUpHandlerTest {
                 "user-1",
                 "Juan Perez",
                 "PE",
-                "+51987654321"
+                "+51987654321",
+                Instant.now()
         );
         when(profileCommandService.handle(any(CreateProfileCommand.class)))
                 .thenReturn(Result.success("profile-1"));
@@ -54,7 +57,8 @@ class CreateProfileOnUserSignedUpHandlerTest {
                 "user-1",
                 "Juan Perez",
                 "PE",
-                "+51987654321"
+                "+51987654321",
+                Instant.now()
         );
         when(profileCommandService.handle(any(CreateProfileCommand.class)))
                 .thenReturn(Result.failure(ApplicationError.businessRuleViolation("profile.failed", "Error")));

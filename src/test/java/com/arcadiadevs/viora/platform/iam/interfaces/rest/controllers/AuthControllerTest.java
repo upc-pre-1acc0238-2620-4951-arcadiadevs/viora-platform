@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,17 +51,13 @@ class AuthControllerTest {
     @Mock
     private BearerTokenService tokenService;
 
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
-
     @BeforeEach
     void setUp() {
         var controller = new AuthController(
                 commandService,
                 queryService,
                 passwordEncoder,
-                tokenService,
-                eventPublisher
+                tokenService
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -143,14 +138,14 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/auth/password-reset-tokens/{token} should return 204 No Content")
+    @DisplayName("PUT /api/v1/auth/password-reset-tokens/{token} with email should return 204 No Content")
     void shouldResetPassword() throws Exception {
         when(passwordEncoder.encode("NewPassword123!")).thenReturn("$argon2id$newencoded");
         when(commandService.handle(any(ResetUserPasswordCommand.class))).thenReturn(Result.success(null));
 
-        String json = "{\"newPassword\": \"NewPassword123!\"}";
+        String json = "{\"email\": \"productor@viora.ag\", \"newPassword\": \"NewPassword123!\"}";
 
-        mockMvc.perform(put("/api/v1/auth/password-reset-tokens/valid-token-123")
+        mockMvc.perform(put("/api/v1/auth/password-reset-tokens/123456")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isNoContent());
