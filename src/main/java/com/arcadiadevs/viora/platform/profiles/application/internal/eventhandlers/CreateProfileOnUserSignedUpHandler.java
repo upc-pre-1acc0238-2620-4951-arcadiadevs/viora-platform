@@ -1,6 +1,6 @@
 package com.arcadiadevs.viora.platform.profiles.application.internal.eventhandlers;
 
-import com.arcadiadevs.viora.platform.iam.application.events.UserSignedUpWithProfileEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
 import com.arcadiadevs.viora.platform.profiles.application.commandservices.ProfileCommandService;
 import com.arcadiadevs.viora.platform.profiles.domain.model.commands.CreateProfileCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;

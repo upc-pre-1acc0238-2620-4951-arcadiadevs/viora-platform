@@ -29,8 +29,11 @@ public class UserAccountPersistenceEntity extends AuditableAbstractPersistenceEn
     @Column(name = "role", nullable = false, length = 50)
     private String role;
 
-    @Column(name = "reset_token", length = 100)
-    private String resetToken;
+    @Column(name = "reset_code_hash")
+    private String resetCodeHash;
+
+    @Column(name = "reset_failed_attempts")
+    private Integer resetFailedAttempts;
 
     @Column(name = "reset_token_expires_at")
     private Instant resetTokenExpiresAt;

@@ -33,11 +33,13 @@ public final class UserAccountPersistenceAssembler {
         entity.setRole(snapshot.role().name());
 
         if (snapshot.resetToken() != null) {
-            entity.setResetToken(snapshot.resetToken().token());
+            entity.setResetCodeHash(snapshot.resetToken().codeHash());
             entity.setResetTokenExpiresAt(snapshot.resetToken().expiresAt());
+            entity.setResetFailedAttempts(snapshot.resetToken().failedAttempts());
         } else {
-            entity.setResetToken(null);
+            entity.setResetCodeHash(null);
             entity.setResetTokenExpiresAt(null);
+            entity.setResetFailedAttempts(null);
         }
 
         entity.setCreatedAt(snapshot.createdAt());
@@ -57,8 +59,9 @@ public final class UserAccountPersistenceAssembler {
         }
 
         PasswordResetToken resetToken = null;
-        if (entity.getResetToken() != null && entity.getResetTokenExpiresAt() != null) {
-            resetToken = new PasswordResetToken(entity.getResetToken(), entity.getResetTokenExpiresAt());
+        if (entity.getResetCodeHash() != null && entity.getResetTokenExpiresAt() != null) {
+            int failedAttempts = entity.getResetFailedAttempts() != null ? entity.getResetFailedAttempts() : 0;
+            resetToken = new PasswordResetToken(entity.getResetCodeHash(), entity.getResetTokenExpiresAt(), failedAttempts);
         }
 
         var snapshot = new UserAccountSnapshot(

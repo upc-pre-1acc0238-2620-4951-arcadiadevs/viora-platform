@@ -22,7 +22,7 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.PlotReso
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.UpdatePlotCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
-import com.arcadiadevs.viora.platform.shared.infrastructure.security.AuthenticationContextHelper;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
@@ -59,26 +59,35 @@ public class PlotController {
     private final PlotCommandService plotCommandService;
     private final PlotQueryService plotQueryService;
     private final PlotRepository plotRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
      * Primary constructor for Spring injection.
      *
-     * @param plotCommandService the plot command service
-     * @param plotQueryService   the plot query service
-     * @param plotRepository     the domain plot repository port
+     * @param plotCommandService  the plot command service
+     * @param plotQueryService    the plot query service
+     * @param plotRepository      the domain plot repository port
+     * @param currentUserProvider resolves the authenticated user, who acts as the plot producer
      */
     public PlotController(
             PlotCommandService plotCommandService,
             PlotQueryService plotQueryService,
-            PlotRepository plotRepository
+            PlotRepository plotRepository,
+            CurrentUserProvider currentUserProvider
     ) {
         this.plotCommandService = plotCommandService;
         this.plotQueryService = plotQueryService;
         this.plotRepository = plotRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
+    /**
+     * Resolves the producer that owns the request: the authenticated IAM user identifier is used as producer id.
+     *
+     * @return the producer identifier of the current user
+     */
     private ProducerId resolveEffectiveProducerId() {
-        return new ProducerId(AuthenticationContextHelper.requireCurrentUserId());
+        return new ProducerId(currentUserProvider.requireCurrentUserId());
     }
 
     /**

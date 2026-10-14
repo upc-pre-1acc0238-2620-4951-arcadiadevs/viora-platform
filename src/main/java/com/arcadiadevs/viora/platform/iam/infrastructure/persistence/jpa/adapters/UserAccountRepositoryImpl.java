@@ -61,13 +61,4 @@ public class UserAccountRepositoryImpl implements UserAccountRepository {
         }
         return persistenceRepository.existsByEmail(email.value());
     }
-
-    @Override
-    public Optional<UserAccount> findByResetToken(String resetToken) {
-        if (resetToken == null || resetToken.isBlank()) {
-            return Optional.empty();
-        }
-        return persistenceRepository.findByResetToken(resetToken.trim())
-                .map(UserAccountPersistenceAssembler::toDomainFromPersistence);
-    }
 }

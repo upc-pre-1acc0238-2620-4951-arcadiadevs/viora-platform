@@ -16,6 +16,4 @@ public interface UserAccountPersistenceRepository extends JpaRepository<UserAcco
     Optional<UserAccountPersistenceEntity> findByEmail(String email);
 
     boolean existsByEmail(String email);
-
-    Optional<UserAccountPersistenceEntity> findByResetToken(String resetToken);
 }

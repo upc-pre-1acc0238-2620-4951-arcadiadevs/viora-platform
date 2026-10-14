@@ -15,10 +15,14 @@ public final class RegisterUserAccountCommandFromResourceAssembler {
         if (resource == null) {
             return null;
         }
+        var profile = resource.profile();
         return new RegisterUserAccountCommand(
                 resource.email(),
                 encodedPassword,
-                resource.role()
+                resource.role(),
+                profile != null ? profile.fullName() : null,
+                profile != null ? profile.country() : null,
+                profile != null ? profile.phoneNumber() : null
         );
     }
 }

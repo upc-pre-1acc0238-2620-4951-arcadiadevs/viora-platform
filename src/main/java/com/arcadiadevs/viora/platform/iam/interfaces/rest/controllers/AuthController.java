@@ -1,7 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
-import com.arcadiadevs.viora.platform.iam.application.events.UserSignedUpWithProfileEvent;
 import com.arcadiadevs.viora.platform.iam.application.queryservices.UserAccountQueryService;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
@@ -18,7 +17,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,26 +36,22 @@ public class AuthController {
     private final UserAccountQueryService userAccountQueryService;
     private final PasswordEncoder passwordEncoder;
     private final BearerTokenService tokenService;
-    private final ApplicationEventPublisher eventPublisher;
 
     public AuthController(
             UserAccountCommandService userAccountCommandService,
             UserAccountQueryService userAccountQueryService,
             PasswordEncoder passwordEncoder,
-            BearerTokenService tokenService,
-            ApplicationEventPublisher eventPublisher
+            BearerTokenService tokenService
     ) {
         if (userAccountCommandService == null) throw new IllegalArgumentException("user.command_service.null");
         if (userAccountQueryService == null) throw new IllegalArgumentException("user.query_service.null");
         if (passwordEncoder == null) throw new IllegalArgumentException("password.encoder.null");
         if (tokenService == null) throw new IllegalArgumentException("jwt.provider.null");
-        if (eventPublisher == null) throw new IllegalArgumentException("event.publisher.null");
 
         this.userAccountCommandService = userAccountCommandService;
         this.userAccountQueryService = userAccountQueryService;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
-        this.eventPublisher = eventPublisher;
     }
 
     @PostMapping("/sign-up")
@@ -71,16 +65,6 @@ public class AuthController {
         return switch (result) {
             case Result.Success<String, ApplicationError> success -> {
                 String userId = success.value();
-
-                // If onboarding profile data is present, publish event for downstream Profiles context
-                if (resource.profile() != null) {
-                    eventPublisher.publishEvent(new UserSignedUpWithProfileEvent(
-                            userId,
-                            resource.profile().fullName(),
-                            resource.profile().country(),
-                            resource.profile().phoneNumber()
-                    ));
-                }
 
                 String accessToken = tokenService.generateAccessToken(userId, resource.email(), resource.role());
                 String refreshToken = RefreshToken.issue().token();
@@ -200,13 +184,13 @@ public class AuthController {
     }
 
     @PutMapping("/password-reset-tokens/{token}")
-    @Operation(summary = "Reset password using token", description = "Consumes single-use recovery token and updates account password", security = {})
+    @Operation(summary = "Reset password using recovery code", description = "Consumes the single-use 6-digit code sent to the given email and updates the account password; the code is locked after 5 wrong attempts", security = {})
     public ResponseEntity<?> resetPassword(
             @PathVariable String token,
             @Valid @RequestBody ResetPasswordResource resource
     ) {
         String newEncodedPassword = passwordEncoder.encode(resource.newPassword());
-        var command = new ResetUserPasswordCommand(token, newEncodedPassword);
+        var command = new ResetUserPasswordCommand(resource.email(), token, newEncodedPassword);
         var result = userAccountCommandService.handle(command);
 
         return switch (result) {
