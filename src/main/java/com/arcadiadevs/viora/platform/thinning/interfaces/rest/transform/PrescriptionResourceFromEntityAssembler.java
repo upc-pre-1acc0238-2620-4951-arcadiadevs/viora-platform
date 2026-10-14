@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThin
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionBlocker;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SustainableCropLoad;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionOutlook;
+import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.CurrentLoadResource;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.PrescriptionResource;
 
 import java.time.LocalDate;
@@ -22,7 +24,7 @@ public final class PrescriptionResourceFromEntityAssembler {
     }
 
     /**
-     * Maps a domain snapshot to the public REST response.
+     * Maps a domain snapshot to the public REST response, without the plan outlook.
      *
      * @param snapshot prescription domain snapshot
      * @param blockers inputs still missing to issue the prescription
@@ -30,6 +32,20 @@ public final class PrescriptionResourceFromEntityAssembler {
      */
     public static PrescriptionResource toResource(
             FruitThinningPrescriptionSnapshot snapshot, List<PrescriptionBlocker> blockers) {
+        return toResource(snapshot, blockers, null);
+    }
+
+    /**
+     * Maps a domain snapshot and its plan outlook to the public REST response.
+     *
+     * @param snapshot prescription domain snapshot
+     * @param blockers inputs still missing to issue the prescription
+     * @param outlook  load before thinning, sampling progress, profile offsets and yield; null to leave them out
+     * @return REST presentation resource
+     */
+    public static PrescriptionResource toResource(
+            FruitThinningPrescriptionSnapshot snapshot, List<PrescriptionBlocker> blockers,
+            PrescriptionOutlook outlook) {
         if (snapshot == null) {
             return null;
         }
@@ -57,7 +73,26 @@ public final class PrescriptionResourceFromEntityAssembler {
                 load == null ? null : load.profileStatus(),
                 windowOpen,
                 blockers == null ? List.of() : blockers.stream().map(Enum::name).toList(),
-                snapshot.issuedAt()
+                snapshot.issuedAt(),
+                outlook == null ? null : currentLoad(outlook),
+                outlook == null ? null : outlook.sampledTrees(),
+                outlook == null ? null : outlook.treesNeeded(),
+                outlook == null ? null : outlook.lastSampledOn(),
+                outlook == null ? null : outlook.windowOpensDaysAfterBloom(),
+                outlook == null ? null : outlook.windowClosesDaysAfterBloom(),
+                outlook == null ? null : YieldEstimateResourceAssembler.toResource(outlook.yieldEstimate())
+        );
+    }
+
+    private static CurrentLoadResource currentLoad(PrescriptionOutlook outlook) {
+        if (outlook.loadState() == null) {
+            return null;
+        }
+        return new CurrentLoadResource(
+                ThinningRounding.load(outlook.currentFruitsPerShoot()),
+                ThinningRounding.load(outlook.targetFruitsPerShoot()),
+                ThinningRounding.load(outlook.loadRatio()),
+                outlook.loadState().name()
         );
     }
 }

@@ -26,6 +26,14 @@ import java.util.List;
  * @param isWindowOpen         whether the intervention window is currently open
  * @param blockers             inputs still missing to issue the prescription; empty once issued
  * @param issuedAt             timestamp when the prescription was issued
+ * @param currentLoad          crop load measured by the sampling against the target (US26); null until the sampling
+ *                             is representative and the variety has a target
+ * @param sampledTrees         distinct trees sampled in the campaign
+ * @param treesNeeded          trees still missing for a representative sampling
+ * @param lastSampledOn        date of the latest tree sampled
+ * @param windowOpensDaysAfterBloom  days after full bloom the profile opens the window; null without profile
+ * @param windowClosesDaysAfterBloom days after full bloom the profile closes the window; null without profile
+ * @param yieldEstimate        sustainable and estimated campaign yield (US26)
  */
 @Schema(name = "PrescriptionResource", description = "Technical thinning prescription, its intervention window and the inputs still missing")
 public record PrescriptionResource(
@@ -75,6 +83,27 @@ public record PrescriptionResource(
         List<String> blockers,
 
         @Schema(description = "Timestamp at which the prescription was issued", example = "2026-10-16T12:00:00Z")
-        Instant issuedAt
+        Instant issuedAt,
+
+        @Schema(description = "Crop load before thinning against the sustainable target; null until the sampling is representative and the variety has a target", nullable = true)
+        CurrentLoadResource currentLoad,
+
+        @Schema(description = "Distinct trees sampled in the campaign", example = "5")
+        Integer sampledTrees,
+
+        @Schema(description = "Trees still missing for a representative sampling", example = "0")
+        Integer treesNeeded,
+
+        @Schema(description = "Date of the latest tree sampled", example = "2026-10-29", nullable = true)
+        LocalDate lastSampledOn,
+
+        @Schema(description = "Days after full bloom the technical profile opens the window; null when the variety has no profile", example = "14", nullable = true)
+        Integer windowOpensDaysAfterBloom,
+
+        @Schema(description = "Days after full bloom the technical profile closes the window; null when the variety has no profile", example = "49", nullable = true)
+        Integer windowClosesDaysAfterBloom,
+
+        @Schema(description = "Sustainable and estimated campaign yield")
+        YieldEstimateResource yieldEstimate
 ) {
 }

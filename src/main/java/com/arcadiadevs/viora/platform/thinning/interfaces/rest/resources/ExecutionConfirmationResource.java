@@ -16,5 +16,7 @@ public record ExecutionConfirmationResource(
         @Schema(description = "Crop load left by the labor")
         LoadBalanceResource loadBalance,
         @Schema(description = "Commercial caliber projection issued with the confirmation")
-        CaliberProjectionResource caliberProjection) {
+        CaliberProjectionResource caliberProjection,
+        @Schema(description = "Campaign yield expected with the load left by the labor (US26)")
+        YieldEstimateResource yieldEstimate) {
 }

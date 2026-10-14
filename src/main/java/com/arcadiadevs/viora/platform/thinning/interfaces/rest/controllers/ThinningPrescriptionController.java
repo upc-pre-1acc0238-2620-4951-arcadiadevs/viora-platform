@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 import jakarta.validation.Valid;
+import com.arcadiadevs.viora.platform.thinning.application.internal.queryservices.ThinningPrescriptionOutlookService;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.RecordFullBloomResource;
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.RecordFullBloomCommand;
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.EvaluateThinningPrescriptionCommand;
@@ -57,6 +58,7 @@ public class ThinningPrescriptionController {
     private final GetThinningPrescriptionQueryService queryService;
     private final FruitThinningPrescriptionCommandService commandService;
     private final ThinningPrescriptionIssuer issuer;
+    private final ThinningPrescriptionOutlookService outlookService;
 
     /**
      * Constructs the controller.
@@ -64,15 +66,18 @@ public class ThinningPrescriptionController {
      * @param queryService   read-only prescription query service
      * @param commandService command service that records the full bloom and issues prescriptions
      * @param issuer         tells what is still missing to issue a prescription
+     * @param outlookService builds the load before thinning, the sampling progress and the yield
      */
     public ThinningPrescriptionController(
             GetThinningPrescriptionQueryService queryService,
             FruitThinningPrescriptionCommandService commandService,
-            ThinningPrescriptionIssuer issuer
+            ThinningPrescriptionIssuer issuer,
+            ThinningPrescriptionOutlookService outlookService
     ) {
         this.queryService = queryService;
         this.commandService = commandService;
         this.issuer = issuer;
+        this.outlookService = outlookService;
     }
 
     /**
@@ -178,14 +183,14 @@ public class ThinningPrescriptionController {
         var query = new GetActiveThinningPrescriptionQuery(targetPlotId, targetCampaignYear, statusFilter);
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 queryService.handle(query),
-                snapshot -> PrescriptionResourceFromEntityAssembler.toResource(
-                        snapshot, issuer.blockers(FruitThinningPrescription.reconstitute(snapshot))),
+                snapshot -> toResource(FruitThinningPrescription.reconstitute(snapshot)),
                 HttpStatus.OK
         );
     }
 
     private PrescriptionResource toResource(FruitThinningPrescription prescription) {
-        return PrescriptionResourceFromEntityAssembler.toResource(prescription.snapshot(), issuer.blockers(prescription));
+        return PrescriptionResourceFromEntityAssembler.toResource(prescription.snapshot(), issuer.blockers(prescription),
+                outlookService.outlookOf(prescription.snapshot()));
     }
 
     /** No filter shows the prescription in whatever state it is; ACTIVE means only the issued (PRESCRIBED) one. */
