@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.phenology.interfaces.acl;
 
+import java.time.LocalDate;
 import java.util.SortedMap;
 
 /**
@@ -18,4 +19,14 @@ public interface PhenologyContextFacade {
      *         does not exist or is not active
      */
     SortedMap<Integer, Double> findHistoricalYields(String plotId);
+
+    /**
+     * Retrieves the daily maximum temperature at a plot, from the same hourly weather the chill model reads.
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @param from   first day, inclusive
+     * @param to     last day, inclusive
+     * @return maximum in degrees Celsius per local day (America/Lima), ascending; empty without location or weather
+     */
+    SortedMap<LocalDate, Double> findDailyMaxTemperatures(String plotId, LocalDate from, LocalDate to);
 }
