@@ -1,8 +1,8 @@
 # ADR-004: Entradas y procedencia de la prescripción de aclareo
 
 * **Estado:** Aceptada
-* **Contexto:** Crop Load Regulation and Thinning Advisory (Thinning) y la app Android (US26, US27)
-* **Fecha:** 2026-10-04
+* **Contexto:** Crop Load Regulation and Thinning Advisory (Thinning) y la app Android (US26, US27, US28)
+* **Fecha:** 2026-10-04 (sección 5: 2026-10-14)
 * **Relacionada:** `docs/mobile-backend-gaps.md`, propuesta de Astra del 2026-10-04 sobre ventana y carga objetivo
 
 ---
@@ -39,3 +39,14 @@ Regla general: **la plataforma no sustituye un dato desconocido por una constant
 * El Plan del lote de la app puede mostrar "qué te falta" en lugar de un 404 o una cifra inventada.
 * Sin un perfil aprobado para la variedad no se emite ninguna prescripción: es el comportamiento deseado hasta tener valores con fuente.
 * Los clientes que leían `targetFruitsPerMeter`, `meanFruitsPerMeter` o los campos `…FruitsPerMeter` de la confirmación deben pasar a `…FruitsPerShoot` (la app Android aún no los consumía).
+
+## 5. Carga actual y rendimiento de la campaña (US26), 2026-10-14
+
+* **Carga antes de aclarear:** con un muestreo representativo y una carga objetivo (la de la prescripción o, si aún no se emitió, la del perfil de la variedad), la respuesta trae `currentLoad` con `fruitsPerShoot`, `targetFruitsPerShoot`, `loadRatio = L / T` y `loadState`, que usa los mismos cortes que la confirmación (`BALANCED` hasta 1,0; `MODERATE_OVERLOAD` hasta 1,3; `SEVERE_OVERLOAD` por encima, la regla de sobrecarga de más del 30 % del reporte). Sin muestreo representativo o sin objetivo, `currentLoad` es `null`.
+* **Rendimiento sostenible:** `promedio de los kg de las campañas anteriores / área`, en kg/ha. Como todo el backend (`totalYieldKg`, `greenKg`, `blackKg` en lugar del `totalTons` del reporte), la API entrega kilos y la app los muestra en t/ha, la unidad del diseño (decisión del 2026-10-04 en Alternancia). Un lote con vecería alterna años ON y OFF; el promedio de varios años es lo que sus árboles producen sin agotar sus reservas, es decir, el rendimiento de la carga objetivo. Solo cuentan las campañas anteriores a la que se estima y se piden **al menos 3**, la misma historia que pide el índice de vecería. La fuente es el historial de Fenología (US20), leído por el ACL `PhenologyContextFacade.findHistoricalYields`.
+* **Rendimiento estimado:** `sostenible × (L / T)^(1 − β)`. El número de frutos crece con `L / T` y el fruto se achica cuando hay más carga (`W ∝ L^−β`, el modelo de calibre de la variedad que ajusta `CaliberModelFittingService` en US28). `β` solo se usa si la variedad está calibrada con cosechas reales y el modelo cubre las dos cargas (`basis = CALIBER_ADJUSTED`). Si no, `β = 0` y la estimación sigue solo el número de frutos (`basis = FRUIT_COUNT_ONLY`); con más carga que el objetivo es un **techo**, porque en la realidad el fruto se achica. Decisión de Victor del 2026-10-14: mostrar esa estimación marcada en lugar de esperar a la calibración.
+* **Estados (`yieldEstimate.status`):** `AVAILABLE`, `LOAD_UNKNOWN` (solo se conoce el sostenible), `INSUFFICIENT_HISTORY` (menos de 3 campañas anteriores, con `harvestCampaigns` y `requiredHarvestCampaigns`) y `AREA_UNKNOWN`. Nada se guarda: se calcula al leer, así que una cosecha o una calibración nueva se reflejan en la siguiente lectura.
+* **Después del aclareo:** la respuesta de `POST /thinning-prescriptions/{id}/execution-confirmations` trae `yieldEstimate` con la carga residual (`L_res`) en lugar de la muestreada.
+* **Perfil para la hoja de plena floración:** `windowOpensDaysAfterBloom` y `windowClosesDaysAfterBloom` del perfil de la variedad (o `null` sin perfil), para que la app muestre la ventana resultante antes de guardar la fecha.
+* **Progreso del muestreo:** `sampledTrees`, `treesNeeded` y `lastSampledOn` viajan con la prescripción para que el Plan no haga otra llamada por lote.
+* **Plan del productor:** `GET /thinning-prescriptions?campaignYear=` lista la prescripción de cada lote activo del productor, en cualquier estado y con los mismos campos; un lote nunca muestreado no tiene prescripción y no aparece. `GET /thinning-prescriptions/{id}` lee una por su identificador (404 si no existe o su lote ya no está activo). Igual que la lectura por lote, el listado emite primero una prescripción pendiente cuyas entradas ya están completas.

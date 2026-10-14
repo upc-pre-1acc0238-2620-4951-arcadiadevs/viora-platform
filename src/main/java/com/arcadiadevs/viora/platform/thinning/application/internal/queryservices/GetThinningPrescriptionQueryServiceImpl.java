@@ -6,10 +6,16 @@ import com.arcadiadevs.viora.platform.thinning.application.internal.outboundserv
 import com.arcadiadevs.viora.platform.thinning.application.queryservices.GetThinningPrescriptionQueryService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescriptionSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetActiveThinningPrescriptionQuery;
+import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetThinningPrescriptionByIdQuery;
+import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetThinningPrescriptionsQuery;
+import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.repositories.FruitThinningPrescriptionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Read-only application service for thinning prescriptions.
@@ -68,5 +74,34 @@ public class GetThinningPrescriptionQueryServiceImpl implements GetThinningPresc
         }
 
         return Result.success(snapshot);
+    }
+
+    @Override
+    public Result<List<FruitThinningPrescriptionSnapshot>, ApplicationError> handle(GetThinningPrescriptionsQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", "thinning.query.null"));
+        }
+        var plotIds = externalOrchardService.findActivePlotIdsByProducerId(query.producerId());
+        if (plotIds.isEmpty()) {
+            return Result.success(List.of());
+        }
+        return Result.success(prescriptionRepository.findByPlotIdInAndCampaignYear(plotIds, query.campaignYear())
+                .stream()
+                .map(FruitThinningPrescription::snapshot)
+                .sorted(Comparator.comparing(snapshot -> snapshot.plotId().plotId()))
+                .toList());
+    }
+
+    @Override
+    public Result<FruitThinningPrescriptionSnapshot, ApplicationError> handle(GetThinningPrescriptionByIdQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", "thinning.query.null"));
+        }
+        var snapshot = prescriptionRepository.findById(query.prescriptionId()).map(FruitThinningPrescription::snapshot);
+        if (snapshot.isEmpty() || !externalOrchardService.existsActivePlot(snapshot.get().plotId())) {
+            return Result.failure(ApplicationError.notFound("ThinningPrescription",
+                    query.prescriptionId().prescriptionId()));
+        }
+        return Result.success(snapshot.get());
     }
 }

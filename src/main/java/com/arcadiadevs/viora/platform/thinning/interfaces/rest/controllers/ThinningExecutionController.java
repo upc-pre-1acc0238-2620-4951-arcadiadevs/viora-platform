@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.thinning.application.internal.queryservices.ThinningPrescriptionOutlookService;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.ConfirmThinningExecutionCommandService;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.ConfirmExecutionResource;
@@ -21,9 +22,12 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Thinning Execution")
 public class ThinningExecutionController {
     private final ConfirmThinningExecutionCommandService service;
+    private final ThinningPrescriptionOutlookService outlookService;
 
-    public ThinningExecutionController(ConfirmThinningExecutionCommandService service) {
+    public ThinningExecutionController(ConfirmThinningExecutionCommandService service,
+            ThinningPrescriptionOutlookService outlookService) {
         this.service = service;
+        this.outlookService = outlookService;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -42,6 +46,8 @@ public class ThinningExecutionController {
     public ResponseEntity<?> confirm(@PathVariable String id, @Valid @RequestBody ConfirmExecutionResource resource) {
         var command = ConfirmThinningExecutionCommandFromResourceAssembler.toCommand(id, resource);
         return ResponseEntityAssembler.toResponseEntityFromResult(service.handle(command),
-                ExecutionConfirmationResourceFromEntityAssembler::toResource, HttpStatus.CREATED);
+                prescription -> ExecutionConfirmationResourceFromEntityAssembler.toResource(prescription,
+                        outlookService.yieldAfterThinning(prescription.snapshot())),
+                HttpStatus.CREATED);
     }
 }

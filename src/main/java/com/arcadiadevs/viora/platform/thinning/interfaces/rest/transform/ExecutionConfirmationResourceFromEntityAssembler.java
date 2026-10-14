@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThin
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CaliberProjection;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.ExecutionTimeliness;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.LoadBalance;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.YieldEstimate;
 import com.arcadiadevs.viora.platform.thinning.domain.services.CaliberModelFittingService;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.CaliberProjectionResource;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.ExecutionConfirmationResource;
@@ -15,7 +16,15 @@ import java.util.ResourceBundle;
 public final class ExecutionConfirmationResourceFromEntityAssembler {
     private ExecutionConfirmationResourceFromEntityAssembler() { }
 
-    public static ExecutionConfirmationResource toResource(FruitThinningPrescription prescription) {
+    /**
+     * Maps a confirmed prescription to the confirmation response.
+     *
+     * @param prescription  the confirmed prescription
+     * @param yieldEstimate campaign yield with the load left by the labor, or null
+     * @return the confirmation response
+     */
+    public static ExecutionConfirmationResource toResource(FruitThinningPrescription prescription,
+            YieldEstimate yieldEstimate) {
         var snapshot = prescription.snapshot();
         var confirmation = snapshot.executionConfirmation();
         return new ExecutionConfirmationResource(snapshot.id().prescriptionId(), confirmation.id().confirmationId(),
@@ -27,7 +36,8 @@ public final class ExecutionConfirmationResourceFromEntityAssembler {
                                 .getString("thinning.execution.late.warning")
                         : null,
                 toResource(confirmation.loadBalance()),
-                toResource(confirmation.caliberProjection()));
+                toResource(confirmation.caliberProjection()),
+                YieldEstimateResourceAssembler.toResource(yieldEstimate));
     }
 
     private static LoadBalanceResource toResource(LoadBalance balance) {

@@ -28,4 +28,14 @@ public final class ThinningRounding {
     public static Double percentage(Double value) {
         return value == null ? null : Math.round(value * 100.0) / 100.0;
     }
+
+    /**
+     * Rounds a yield in kilograms per hectare for display.
+     *
+     * @param value kilograms per hectare, or null
+     * @return the value with one decimal, or null
+     */
+    public static Double kilograms(Double value) {
+        return value == null ? null : Math.round(value * 10.0) / 10.0;
+    }
 }
