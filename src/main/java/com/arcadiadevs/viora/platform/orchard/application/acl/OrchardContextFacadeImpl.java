@@ -141,6 +141,13 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
     }
 
     @Override
+    public List<String> findAllActivePlotIds() {
+        return plotRepository.findAllActive().stream()
+                .map(plot -> plot.snapshot().id().plotId())
+                .toList();
+    }
+
+    @Override
     public Optional<Double> findPlotAreaHectares(String plotId) {
         if (plotId == null || plotId.isBlank()) {
             return Optional.empty();

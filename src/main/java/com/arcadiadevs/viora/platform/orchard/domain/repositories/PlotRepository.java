@@ -49,6 +49,13 @@ public interface PlotRepository {
     List<Plot> findActiveByProducerId(ProducerId producerId);
 
     /**
+     * Finds every active plot of every producer.
+     *
+     * @return list of active plot aggregate roots
+     */
+    List<Plot> findAllActive();
+
+    /**
      * Finds the plots associated with a producer that are in a given lifecycle status.
      *
      * @param producerId the producer identifier value object

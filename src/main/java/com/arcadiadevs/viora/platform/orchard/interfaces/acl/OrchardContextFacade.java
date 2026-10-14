@@ -60,6 +60,13 @@ public interface OrchardContextFacade {
     List<String> findActivePlotIdsByProducerId(String producerId);
 
     /**
+     * Retrieves the identifiers of every active plot, of any producer, for platform-wide monitoring jobs.
+     *
+     * @return list of active plot identifier strings
+     */
+    List<String> findAllActivePlotIds();
+
+    /**
      * Retrieves the surface area in hectares for an active plot.
      *
      * @param plotId the plot identifier string (UUID)
