@@ -3,12 +3,12 @@ package com.arcadiadevs.viora.platform.iam.domain.model.events;
 import java.time.Instant;
 
 /**
- * Domain event published when a password reset token is requested.
+ * Domain event published when a password reset code is requested.
  * Consumed by asynchronous email notifications (e.g. Brevo).
  *
  * @param userId the user identifier string
  * @param email the recipient email address
- * @param resetToken the generated ephemeral recovery token string
+ * @param resetToken the plain 6-digit recovery code, only meant for delivery to the user
  * @param expiresAt token expiration instant
  * @param occurredOn event timestamp
  */

@@ -4,7 +4,6 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.CheckUserAccountExistsByEmailQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByIdQuery;
-import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByResetTokenQuery;
 
 import java.util.Optional;
 
@@ -37,12 +36,4 @@ public interface UserAccountQueryService {
      * @return true if registered; false otherwise
      */
     boolean handle(CheckUserAccountExistsByEmailQuery query);
-
-    /**
-     * Finds a user account matching an active reset token query.
-     *
-     * @param query the reset token query
-     * @return Optional containing the aggregate if found
-     */
-    Optional<UserAccount> handle(GetUserAccountByResetTokenQuery query);
 }

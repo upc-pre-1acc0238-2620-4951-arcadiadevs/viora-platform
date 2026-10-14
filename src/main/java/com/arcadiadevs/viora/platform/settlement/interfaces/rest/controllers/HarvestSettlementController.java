@@ -12,6 +12,7 @@ import com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform.Harve
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform.SettleCampaignHarvestCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.infrastructure.security.AuthenticationContextHelper;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,7 +26,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -41,22 +41,22 @@ public class HarvestSettlementController {
     private final HarvestSettlementCommandService service;
     private final HarvestSettlementQueryService queryService;
     private final HarvestSettlementResourceFromEntityAssembler assembler;
-    private final String actorId;
 
     /**
      * @param service      command service
      * @param queryService query service
      * @param assembler    mapper of the settlement voucher to its response
-     * @param actorId      transitional actor until IAM: the configured mock producer
      */
     public HarvestSettlementController(HarvestSettlementCommandService service,
             HarvestSettlementQueryService queryService,
-            HarvestSettlementResourceFromEntityAssembler assembler,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String actorId) {
+            HarvestSettlementResourceFromEntityAssembler assembler) {
         this.service = service;
         this.queryService = queryService;
         this.assembler = assembler;
-        this.actorId = actorId;
+    }
+
+    private String resolveEffectiveActorId() {
+        return AuthenticationContextHelper.requireCurrentUserId();
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -96,7 +96,7 @@ public class HarvestSettlementController {
                     example = "8f4c1f2e-6c1a-4d5b-9a3e-2b7c9d0e1f55")
             @RequestHeader(name = "Idempotency-Key", required = false) @Nullable String idempotencyKey,
             @Valid @RequestBody SettleHarvestResource resource) {
-        var command = SettleCampaignHarvestCommandFromResourceAssembler.toCommand(plotId, actorId, idempotencyKey,
+        var command = SettleCampaignHarvestCommandFromResourceAssembler.toCommand(plotId, resolveEffectiveActorId(), idempotencyKey,
                 resource);
         return switch (service.handle(command)) {
             // A replay is not a creation, so it answers 200 while a fresh settlement answers 201.
@@ -133,7 +133,7 @@ public class HarvestSettlementController {
     public ResponseEntity<?> list(
             @Parameter(description = "Unique plot UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
             @PathVariable String plotId) {
-        var query = new GetHarvestSettlementsByPlotIdQuery(plotId, actorId);
+        var query = new GetHarvestSettlementsByPlotIdQuery(plotId, resolveEffectiveActorId());
         var result = queryService.handle(query)
                 .map(settlements -> settlements.stream()
                         .map(assembler::toResource)
@@ -167,7 +167,7 @@ public class HarvestSettlementController {
             @PathVariable String plotId,
             @Parameter(description = "Settled agricultural campaign year (2000 - 2100)", example = "2026")
             @PathVariable Integer campaignYear) {
-        var query = new GetHarvestSettlementByPlotIdAndCampaignYearQuery(plotId, campaignYear, actorId);
+        var query = new GetHarvestSettlementByPlotIdAndCampaignYearQuery(plotId, campaignYear, resolveEffectiveActorId());
         return ResponseEntityAssembler.toResponseEntityFromResult(queryService.handle(query),
                 assembler::toResource, HttpStatus.OK);
     }

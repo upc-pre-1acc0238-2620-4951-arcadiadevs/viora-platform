@@ -110,7 +110,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
             if (optionalAccount.isPresent()) {
                 var account = optionalAccount.get();
-                account.requestPasswordReset();
+                account.requestPasswordReset(Instant.now());
                 userAccountRepository.save(account);
 
                 for (var event : account.domainEvents()) {
@@ -132,13 +132,20 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             return Result.failure(ApplicationError.validationError("command", "user.command.null"));
         }
         try {
-            var optionalAccount = userAccountRepository.findByResetToken(command.resetToken().trim());
+            var optionalAccount = userAccountRepository.findByEmail(new EmailAddress(command.email()));
             if (optionalAccount.isEmpty()) {
+                // Same answer as a wrong code, so the endpoint does not reveal which emails are registered
                 return Result.failure(ApplicationError.businessRuleViolation("password_reset", "user.password_reset.invalid_token"));
             }
 
             var account = optionalAccount.get();
-            account.resetPassword(command.resetToken(), new PasswordHash(command.newPasswordHash()), Instant.now());
+            try {
+                account.resetPassword(command.resetToken(), new PasswordHash(command.newPasswordHash()), Instant.now());
+            } catch (BusinessRuleException ex) {
+                // A wrong code is counted on the aggregate, so it must be persisted even though the reset failed
+                userAccountRepository.save(account);
+                return Result.failure(ApplicationError.businessRuleViolation("password_reset", ex.getMessage()));
+            }
             userAccountRepository.save(account);
 
             for (var event : account.domainEvents()) {
@@ -147,8 +154,6 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             account.clearDomainEvents();
 
             return Result.success(null);
-        } catch (BusinessRuleException ex) {
-            return Result.failure(ApplicationError.businessRuleViolation("password_reset", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }

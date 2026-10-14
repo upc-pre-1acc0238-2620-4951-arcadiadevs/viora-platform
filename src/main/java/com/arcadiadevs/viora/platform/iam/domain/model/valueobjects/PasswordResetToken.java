@@ -1,26 +1,29 @@
 package com.arcadiadevs.viora.platform.iam.domain.model.valueobjects;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
 
 /**
- * Value object representing an ephemeral password recovery token with a 15-minute lifespan.
+ * Value object representing an ephemeral password recovery token (6-digit numeric OTP) with a 15-minute lifespan.
  *
- * @param token the cryptographically unique token string
+ * @param token the cryptographically unique token or 6-digit OTP string
  * @param expiresAt the instant after which this token cannot be used
  */
 public record PasswordResetToken(String token, Instant expiresAt) {
 
     private static final long EXPIRY_MINUTES = 15;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     /**
-     * Factory method creating a fresh reset token valid for 15 minutes from now.
+     * Factory method creating a fresh reset token (6-digit OTP) valid for 15 minutes from now.
      *
      * @return newly issued PasswordResetToken
      */
     public static PasswordResetToken issue() {
-        return new PasswordResetToken(UUID.randomUUID().toString(), Instant.now().plus(EXPIRY_MINUTES, ChronoUnit.MINUTES));
+        int otp = SECURE_RANDOM.nextInt(1_000_000);
+        String code = String.format("%06d", otp);
+        return new PasswordResetToken(code, Instant.now().plus(EXPIRY_MINUTES, ChronoUnit.MINUTES));
     }
 
     /**

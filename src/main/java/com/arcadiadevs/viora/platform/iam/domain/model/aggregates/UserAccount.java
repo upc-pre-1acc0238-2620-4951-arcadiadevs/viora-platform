@@ -111,34 +111,46 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
     }
 
     /**
-     * Issues an ephemeral password reset token and registers {@link PasswordResetRequestedEvent}.
+     * Issues a fresh 6-digit recovery code, replacing any previous one, and registers
+     * {@link PasswordResetRequestedEvent} carrying the plain code for delivery.
      *
-     * @return newly generated {@link PasswordResetToken}
+     * <p>The aggregate keeps only the digest of the code; the event is the only place the plain code travels.</p>
+     *
+     * @param now the instant the code is issued
+     * @throws IllegalArgumentException if {@code now} is null
      */
-    public PasswordResetToken requestPasswordReset() {
-        var token = PasswordResetToken.issue();
+    public void requestPasswordReset(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("user.clock.now.null");
+        }
+        var code = PasswordResetToken.generateCode();
+        var token = PasswordResetToken.forCode(code, now);
         this.resetToken = token;
-        this.updatedAt = Instant.now();
+        this.updatedAt = now;
         registerDomainEvent(new PasswordResetRequestedEvent(
                 this.id.userId(),
                 this.email.value(),
-                token.token(),
+                code,
                 token.expiresAt(),
-                this.updatedAt
+                now
         ));
-        return token;
     }
 
     /**
-     * Consumes a valid recovery token to reset the password.
+     * Consumes a valid recovery code to reset the password.
      *
-     * @param tokenString incoming plain token string
+     * <p>A wrong code is recorded on the token before the exception is thrown, so the caller must persist the
+     * aggregate even when this method fails. After {@link PasswordResetToken#MAX_FAILED_ATTEMPTS} wrong codes the
+     * token is locked until a new code is requested.</p>
+     *
+     * @param code            the 6-digit code submitted by the user
      * @param newPasswordHash new hashed password
-     * @param now current instant for expiry verification
-     * @throws BusinessRuleException if the token is missing, mismatched, or expired
+     * @param now             current instant for expiry verification
+     * @throws IllegalArgumentException if an argument is missing
+     * @throws BusinessRuleException    if there is no active code, it expired, it is locked, or it does not match
      */
-    public void resetPassword(String tokenString, PasswordHash newPasswordHash, Instant now) {
-        if (tokenString == null || tokenString.isBlank()) {
+    public void resetPassword(String code, PasswordHash newPasswordHash, Instant now) {
+        if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("user.reset_token.null_or_empty");
         }
         if (newPasswordHash == null) {
@@ -151,11 +163,16 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
         if (this.resetToken == null) {
             throw new BusinessRuleException("user.password_reset.no_active_token");
         }
-        if (!this.resetToken.token().equals(tokenString.trim())) {
-            throw new BusinessRuleException("user.password_reset.invalid_token");
-        }
         if (this.resetToken.isExpired(now)) {
             throw new BusinessRuleException("user.password_reset.token_expired");
+        }
+        if (this.resetToken.hasExhaustedAttempts()) {
+            throw new BusinessRuleException("user.password_reset.attempts_exceeded");
+        }
+        if (!this.resetToken.matches(code)) {
+            this.resetToken = this.resetToken.withFailedAttempt();
+            this.updatedAt = now;
+            throw new BusinessRuleException("user.password_reset.invalid_token");
         }
 
         this.passwordHash = newPasswordHash;
