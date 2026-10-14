@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.thinning.application.queryservices.GetPlotSamplingStatesQueryService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetPlotSamplingStatesQuery;
@@ -18,8 +19,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,30 +40,17 @@ import java.time.ZoneOffset;
 public class PlotSamplingCollectionController {
 
     private final GetPlotSamplingStatesQueryService queryService;
-    private final String defaultProducerId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
-     * Primary constructor injecting query service and default producer identifier.
+     * Primary constructor injecting query service.
      *
-     * @param queryService      query service retrieving plot sampling states
-     * @param defaultProducerId fallback producer identifier from configuration
+     * @param queryService        query service retrieving plot sampling states
+     * @param currentUserProvider resolves the authenticated user of each request
      */
-    @Autowired
-    public PlotSamplingCollectionController(
-            GetPlotSamplingStatesQueryService queryService,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultProducerId
-    ) {
+    public PlotSamplingCollectionController(GetPlotSamplingStatesQueryService queryService, CurrentUserProvider currentUserProvider) {
         this.queryService = queryService;
-        this.defaultProducerId = defaultProducerId;
-    }
-
-    /**
-     * Test-convenience constructor using default producer identifier.
-     *
-     * @param queryService query service retrieving plot sampling states
-     */
-    public PlotSamplingCollectionController(GetPlotSamplingStatesQueryService queryService) {
-        this(queryService, "550e8400-e29b-41d4-a716-446655440000");
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
@@ -103,7 +89,7 @@ public class PlotSamplingCollectionController {
             );
         }
 
-        var query = new GetPlotSamplingStatesQuery(defaultProducerId, targetCampaignYear);
+        var query = new GetPlotSamplingStatesQuery(currentUserProvider.requireCurrentUserId(), targetCampaignYear);
         var result = queryService.handle(query);
 
         return ResponseEntityAssembler.toResponseEntityFromResult(

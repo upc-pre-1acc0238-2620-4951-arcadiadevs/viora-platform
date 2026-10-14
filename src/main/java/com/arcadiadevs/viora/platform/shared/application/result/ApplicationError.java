@@ -129,6 +129,20 @@ public record ApplicationError(
     }
 
     /**
+     * Creates an unauthorized error when the request carries no authenticated user.
+     *
+     * @param resource the resource being accessed
+     * @param reason   the reason why authentication is required
+     * @return an {@link ApplicationError} mapped to 401 Unauthorized
+     */
+    public static ApplicationError unauthorized(String resource, String reason) {
+        return new ApplicationError(
+                "%s_UNAUTHORIZED".formatted(resource.toUpperCase().replace('-', '_')),
+                "Authentication required: %s".formatted(resource),
+                reason);
+    }
+
+    /**
      * Creates a forbidden error when the authenticated actor cannot access the resource.
      *
      * @param resource the resource being accessed

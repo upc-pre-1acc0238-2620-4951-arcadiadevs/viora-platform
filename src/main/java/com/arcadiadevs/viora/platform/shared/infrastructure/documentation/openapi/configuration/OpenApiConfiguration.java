@@ -9,7 +9,6 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
-import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -94,24 +93,5 @@ public class OpenApiConfiguration {
                                         .description("JWT Bearer token for API authentication")));
 
         return openApi;
-    }
-
-    /**
-     * Customizer ensuring public authentication endpoints explicitly declare empty security requirements,
-     * removing the lock icon and Bearer requirement from Swagger UI for unauthenticated endpoints.
-     *
-     * @return OpenApiCustomizer instance
-     */
-    @Bean
-    public OpenApiCustomizer publicEndpointsSecurityCustomizer() {
-        return openApi -> {
-            if (openApi.getPaths() != null) {
-                openApi.getPaths().forEach((path, pathItem) -> {
-                    if (path.startsWith("/api/v1/auth") && !path.endsWith("/passwords")) {
-                        pathItem.readOperations().forEach(operation -> operation.setSecurity(List.of()));
-                    }
-                });
-            }
-        };
     }
 }

@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.thinning.application.queryservices.GetThinningEventsQueryService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetThinningEventsQuery;
@@ -18,8 +19,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,30 +40,17 @@ import java.time.ZoneOffset;
 public class ThinningEventController {
 
     private final GetThinningEventsQueryService queryService;
-    private final String defaultActorId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
-     * Primary constructor injecting query service and default actor identifier.
+     * Primary constructor injecting query service.
      *
-     * @param queryService   the query service retrieving thinning events
-     * @param defaultActorId default mock producer/actor identifier
+     * @param queryService        the query service retrieving thinning events
+     * @param currentUserProvider resolves the authenticated user of each request
      */
-    @Autowired
-    public ThinningEventController(
-            GetThinningEventsQueryService queryService,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultActorId
-    ) {
+    public ThinningEventController(GetThinningEventsQueryService queryService, CurrentUserProvider currentUserProvider) {
         this.queryService = queryService;
-        this.defaultActorId = defaultActorId;
-    }
-
-    /**
-     * Test-convenience constructor using default actor identifier.
-     *
-     * @param queryService query service retrieving thinning events
-     */
-    public ThinningEventController(GetThinningEventsQueryService queryService) {
-        this(queryService, "550e8400-e29b-41d4-a716-446655440000");
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
@@ -109,7 +95,7 @@ public class ThinningEventController {
             );
         }
 
-        var query = new GetThinningEventsQuery(defaultActorId, targetCampaignYear, targetPlotId);
+        var query = new GetThinningEventsQuery(currentUserProvider.requireCurrentUserId(), targetCampaignYear, targetPlotId);
         var result = queryService.handle(query);
 
         return ResponseEntityAssembler.toResponseEntityFromResult(
