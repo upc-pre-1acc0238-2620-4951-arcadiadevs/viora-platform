@@ -216,6 +216,7 @@ public final class AgroclimaticIncidentResourceFromEntityAssembler {
             case HYDRIC_STRESS -> "hydric_stress.headline";
             case HEAT_WAVE -> "heat_wave.headline";
             case FROST_WARNING -> "frost_warning.headline";
+            case WARM_WINTER -> "warm_winter.headline";
         };
     }
 
@@ -224,6 +225,8 @@ public final class AgroclimaticIncidentResourceFromEntityAssembler {
             case HEAT_WAVE -> "11:00 - 16:00";
             case FROST_WARNING -> "03:00 - 07:00";
             case HYDRIC_STRESS -> "06:00 - 10:00";
+            // The warm hours of a winter day, when its maximum is reached
+            case WARM_WINTER -> "11:00 - 16:00";
         };
     }
 }

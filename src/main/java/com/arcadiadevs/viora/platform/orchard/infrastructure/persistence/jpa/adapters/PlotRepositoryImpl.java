@@ -70,6 +70,14 @@ public class PlotRepositoryImpl implements PlotRepository {
     }
 
     @Override
+    public List<Plot> findAllActive() {
+        return plotPersistenceRepository.findAllByStatus(PlotStatus.ACTIVE)
+                .stream()
+                .map(PlotPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
     public List<Plot> findByProducerIdAndStatus(ProducerId producerId, PlotStatus status) {
         return plotPersistenceRepository.findAllByProducerIdAndStatus(producerId, status)
                 .stream()

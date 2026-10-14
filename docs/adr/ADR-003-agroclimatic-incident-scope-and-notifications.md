@@ -114,3 +114,13 @@ flowchart TD
   2. **Aplicación:** `AgroclimaticIncidentCommandService` y `AgroclimaticIncidentQueryService` utilizando `Result<T, ApplicationError>`.
   3. **Infraestructura:** Entidades JPA, repositorios Spring Data, adaptadores y assemblers de persistencia unificados.
   4. **Interfaces REST:** Controlador `/api/v1/agroclimatic-incidents` con verbos y nombres de recursos REST puros (sin RPC).
+
+### 6. Invierno cálido (`WARM_WINTER`, US23), 2026-10-14
+
+* **Regla, local y térmica:** un día es cálido si su máxima pasa de 24 °C; la alerta se abre cuando hay **más de 3 días cálidos seguidos dentro de la temporada de frío** (1 de junio al 31 de agosto). No se usa un índice de El Niño: Viora no tiene una fuente de ENOS por lote y la regla del escenario 1 de US23 ya es térmica. Es la misma regla de `ChillSeasonEvaluator`, que ya publicaba `thermalAnomaly` en la métrica de frío.
+* **Quién evalúa:** Fenología, dueña del modelo de frío. `WinterWarmthMonitor` evalúa todos los lotes activos y publica `WinterWarmthEvaluatedEvent`. Corre un minuto después de arrancar (el host gratuito duerme y despierta con la primera petición) y luego cada 6 horas, solo en temporada y hasta 7 días después, para cerrar alertas abiertas. Se apaga con `viora.phenology.warm-winter-monitor.enabled=false` (así corren los tests, sin llamar al servicio de clima).
+* **Quién alerta:** Telemetría escucha el evento (`WinterWarmthEvaluatedEventHandler`). Con racha activa abre un único `WARM_WINTER` `CRITICAL` por lote (activo o pospuesto, nunca dos), con métrica `DAILY_MAX_TEMPERATURE`, el valor del último día evaluado y umbral 24 °C. Cuando la racha termina, o termina la temporada, lo normaliza.
+* **Qué hacer:** tres pasos que solo remiten a lo que Viora ya mide, sin consejo agronómico inventado: seguir el frío, esperar la floración antes de decidir el aclareo y registrar la plena floración.
+* **Gráfica de la alerta (T15):** las máximas diarias de los 7 días anteriores al disparo, leídas de Fenología (`PhenologyContextFacade.findDailyMaxTemperatures`), es decir, los mismos días que vio la regla. Si no hay clima se usa la serie del nodo, como en los otros tipos.
+* **Fuera de alcance:** la carga esperada reajustada que mostraba el diseño original (9,8 → 7,4 t/ha) no tiene fórmula que relacione el calor invernal con la floración, así que no se calcula; el plan de aclareo se ajusta con el muestreo de cuajado real. Las notificaciones push siguen fuera (sección 2).
+* **Compatibilidad:** la app Android 1.1.x mapea los tipos desconocidos a `UNKNOWN`, así que recibir `WARM_WINTER` no la rompe.

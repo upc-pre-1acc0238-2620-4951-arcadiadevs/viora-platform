@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.telemetry.application;
 
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalOrchardService;
+import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.queryservices.AgroclimaticIncidentQueryServiceImpl;
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.AgroclimaticIncidentDetail;
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.AgroclimaticIncidentsSummary;
@@ -34,6 +35,9 @@ import static org.mockito.Mockito.when;
 class AgroclimaticIncidentQueryServiceTest {
 
     @Mock
+    private ExternalPhenologyService externalPhenologyService;
+
+    @Mock
     private AgroclimaticIncidentRepository incidentRepository;
 
     @Mock
@@ -48,7 +52,8 @@ class AgroclimaticIncidentQueryServiceTest {
 
     @BeforeEach
     void setUp() {
-        queryService = new AgroclimaticIncidentQueryServiceImpl(incidentRepository, externalOrchardService, telemetrySeriesRepository);
+        queryService = new AgroclimaticIncidentQueryServiceImpl(incidentRepository, externalOrchardService, telemetrySeriesRepository,
+                externalPhenologyService);
     }
 
     @Test

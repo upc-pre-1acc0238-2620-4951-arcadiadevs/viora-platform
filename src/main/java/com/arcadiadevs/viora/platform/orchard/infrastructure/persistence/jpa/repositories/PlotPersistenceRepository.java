@@ -36,6 +36,14 @@ public interface PlotPersistenceRepository extends JpaRepository<PlotPersistence
     List<PlotPersistenceEntity> findAllByProducerIdAndStatus(ProducerId producerId, PlotStatus status);
 
     /**
+     * Retrieves all plots with a status, of any producer.
+     *
+     * @param status the plot status
+     * @return list of matching plot persistence entities
+     */
+    List<PlotPersistenceEntity> findAllByStatus(PlotStatus status);
+
+    /**
      * Retrieves plots belonging to a producer updated at or after the given instant.
      *
      * @param producerId   the producer identifier value object
