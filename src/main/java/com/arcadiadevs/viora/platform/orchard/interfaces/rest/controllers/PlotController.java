@@ -22,6 +22,7 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.PlotReso
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.transform.UpdatePlotCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
@@ -36,8 +37,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -60,46 +59,35 @@ public class PlotController {
     private final PlotCommandService plotCommandService;
     private final PlotQueryService plotQueryService;
     private final PlotRepository plotRepository;
-    private final String defaultProducerId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
      * Primary constructor for Spring injection.
      *
-     * @param plotCommandService the plot command service
-     * @param plotQueryService   the plot query service
-     * @param plotRepository     the domain plot repository port
-     * @param defaultProducerId  the default mock producer identifier from application properties
+     * @param plotCommandService  the plot command service
+     * @param plotQueryService    the plot query service
+     * @param plotRepository      the domain plot repository port
+     * @param currentUserProvider resolves the authenticated user, who acts as the plot producer
      */
-    @Autowired
     public PlotController(
             PlotCommandService plotCommandService,
             PlotQueryService plotQueryService,
             PlotRepository plotRepository,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultProducerId
+            CurrentUserProvider currentUserProvider
     ) {
         this.plotCommandService = plotCommandService;
         this.plotQueryService = plotQueryService;
         this.plotRepository = plotRepository;
-        this.defaultProducerId = defaultProducerId;
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
-     * Test-convenience constructor using default mock producer UUID.
+     * Resolves the producer that owns the request: the authenticated IAM user identifier is used as producer id.
      *
-     * @param plotCommandService the plot command service
-     * @param plotQueryService   the plot query service
-     * @param plotRepository     the domain plot repository port
+     * @return the producer identifier of the current user
      */
-    public PlotController(
-            PlotCommandService plotCommandService,
-            PlotQueryService plotQueryService,
-            PlotRepository plotRepository
-    ) {
-        this(plotCommandService, plotQueryService, plotRepository, "550e8400-e29b-41d4-a716-446655440000");
-    }
-
     private ProducerId resolveEffectiveProducerId() {
-        return new ProducerId(defaultProducerId);
+        return new ProducerId(currentUserProvider.requireCurrentUserId());
     }
 
     /**

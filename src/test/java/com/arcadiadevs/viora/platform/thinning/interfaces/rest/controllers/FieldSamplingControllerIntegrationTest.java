@@ -2,8 +2,10 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.infrastructure.security.SpringSecurityCurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHandler;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.FruitThinningPrescriptionCommandService;
+import com.arcadiadevs.viora.platform.thinning.application.queryservices.GetSamplingSummaryQueryService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.IngestFieldSamplingsBatchCommand;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
@@ -11,6 +13,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.Campaig
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingBatchId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.UserId;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -41,14 +46,26 @@ class FieldSamplingControllerIntegrationTest {
     @Mock
     private FruitThinningPrescriptionCommandService thinningCommandService;
 
+    @Mock
+    private GetSamplingSummaryQueryService samplingSummaryQueryService;
+
     private final UUID plotId = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
-        var controller = new FieldSamplingController(thinningCommandService);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null, List.of())
+        );
+        var controller = new FieldSamplingController(thinningCommandService, samplingSummaryQueryService,
+                new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -194,5 +211,32 @@ class FieldSamplingControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidBody))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/plots/{plotId}/samplings - 401 Unauthorized when unauthenticated")
+    void shouldReturnUnauthorizedWhenUnauthenticated() throws Exception {
+        SecurityContextHolder.clearContext();
+        String validBody = """
+                {
+                  "clientBatchId": "d3b07384-d113-496e-bc35-cf21eb943c5a",
+                  "campaignYear": 2026,
+                  "samples": [
+                    {
+                      "treeTag": "T-042",
+                      "shootCount": 12,
+                      "fruitSetCount": 144,
+                      "trunkDiameterMm": 185.0,
+                      "samplingDate": "2026-05-15"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/plots/{plotId}/samplings", plotId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("USER_UNAUTHORIZED")));
     }
 }

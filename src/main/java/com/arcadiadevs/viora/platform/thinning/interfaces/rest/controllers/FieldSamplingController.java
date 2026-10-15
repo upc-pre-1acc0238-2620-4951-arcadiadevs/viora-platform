@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.FruitThinningPrescriptionCommandService;
 import com.arcadiadevs.viora.platform.thinning.application.queryservices.GetSamplingSummaryQueryService;
@@ -23,8 +24,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,54 +44,23 @@ public class FieldSamplingController {
 
     private final FruitThinningPrescriptionCommandService thinningCommandService;
     private final GetSamplingSummaryQueryService samplingSummaryQueryService;
-    private final String defaultActorId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
-     * Primary constructor injecting command service and configured fallback actor identifier.
+     * Primary constructor injecting command and query services.
      *
-     * @param thinningCommandService the command service orchestrating thinning prescription operations
-     * @param defaultActorId         the default mock user/actor identifier from application properties
+     * @param thinningCommandService      the command service orchestrating thinning prescription operations
+     * @param samplingSummaryQueryService the query service for sampling summary
+     * @param currentUserProvider         resolves the authenticated actor of each request
      */
-    @Autowired
     public FieldSamplingController(
             FruitThinningPrescriptionCommandService thinningCommandService,
             GetSamplingSummaryQueryService samplingSummaryQueryService,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultActorId
+            CurrentUserProvider currentUserProvider
     ) {
         this.thinningCommandService = thinningCommandService;
         this.samplingSummaryQueryService = samplingSummaryQueryService;
-        this.defaultActorId = defaultActorId;
-    }
-
-    /**
-     * Test-convenience constructor using the default mock actor identifier.
-     *
-     * @param thinningCommandService      command service for sampling ingestion
-     * @param samplingSummaryQueryService query service for sampling summary
-     */
-    public FieldSamplingController(
-            FruitThinningPrescriptionCommandService thinningCommandService,
-            GetSamplingSummaryQueryService samplingSummaryQueryService
-    ) {
-        this(thinningCommandService, samplingSummaryQueryService, "550e8400-e29b-41d4-a716-446655440000");
-    }
-
-    /**
-     * Test-convenience constructor using default actor identifier.
-     *
-     * @param thinningCommandService the command service orchestrating thinning prescription operations
-     */
-    public FieldSamplingController(FruitThinningPrescriptionCommandService thinningCommandService) {
-        this(thinningCommandService, null, "550e8400-e29b-41d4-a716-446655440000");
-    }
-
-    /**
-     * Resolves the current authenticated user/actor identifier.
-     *
-     * @return the resolved user UUID string
-     */
-    private String resolveEffectiveActorId() {
-        return defaultActorId;
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
@@ -122,7 +90,7 @@ public class FieldSamplingController {
             @PathVariable String plotId,
             @Valid @RequestBody SubmitSamplingResource resource
     ) {
-        String actorId = resolveEffectiveActorId();
+        String actorId = currentUserProvider.requireCurrentUserId();
         var command = IngestFieldSamplingsBatchCommandFromResourceAssembler.toCommandFromResource(plotId, actorId, resource);
         var result = thinningCommandService.handle(command);
         return ResponseEntityAssembler.toResponseEntityFromResult(

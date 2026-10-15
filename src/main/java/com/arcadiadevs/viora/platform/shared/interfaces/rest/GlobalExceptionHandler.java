@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.shared.interfaces.rest;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.PlotRevisionMismatchException;
 import com.arcadiadevs.viora.platform.phenology.domain.exceptions.TrackerRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.shared.application.security.AuthenticationRequiredException;
 import com.arcadiadevs.viora.platform.telemetry.domain.exceptions.DeviceRevisionMismatchException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.ResourceConflictException;
@@ -16,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -222,6 +224,32 @@ public class GlobalExceptionHandler {
                 resolveMessageOrDefault("validation.request.argument", "request-argument"),
                 detail
         );
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles requests that need an authenticated user and carry none.
+     *
+     * @param ex the authentication required exception
+     * @return ProblemDetail response with UNAUTHORIZED status
+     */
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<ProblemDetail> handleAuthenticationRequiredException(AuthenticationRequiredException ex) {
+        var detail = resolveMessageOrDefault(AuthenticationRequiredException.MESSAGE_KEY, "Authentication is required");
+        var applicationError = ApplicationError.unauthorized("user", detail);
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles access denied exceptions raised when an authenticated user lacks permission for an operation.
+     *
+     * @param ex the access denied exception
+     * @return ProblemDetail response with FORBIDDEN status
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex) {
+        var detail = resolveMessageOrDefault("error.access_denied", "Access denied");
+        var applicationError = ApplicationError.forbidden("user", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
     }
 

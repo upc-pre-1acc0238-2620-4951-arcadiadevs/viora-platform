@@ -4,12 +4,15 @@ import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundser
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.meteo.HourlyWeatherProvider.HourlyWeatherObservation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -51,9 +54,13 @@ class TelemetryEndpointsE2EIntegrationTest {
 
     private MockMvc mockMvc;
     private String plotId;
+    private final String producerId = UUID.randomUUID().toString();
 
     @BeforeEach
     void setUp() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(producerId, null, List.of())
+        );
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
 
         var currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS);
@@ -66,14 +73,13 @@ class TelemetryEndpointsE2EIntegrationTest {
         // 1. Create a persistent plot in the live DB to instrument
         String plotPayload = """
                 {
-                  "producerId": "%s",
                   "name": "Cuartel Telemétrico %s",
                   "variety": "ARBEQUINA",
                   "polygonGeoJson": "{\\"type\\":\\"Polygon\\",\\"coordinates\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
                   "rowSpacingM": 6.0,
                   "treeSpacingM": 4.0
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID().toString().substring(0, 8));
+                """.formatted(UUID.randomUUID().toString().substring(0, 8));
 
         var plotResponse = mockMvc.perform(post("/api/v1/plots")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,6 +91,11 @@ class TelemetryEndpointsE2EIntegrationTest {
 
         JsonNode plotJson = objectMapper.readTree(plotResponse);
         this.plotId = plotJson.get("id").asText();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test

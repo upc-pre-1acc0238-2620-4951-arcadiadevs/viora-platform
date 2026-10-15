@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.infrastructure.security.SpringSecurityCurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHandler;
@@ -8,6 +9,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.queries.GetThinningE
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.ThinningEvent;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -41,14 +45,22 @@ class ThinningEventControllerIntegrationTest {
     private GetThinningEventsQueryService queryService;
 
     private final UUID plotId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
-    private final String defaultActorId = "550e8400-e29b-41d4-a716-446655440000";
+    private final String testActorId = "550e8400-e29b-41d4-a716-446655440000";
 
     @BeforeEach
     void setUp() {
-        var controller = new ThinningEventController(queryService, defaultActorId);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(testActorId, null, List.of())
+        );
+        var controller = new ThinningEventController(queryService, new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -135,5 +147,15 @@ class ThinningEventControllerIntegrationTest {
                         .param("plotId", "invalid-uuid")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/thinning-events - 401 Unauthorized when unauthenticated")
+    void shouldReturnUnauthorizedWhenUnauthenticated() throws Exception {
+        SecurityContextHolder.clearContext();
+        mockMvc.perform(get("/api/v1/thinning-events")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("USER_UNAUTHORIZED")));
     }
 }
