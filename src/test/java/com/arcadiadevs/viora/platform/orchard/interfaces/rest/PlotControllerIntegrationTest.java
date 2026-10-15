@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.orchard.interfaces.rest;
 
+import com.arcadiadevs.viora.platform.shared.infrastructure.security.SpringSecurityCurrentUserProvider;
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
 import com.arcadiadevs.viora.platform.orchard.application.queryservices.PlotQueryService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
@@ -24,6 +25,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -66,10 +69,19 @@ class PlotControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        var plotController = new PlotController(plotCommandService, plotQueryService, plotRepository);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(producerId.toString(), null, List.of())
+        );
+        var plotController = new PlotController(plotCommandService, plotQueryService, plotRepository,
+                new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
         mockMvc = MockMvcBuilders.standaloneSetup(plotController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -446,5 +458,43 @@ class PlotControllerIntegrationTest {
         mockMvc.perform(post("/api/v1/plots/{plotId}/restore", plotId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/plot-conflict")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots should extract producerId from authenticated SecurityContextHolder user when present")
+    void shouldExtractProducerIdFromAuthenticatedSecurityContext() throws Exception {
+        var authenticatedUserId = "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d";
+        var auth = new UsernamePasswordAuthenticationToken(authenticatedUserId, null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            var plot = samplePlot("Cuartel Usuario Autenticado");
+            when(plotQueryService.handle(any(GetAllActivePlotsByProducerIdQuery.class)))
+                    .thenReturn(List.of(plot));
+
+            mockMvc.perform(get("/api/v1/plots"))
+                    .andExpect(status().isOk());
+
+            var captor = ArgumentCaptor.forClass(GetAllActivePlotsByProducerIdQuery.class);
+            verify(plotQueryService).handle(captor.capture());
+            org.junit.jupiter.api.Assertions.assertEquals(
+                    authenticatedUserId,
+                    captor.getValue().producerId().producerId()
+            );
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(producerId.toString(), null, List.of())
+            );
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/plots should return 401 Unauthorized when unauthenticated")
+    void shouldReturnUnauthorizedWhenUnauthenticated() throws Exception {
+        SecurityContextHolder.clearContext();
+        mockMvc.perform(get("/api/v1/plots")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type", is("https://api.viora.com/errors/user-unauthorized")))
+                .andExpect(jsonPath("$.code", is("USER_UNAUTHORIZED")));
     }
 }

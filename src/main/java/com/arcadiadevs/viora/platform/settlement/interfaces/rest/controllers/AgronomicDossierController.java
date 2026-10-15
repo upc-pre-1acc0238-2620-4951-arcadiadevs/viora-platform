@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.SealD
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform.AgronomicDossierResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +20,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -46,19 +46,19 @@ public class AgronomicDossierController {
 
     private final SealAgronomicDossierCommandService commandService;
     private final SealedDossierQueryService queryService;
-    private final String actorId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
      * @param commandService seals dossiers
      * @param queryService   reads dossiers and their PDF
-     * @param actorId        transitional actor until IAM: the configured mock producer
+     * @param currentUserProvider resolves the authenticated actor of each request
      */
     public AgronomicDossierController(SealAgronomicDossierCommandService commandService,
             SealedDossierQueryService queryService,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String actorId) {
+            CurrentUserProvider currentUserProvider) {
         this.commandService = commandService;
         this.queryService = queryService;
-        this.actorId = actorId;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -83,7 +83,7 @@ public class AgronomicDossierController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<?> seal(@PathVariable String plotId, @Valid @RequestBody SealDossierResource resource) {
-        var result = commandService.handle(new SealAgronomicDossierCommand(plotId, resource.campaignYear(), actorId));
+        var result = commandService.handle(new SealAgronomicDossierCommand(plotId, resource.campaignYear(), currentUserProvider.requireCurrentUserId()));
         if (result instanceof Result.Success<SealAgronomicDossierCommandService.Sealing, ApplicationError> success) {
             var sealing = success.value();
             return new ResponseEntity<>(AgronomicDossierResourceAssembler.toResource(sealing.dossier()),
@@ -101,7 +101,7 @@ public class AgronomicDossierController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<?> list(@PathVariable String plotId) {
-        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.findByPlot(plotId, actorId),
+        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.findByPlot(plotId, currentUserProvider.requireCurrentUserId()),
                 dossiers -> dossiers.stream().map(AgronomicDossierResourceAssembler::toResource).toList(),
                 HttpStatus.OK);
     }
@@ -122,7 +122,7 @@ public class AgronomicDossierController {
             @PathVariable @Parameter(description = "Campaign year", example = "2026") Integer campaignYear,
             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
         if (accept != null && accept.contains(MediaType.APPLICATION_PDF_VALUE)) {
-            var file = queryService.findDocument(plotId, campaignYear, actorId);
+            var file = queryService.findDocument(plotId, campaignYear, currentUserProvider.requireCurrentUserId());
             if (file instanceof Result.Success<SealedDossierQueryService.DossierFile, ApplicationError> success) {
                 var dossier = success.value().dossier();
                 byte[] bytes = success.value().document().content();
@@ -141,7 +141,7 @@ public class AgronomicDossierController {
                     .getStatusCode()).build();
         }
         return ResponseEntityAssembler.toResponseEntityFromResult(
-                queryService.findByPlotAndCampaign(plotId, campaignYear, actorId),
+                queryService.findByPlotAndCampaign(plotId, campaignYear, currentUserProvider.requireCurrentUserId()),
                 view -> AgronomicDossierResourceAssembler.toResource(view.dossier(), view.certification()),
                 HttpStatus.OK);
     }

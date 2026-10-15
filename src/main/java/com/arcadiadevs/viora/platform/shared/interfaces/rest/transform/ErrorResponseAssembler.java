@@ -86,6 +86,7 @@ public final class ErrorResponseAssembler {
         }
         return switch (status.value()) {
             case 400 -> "Bad Request";
+            case 401 -> "Unauthorized";
             case 403 -> "Forbidden";
             case 404 -> "Not Found";
             case 409 -> "Conflict";
@@ -229,6 +230,7 @@ public final class ErrorResponseAssembler {
     public static HttpStatusCode toStatusFromErrorCode(String errorCode) {
         return switch (errorCode) {
             case "VALIDATION_ERROR" -> HttpStatus.BAD_REQUEST;
+            case String s when s.endsWith("_UNAUTHORIZED") -> HttpStatus.UNAUTHORIZED;
             case String s when s.endsWith("_FORBIDDEN") -> HttpStatus.FORBIDDEN;
             case String s when s.endsWith("_NOT_FOUND") -> HttpStatus.NOT_FOUND;
             case String s when s.endsWith("_PRECONDITION_FAILED") -> HttpStatus.PRECONDITION_FAILED;

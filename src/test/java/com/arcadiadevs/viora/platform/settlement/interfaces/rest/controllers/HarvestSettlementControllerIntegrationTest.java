@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.Commerc
 import com.arcadiadevs.viora.platform.thinning.domain.repositories.CaliberCalibrationObservationRepository;
 import com.arcadiadevs.viora.platform.thinning.domain.repositories.FruitThinningPrescriptionRepository;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -50,6 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 class HarvestSettlementControllerIntegrationTest {
+    private static final String ACTOR_ID = "550e8400-e29b-41d4-a716-446655440000";
     @Autowired WebApplicationContext context;
     @Autowired AgronomicReportRepository reportRepository;
     @Autowired FruitThinningPrescriptionRepository prescriptionRepository;
@@ -88,8 +92,16 @@ class HarvestSettlementControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(ACTOR_ID, null, List.of())
+        );
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         transactions = new TransactionTemplate(transactionManager);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -220,6 +232,9 @@ class HarvestSettlementControllerIntegrationTest {
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         Callable<Integer> request = () -> {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(ACTOR_ID, null, List.of())
+            );
             ready.countDown();
             assertTrue(start.await(10, TimeUnit.SECONDS));
             return settle(plotId, 2026, 100, 100, null).andReturn().getResponse().getStatus();
@@ -507,6 +522,9 @@ class HarvestSettlementControllerIntegrationTest {
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         Callable<org.springframework.mock.web.MockHttpServletResponse> request = () -> {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(ACTOR_ID, null, List.of())
+            );
             ready.countDown();
             assertTrue(start.await(10, TimeUnit.SECONDS));
             return postSettlement(plotId, "race-key", settleBody(RACE_YEAR, null, null)).andReturn().getResponse();
@@ -534,6 +552,9 @@ class HarvestSettlementControllerIntegrationTest {
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             var futures = plots.stream().map(plot -> executor.submit(() -> {
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(ACTOR_ID, null, List.of())
+                );
                 ready.countDown();
                 assertTrue(start.await(10, TimeUnit.SECONDS));
                 return postSettlement(plot, "shared-race-key", settleBody(SHARED_KEY_RACE_YEAR, null, null))
@@ -657,5 +678,14 @@ class HarvestSettlementControllerIntegrationTest {
                         .content("{\"executedDate\":\"%s\",\"actualRemovalPercentage\":25.0,\"removedKg\":420.0,\"laborCrewSize\":4}"
                                 .formatted(executedDate)))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void returnsUnauthorizedWhenUnauthenticated() throws Exception {
+        SecurityContextHolder.clearContext();
+        mvc.perform(get("/api/v1/plots/" + UUID.randomUUID() + "/harvest-settlements")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("USER_UNAUTHORIZED"));
     }
 }
