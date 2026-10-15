@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.phenology.application.internal.outboundser
 import com.arcadiadevs.viora.platform.phenology.domain.model.events.WinterWarmthEvaluatedEvent;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HourlyTemperature;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -21,6 +24,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.everyItem;
@@ -53,7 +57,15 @@ class WarmWinterAlertIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null, List.of())
+        );
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     private WinterWarmthEvaluatedEvent evaluation(String plotId, String anomaly, int streak, Double latestMax) {

@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.FruitThinningPrescriptionCommandService;
 import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.ThinningPrescriptionIssuer;
@@ -29,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -59,7 +59,7 @@ public class ThinningPrescriptionsController {
     private final FruitThinningPrescriptionCommandService commandService;
     private final ThinningPrescriptionIssuer issuer;
     private final ThinningPrescriptionOutlookService outlookService;
-    private final String defaultProducerId;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
      * Constructs the controller.
@@ -68,20 +68,20 @@ public class ThinningPrescriptionsController {
      * @param commandService    issues a pending prescription whose inputs became complete
      * @param issuer            tells what is still missing to issue a prescription
      * @param outlookService    builds the load before thinning, the sampling progress and the yield
-     * @param defaultProducerId mock producer until IAM is in place
+     * @param currentUserProvider resolves the authenticated actor of each request
      */
     public ThinningPrescriptionsController(
             GetThinningPrescriptionQueryService queryService,
             FruitThinningPrescriptionCommandService commandService,
             ThinningPrescriptionIssuer issuer,
             ThinningPrescriptionOutlookService outlookService,
-            @Value("${viora.security.mock.default-producer-id:550e8400-e29b-41d4-a716-446655440000}") String defaultProducerId
+            CurrentUserProvider currentUserProvider
     ) {
         this.queryService = queryService;
         this.commandService = commandService;
         this.issuer = issuer;
         this.outlookService = outlookService;
-        this.defaultProducerId = defaultProducerId;
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
@@ -121,7 +121,7 @@ public class ThinningPrescriptionsController {
             );
         }
         return ResponseEntityAssembler.toResponseEntityFromResult(
-                queryService.handle(new GetThinningPrescriptionsQuery(defaultProducerId, targetCampaignYear)),
+                queryService.handle(new GetThinningPrescriptionsQuery(currentUserProvider.requireCurrentUserId(), targetCampaignYear)),
                 this::toResources,
                 HttpStatus.OK
         );
