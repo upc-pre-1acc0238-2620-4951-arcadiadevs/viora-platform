@@ -1,18 +1,22 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.email.brevo;
 
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -28,6 +32,7 @@ import java.util.Map;
 @Component
 public class BrevoTransactionalEmailAdapter implements TransactionalEmailService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(BrevoTransactionalEmailAdapter.class);
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String RESET_CODE_TEMPLATE = "templates/email/password-reset-code.html";
     private static final String CODE_PLACEHOLDER = "{{code}}";
@@ -85,6 +90,10 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
         this.senderName = senderName;
         this.resetSubject = resetSubject;
         this.resetCodeTemplate = loadTemplate(RESET_CODE_TEMPLATE);
+        if (!enabled || this.apiKey.isBlank()) {
+            LOG.warn("Password reset emails are not sent: Brevo needs BREVO_ENABLED=true and BREVO_API_KEY (enabled={}, api key set={})",
+                    enabled, !this.apiKey.isBlank());
+        }
     }
 
     /**
@@ -118,16 +127,25 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
                     .body(payload)
                     .retrieve()
                     .toBodilessEntity();
+            LOG.info("Password reset email accepted by Brevo");
+        } catch (RestClientResponseException ex) {
+            // Brevo says why in the body, e.g. an API key used from an IP that is not in its authorized IPs list
+            LOG.warn("Brevo rejected the password reset email with {}: {}",
+                    ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            throw new IllegalStateException("email.password_reset.dispatch_failed", ex);
         } catch (RestClientException ex) {
-            // Not logged here: the async uncaught exception handler logs it once, with the cause attached
             throw new IllegalStateException("email.password_reset.dispatch_failed", ex);
         }
     }
 
+    /**
+     * Uses the JDK HTTP client: unlike {@code HttpURLConnection} it keeps the body of a 401 answer, which is where
+     * Brevo explains the rejection.
+     */
     private static RestClient defaultRestClient() {
-        var requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-        requestFactory.setReadTimeout((int) Duration.ofSeconds(15).toMillis());
+        var httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofSeconds(15));
         return RestClient.builder()
                 .requestFactory(requestFactory)
                 .build();
