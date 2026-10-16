@@ -188,12 +188,28 @@ def render_sprig(out, frames=40, frame_ms=55):
                    disposal=1)
 
 
+def render_copy_icon(out):
+    """Material "content_copy" drawn in the email's light ink on a transparent background, 2x for sharp screens."""
+    s = 2 * SUPERSAMPLE
+    size = 24
+    image = Image.new("RGBA", (size * s, size * s), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    stroke = round(2 * s)
+    ink = (249, 246, 241, 255)
+    draw.rounded_rectangle([8 * s, 2 * s, 21 * s, 17 * s], radius=2.5 * s, outline=ink, width=stroke)
+    draw.line([(4 * s, 7 * s), (4 * s, 20 * s)], fill=ink, width=stroke)
+    draw.line([(4 * s, 21 * s), (15 * s, 21 * s)], fill=ink, width=stroke)
+    draw.ellipse([3 * s, 20 * s, 5 * s, 22 * s], fill=ink)
+    image.resize((size * 2, size * 2), Image.LANCZOS).save(out, optimize=True)
+
+
 def main():
     font_path, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
     render_logo(font_path, out_dir / "viora-logo.png")
     render_sprig(out_dir / "olive-sprig.gif")
-    for name in ("viora-logo.png", "olive-sprig.gif"):
+    render_copy_icon(out_dir / "copy.png")
+    for name in ("viora-logo.png", "olive-sprig.gif", "copy.png"):
         print(name, (out_dir / name).stat().st_size, "bytes")
 
 

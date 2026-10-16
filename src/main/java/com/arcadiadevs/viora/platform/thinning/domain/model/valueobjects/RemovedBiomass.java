@@ -1,9 +1,9 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects;
 
-/** Measured removed biomass and actual removal percentage, including zero. */
+/** Actual removal percentage, including zero, and the removed biomass when it was weighed (null otherwise). */
 public record RemovedBiomass(Double removedKg, Double actualRemovalPercentage) {
     public RemovedBiomass {
-        if (removedKg == null || !Double.isFinite(removedKg) || removedKg < 0) {
+        if (removedKg != null && (!Double.isFinite(removedKg) || removedKg < 0)) {
             throw new IllegalArgumentException("thinning.execution.kg.invalid");
         }
         if (actualRemovalPercentage == null || !Double.isFinite(actualRemovalPercentage)

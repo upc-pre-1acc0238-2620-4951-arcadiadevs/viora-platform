@@ -85,6 +85,23 @@ class ThinningExecutionControllerIntegrationTest {
         return transactions.execute(tx -> repository.findById(new PrescriptionId(id)).orElseThrow().snapshot());
     }
 
+    @Test
+    @DisplayName("The kilos and the crew are optional: the producer records only the date and the share removed (P62)")
+    void kilosAndCrewAreOptional() throws Exception {
+        var id = seed(PrescriptionStatus.PRESCRIBED, date);
+        mvc.perform(post(route(id)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"executedDate\":\"%s\",\"actualRemovalPercentage\":30.0}".formatted(date)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.actualRemovalPercentage").value(30.0))
+                .andExpect(jsonPath("$.removedKg").doesNotExist())
+                .andExpect(jsonPath("$.laborCrewSize").doesNotExist())
+                .andExpect(jsonPath("$.loadBalance.loadState").exists());
+        var evidence = reload(id).executionConfirmation();
+        assertNull(evidence.removedKg());
+        assertNull(evidence.laborCrewSize());
+        assertEquals(30.0, evidence.actualRemovalPercentage());
+    }
+
     @ParameterizedTest
     @CsvSource({"0,OPTIMAL,true", "1,LATE,false"})
     void persistsCompleteConfirmationAndRejectsReplay(int daysLate, String qualification, boolean opportune) throws Exception {

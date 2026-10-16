@@ -33,7 +33,7 @@ public final class ExecutionConfirmation {
                 ? ExecutionTimeliness.LATE : ExecutionTimeliness.OPTIMAL;
         var projection = CaliberProjectionService.project(loadBalance, timeliness, calibration);
         return new ExecutionConfirmation(new ExecutionConfirmationSnapshot(new ConfirmationId(),
-                executionDate, biomass.actualRemovalPercentage(), crew.value(), timeliness,
+                executionDate, biomass.actualRemovalPercentage(), crew == null ? null : crew.value(), timeliness,
                 clock.instant(), biomass.removedKg(), notes, loadBalance, projection));
     }
 
