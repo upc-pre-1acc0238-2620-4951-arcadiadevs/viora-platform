@@ -27,7 +27,8 @@ import java.util.Map;
  *
  * <p>Implements the {@link TransactionalEmailService} outbound application port, satisfying
  * Hexagonal Architecture and the Dependency Inversion Principle. The email body is read from the
- * {@code templates/email/password-reset-code.html} classpath template.</p>
+ * {@code templates/email/password-reset-code.html} classpath template; its images are served by the platform itself
+ * from {@code static/email}, so they are linked with the public base URL of the platform.</p>
  */
 @Component
 public class BrevoTransactionalEmailAdapter implements TransactionalEmailService {
@@ -36,6 +37,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String RESET_CODE_TEMPLATE = "templates/email/password-reset-code.html";
     private static final String CODE_PLACEHOLDER = "{{code}}";
+    private static final String ASSETS_BASE_URL_PLACEHOLDER = "{{assetsBaseUrl}}";
 
     private final RestClient restClient;
     private final boolean enabled;
@@ -43,6 +45,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     private final String senderEmail;
     private final String senderName;
     private final String resetSubject;
+    private final String assetsBaseUrl;
     private final String resetCodeTemplate;
 
     /**
@@ -52,7 +55,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param apiKey       the Brevo API key; when blank every call is a no-op
      * @param senderEmail  the sender address
      * @param senderName   the sender display name
-     * @param resetSubject the subject of the password reset email
+     * @param resetSubject  the subject of the password reset email
+     * @param assetsBaseUrl public base URL of the platform, where the email images are served
      */
     @Autowired
     public BrevoTransactionalEmailAdapter(
@@ -60,9 +64,10 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             @Value("${viora.brevo.api-key:}") String apiKey,
             @Value("${viora.brevo.sender-email}") String senderEmail,
             @Value("${viora.brevo.sender-name}") String senderName,
-            @Value("${viora.brevo.reset-subject}") String resetSubject
+            @Value("${viora.brevo.reset-subject}") String resetSubject,
+            @Value("${viora.brevo.assets-base-url}") String assetsBaseUrl
     ) {
-        this(defaultRestClient(), enabled, apiKey, senderEmail, senderName, resetSubject);
+        this(defaultRestClient(), enabled, apiKey, senderEmail, senderName, resetSubject, assetsBaseUrl);
     }
 
     /**
@@ -73,7 +78,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param apiKey       the Brevo API key
      * @param senderEmail  the sender address
      * @param senderName   the sender display name
-     * @param resetSubject the subject of the password reset email
+     * @param resetSubject  the subject of the password reset email
+     * @param assetsBaseUrl public base URL of the platform, where the email images are served
      */
     public BrevoTransactionalEmailAdapter(
             RestClient restClient,
@@ -81,7 +87,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             String apiKey,
             String senderEmail,
             String senderName,
-            String resetSubject
+            String resetSubject,
+            String assetsBaseUrl
     ) {
         this.restClient = restClient;
         this.enabled = enabled;
@@ -89,6 +96,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
         this.senderEmail = senderEmail;
         this.senderName = senderName;
         this.resetSubject = resetSubject;
+        this.assetsBaseUrl = assetsBaseUrl != null ? assetsBaseUrl.trim().replaceAll("/+$", "") : "";
         this.resetCodeTemplate = loadTemplate(RESET_CODE_TEMPLATE);
         if (!enabled || this.apiKey.isBlank()) {
             LOG.warn("Password reset emails are not sent: Brevo needs BREVO_ENABLED=true and BREVO_API_KEY (enabled={}, api key set={})",
@@ -115,7 +123,9 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
                 "sender", Map.of("name", senderName, "email", senderEmail),
                 "to", List.of(Map.of("email", recipientEmail)),
                 "subject", resetSubject,
-                "htmlContent", resetCodeTemplate.replace(CODE_PLACEHOLDER, resetToken)
+                "htmlContent", resetCodeTemplate
+                        .replace(CODE_PLACEHOLDER, resetToken)
+                        .replace(ASSETS_BASE_URL_PLACEHOLDER, assetsBaseUrl)
         );
 
         try {
