@@ -29,5 +29,11 @@ public record CaliberProjectionResource(
         @Schema(description = "Minimum observations before the variety model can be activated", example = "8")
         Integer requiredObservations,
         @Schema(description = "Projection method identifier", example = "LOAD_RESPONSE_V1")
-        String model) {
+        String model,
+        @Schema(description = "Lowest residual load (fruits per shoot) the variety model covers, null without a model",
+                example = "0.25", nullable = true)
+        Double calibratedLoadMin,
+        @Schema(description = "Highest residual load (fruits per shoot) the variety model covers, null without a model",
+                example = "0.8", nullable = true)
+        Double calibratedLoadMax) {
 }

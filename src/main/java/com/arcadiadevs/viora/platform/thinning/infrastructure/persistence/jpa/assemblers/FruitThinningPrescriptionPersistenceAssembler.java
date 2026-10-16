@@ -237,6 +237,8 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             entity.setCaliberConfidenceLevel(projection.confidenceLevel());
             entity.setCaliberCalibrationObservations(projection.calibrationObservations());
             entity.setCaliberModelVersion(projection.modelVersion());
+            entity.setCaliberCalibratedLoadMin(projection.calibratedLoadMin());
+            entity.setCaliberCalibratedLoadMax(projection.calibratedLoadMax());
         }
         parent.setExecutionConfirmation(entity);
     }
@@ -267,6 +269,7 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
         return new CaliberProjection(CaliberProjectionStatus.valueOf(entity.getCaliberStatus()),
                 entity.getCaliberMostLikelyFruitsPerKg(), entity.getCaliberFruitsPerKgLow(),
                 entity.getCaliberFruitsPerKgHigh(), entity.getCaliberConfidenceLevel(),
-                entity.getCaliberCalibrationObservations(), entity.getCaliberModelVersion());
+                entity.getCaliberCalibrationObservations(), entity.getCaliberModelVersion(),
+                entity.getCaliberCalibratedLoadMin(), entity.getCaliberCalibratedLoadMax());
     }
 }
