@@ -17,7 +17,7 @@ class ThinningExecutionTest {
         var prescription = windowedPrescription();
         var before = prescription.snapshot();
         var error = assertThrows(IllegalArgumentException.class,
-                () -> prescription.confirmExecution(date, 10, 25, 2, null, CLOCK));
+                () -> prescription.confirmExecution(date, 10.0, 25, 2, null, CLOCK));
         assertEquals("thinning.execution.before_window", error.getMessage());
         assertEquals(before, prescription.snapshot());
         assertTrue(prescription.domainEvents().isEmpty());
@@ -27,7 +27,7 @@ class ThinningExecutionTest {
     @CsvSource({"2026-09-24,OPTIMAL", "2026-09-25,OPTIMAL", "2026-09-26,LATE"})
     void acceptsOpeningAndClosingBoundariesAndLateEvidence(LocalDate date, ExecutionTimeliness expected) {
         var prescription = windowedPrescription();
-        prescription.confirmExecution(date, 10, 25, 2, null, CLOCK);
+        prescription.confirmExecution(date, 10.0, 25, 2, null, CLOCK);
         assertEquals(expected, prescription.snapshot().executionConfirmation().timeliness());
     }
 
@@ -49,7 +49,7 @@ class ThinningExecutionTest {
     @CsvSource({"2026-09-24,OPTIMAL", "2026-09-25,OPTIMAL", "2026-09-26,LATE"})
     void qualifiesExecutionAndPublishesCompleteEvidence(LocalDate date, ExecutionTimeliness timeliness) {
         var prescription = prescribed(CUTOFF);
-        prescription.confirmExecution(date, 420, 25, 4, "Field notes", CLOCK);
+        prescription.confirmExecution(date, 420.0, 25, 4, "Field notes", CLOCK);
         var snapshot = prescription.snapshot();
         var confirmation = snapshot.executionConfirmation();
         assertEquals(PrescriptionStatus.EXECUTED, snapshot.status());
@@ -84,7 +84,7 @@ class ThinningExecutionTest {
     void projectsCaliberWhenThePlotVarietyIsCalibrated() {
         var prescription = prescribed(CUTOFF);
         var calibration = CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA"));
-        prescription.confirmExecution(CUTOFF, 420, 25, 4, null, calibration, CLOCK);
+        prescription.confirmExecution(CUTOFF, 420.0, 25, 4, null, calibration, CLOCK);
         var projection = prescription.snapshot().executionConfirmation().caliberProjection();
         // Residual 6.3 fruits/shoot: W = 10 x (6.3/6)^-0.6 = 9.71 g -> 103.0 fruits/kg
         assertEquals(CaliberProjectionStatus.ESTIMATED, projection.status());
@@ -97,7 +97,7 @@ class ThinningExecutionTest {
     void requiresRepresentativeSamplingToComputeTheLoadBalance() {
         var prescription = prescribedWithoutSampling(CUTOFF);
         assertThrows(IllegalStateException.class,
-                () -> prescription.confirmExecution(CUTOFF, 1, 25, 1, null, CLOCK));
+                () -> prescription.confirmExecution(CUTOFF, 1.0, 25, 1, null, CLOCK));
         assertNull(prescription.snapshot().executionConfirmation());
         assertTrue(prescription.domainEvents().isEmpty());
     }
@@ -105,7 +105,7 @@ class ThinningExecutionTest {
     @Test
     void fullRemovalLeavesNoCaliberToProject() {
         var prescription = prescribed(CUTOFF);
-        prescription.confirmExecution(CUTOFF, 900, 100, 4, null,
+        prescription.confirmExecution(CUTOFF, 900.0, 100, 4, null,
                 CaliberModelFittingService.calibrate("SEVILLANA", exactObservations("SEVILLANA")), CLOCK);
         var confirmation = prescription.snapshot().executionConfirmation();
         assertEquals(0.0, confirmation.loadBalance().residualFruitsPerShoot());
@@ -117,7 +117,7 @@ class ThinningExecutionTest {
     void rejectsNonPrescribedStates(PrescriptionStatus status) {
         var prescription = withStatus(status, CUTOFF);
         assertThrows(IllegalStateException.class,
-                () -> prescription.confirmExecution(CUTOFF, 1, 25, 1, null, CLOCK));
+                () -> prescription.confirmExecution(CUTOFF, 1.0, 25, 1, null, CLOCK));
         assertEquals(status, prescription.snapshot().status());
         assertTrue(prescription.domainEvents().isEmpty());
     }
@@ -125,10 +125,10 @@ class ThinningExecutionTest {
     @Test
     void rejectsSecondConfirmationWithoutReplacingEvidence() {
         var prescription = prescribed(CUTOFF);
-        prescription.confirmExecution(CUTOFF, 1, 25, 1, null, CLOCK);
+        prescription.confirmExecution(CUTOFF, 1.0, 25, 1, null, CLOCK);
         var original = prescription.snapshot().executionConfirmation();
         assertThrows(IllegalStateException.class,
-                () -> prescription.confirmExecution(CUTOFF, 2, 50, 2, "changed", CLOCK));
+                () -> prescription.confirmExecution(CUTOFF, 2.0, 50, 2, "changed", CLOCK));
         assertEquals(original, prescription.snapshot().executionConfirmation());
         assertEquals(1, prescription.domainEvents().size());
     }
@@ -137,7 +137,7 @@ class ThinningExecutionTest {
     void requiresWindowWithoutGuessingOne() {
         var prescription = prescribed(null);
         assertThrows(IllegalStateException.class,
-                () -> prescription.confirmExecution(CUTOFF, 1, 25, 1, null, CLOCK));
+                () -> prescription.confirmExecution(CUTOFF, 1.0, 25, 1, null, CLOCK));
         assertNull(prescription.snapshot().executionConfirmation());
     }
 
@@ -147,7 +147,7 @@ class ThinningExecutionTest {
     void rejectsMissingOrFutureDate(String date) {
         var prescription = prescribed(CUTOFF);
         assertThrows(IllegalArgumentException.class, () -> prescription.confirmExecution(
-                date == null ? null : LocalDate.parse(date), 1, 25, 1, null, CLOCK));
+                date == null ? null : LocalDate.parse(date), 1.0, 25, 1, null, CLOCK));
         assertEquals(PrescriptionStatus.PRESCRIBED, prescription.snapshot().status());
         assertTrue(prescription.domainEvents().isEmpty());
     }
@@ -168,7 +168,7 @@ class ThinningExecutionTest {
     @ValueSource(doubles = {0, 100})
     void acceptsPercentageBoundaries(double percentage) {
         var prescription = prescribed(CUTOFF);
-        prescription.confirmExecution(CUTOFF, 0, percentage, 1, null, CLOCK);
+        prescription.confirmExecution(CUTOFF, 0.0, percentage, 1, null, CLOCK);
         assertEquals(percentage, prescription.snapshot().executionConfirmation().actualRemovalPercentage());
     }
 
