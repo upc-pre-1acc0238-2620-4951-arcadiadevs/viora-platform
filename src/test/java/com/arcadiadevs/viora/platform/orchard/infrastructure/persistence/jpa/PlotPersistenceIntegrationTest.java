@@ -49,6 +49,8 @@ class PlotPersistenceIntegrationTest {
         var created = plotRepository.save(newPlot());
         entityManager.clear();
         assertThat(created.snapshot().revision()).isEqualTo(0L);
+        // The registration date the plan list shows (P60) comes from the stored row, never from the request
+        assertThat(created.snapshot().registeredAt()).isNotNull();
 
         var plot = plotRepository.findById(created.snapshot().id()).orElseThrow();
         plot.remove("No longer farmed");
