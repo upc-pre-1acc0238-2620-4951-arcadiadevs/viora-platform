@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.settlement.application.internal.commandse
 import com.arcadiadevs.viora.platform.settlement.application.commandservices.SealAgronomicDossierCommandService;
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalPhenologyService;
+import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalProfileService;
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.settlement.domain.exceptions.DossierRenderingException;
@@ -47,13 +48,14 @@ public class SealAgronomicDossierCommandServiceImpl implements SealAgronomicDoss
     private final ExternalThinningService thinning;
     private final ExternalPhenologyService phenology;
     private final ExternalTelemetryService telemetry;
+    private final ExternalProfileService profiles;
     private final SealedDossierPdfGenerator pdfGenerator;
     private final CryptographicHashService hashService;
     private final Clock clock;
 
     public SealAgronomicDossierCommandServiceImpl(AgronomicReportRepository reportRepository,
             SealedDossierRepository dossierRepository, ExternalOrchardService orchard, ExternalThinningService thinning,
-            ExternalPhenologyService phenology, ExternalTelemetryService telemetry,
+            ExternalPhenologyService phenology, ExternalTelemetryService telemetry, ExternalProfileService profiles,
             SealedDossierPdfGenerator pdfGenerator, CryptographicHashService hashService, Clock clock) {
         this.reportRepository = reportRepository;
         this.dossierRepository = dossierRepository;
@@ -61,6 +63,7 @@ public class SealAgronomicDossierCommandServiceImpl implements SealAgronomicDoss
         this.thinning = thinning;
         this.phenology = phenology;
         this.telemetry = telemetry;
+        this.profiles = profiles;
         this.pdfGenerator = pdfGenerator;
         this.hashService = hashService;
         this.clock = clock;
@@ -146,7 +149,9 @@ public class SealAgronomicDossierCommandServiceImpl implements SealAgronomicDoss
                 climate.daysWithReadings(),
                 history.firstKey(),
                 history.lastKey(),
-                history.size());
+                history.size(),
+                // Frozen with the dossier: a later change of the profile name never alters a sealed PDF
+                profiles.findFullName(producerId).orElse(null));
         return new SealedDossierContent(plotId, producerId, campaignYear, facts, settlement, history, sealedAt);
     }
 }

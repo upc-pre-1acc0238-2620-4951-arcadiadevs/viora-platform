@@ -52,7 +52,8 @@ public final class CaliberProjectionService {
         }
         var model = state.model();
         if (!model.covers(residualLoad)) {
-            return CaliberProjection.withoutEstimate(CaliberProjectionStatus.OUTSIDE_CALIBRATION_RANGE, observations);
+            return CaliberProjection.withoutEstimate(CaliberProjectionStatus.OUTSIDE_CALIBRATION_RANGE, observations)
+                    .withCalibratedRange(model);
         }
 
         double logWeight = model.predictLogWeight(residualLoad);
@@ -63,6 +64,7 @@ public final class CaliberProjectionService {
         double low = 1000.0 / Math.exp(logWeight + halfWidth);
         double high = 1000.0 / Math.exp(logWeight - halfWidth);
         return new CaliberProjection(CaliberProjectionStatus.ESTIMATED, mostLikely, low, high,
-                CONFIDENCE_LEVEL, observations, CaliberProjection.MODEL_VERSION);
+                CONFIDENCE_LEVEL, observations, CaliberProjection.MODEL_VERSION, model.minResidualLoad(),
+                model.maxResidualLoad());
     }
 }

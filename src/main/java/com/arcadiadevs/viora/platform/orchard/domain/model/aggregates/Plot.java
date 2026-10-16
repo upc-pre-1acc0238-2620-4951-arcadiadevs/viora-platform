@@ -37,6 +37,8 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
     private LocalDate lastPruningDate;
     private PlotStatus status;
     private Long revision;
+    /** When the plot was first stored; null until then. */
+    private final Instant registeredAt;
 
     private Plot(
             PlotId id,
@@ -48,7 +50,8 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
             TreeDensity density,
             LocalDate lastPruningDate,
             PlotStatus status,
-            Long revision
+            Long revision,
+            Instant registeredAt
     ) {
         this.id = id;
         this.producerId = producerId;
@@ -60,6 +63,7 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
         this.lastPruningDate = lastPruningDate;
         this.status = status;
         this.revision = revision;
+        this.registeredAt = registeredAt;
     }
 
     /**
@@ -93,7 +97,8 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 density,
                 null,
                 PlotStatus.ACTIVE,
-                initialRevision
+                initialRevision,
+                null
         );
 
         plot.registerDomainEvent(new PlotDelimitedEvent(
@@ -127,7 +132,8 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 snapshot.density(),
                 snapshot.lastPruningDate(),
                 snapshot.status(),
-                snapshot.revision()
+                snapshot.revision(),
+                snapshot.registeredAt()
         );
     }
 
@@ -248,7 +254,8 @@ public class Plot extends AbstractDomainAggregateRoot<Plot> {
                 density,
                 lastPruningDate,
                 status,
-                revision
+                revision,
+                registeredAt
         );
     }
 }

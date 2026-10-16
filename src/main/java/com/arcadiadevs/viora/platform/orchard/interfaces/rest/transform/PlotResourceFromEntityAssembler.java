@@ -30,7 +30,8 @@ public class PlotResourceFromEntityAssembler {
                 snap.geometry().geoJson(),
                 snap.lastPruningDate(),
                 snap.status().name(),
-                snap.revision()
+                snap.revision(),
+                snap.registeredAt()
         );
     }
 

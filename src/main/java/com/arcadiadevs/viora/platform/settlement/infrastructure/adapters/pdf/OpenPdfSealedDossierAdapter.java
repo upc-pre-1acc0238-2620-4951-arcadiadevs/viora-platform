@@ -101,7 +101,11 @@ public class OpenPdfSealedDossierAdapter implements SealedDossierPdfGenerator {
         row(identification, fonts, "Variedad", variety(facts.variety()));
         row(identification, fonts, "Superficie", facts.areaHectares() == null ? NOT_RECORDED
                 : decimal(facts.areaHectares(), 2) + " ha");
-        row(identification, fonts, "ID de productor", content.producerId().userId());
+        if (facts.holderName() != null && !facts.holderName().isBlank()) {
+            row(identification, fonts, "Titular", facts.holderName());
+        } else {
+            row(identification, fonts, "ID de productor", content.producerId().userId());
+        }
         row(identification, fonts, "Campaña", String.valueOf(content.campaignYear().value()));
         row(identification, fonts, "Sellado", INSTANT.format(content.sealedAt()));
         document.add(identification);

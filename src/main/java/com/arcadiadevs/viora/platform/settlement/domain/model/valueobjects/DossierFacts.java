@@ -49,7 +49,8 @@ public record DossierFacts(
         int daysWithReadings,
         Integer historyFromYear,
         Integer historyToYear,
-        int harvestCampaigns
+        int harvestCampaigns,
+        String holderName
 ) {
 
     public DossierFacts {

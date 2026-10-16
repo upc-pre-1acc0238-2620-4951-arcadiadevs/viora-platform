@@ -14,6 +14,8 @@ public record AgronomicDossierResource(
         @Schema(description = "Dossier UUID") String id,
         @Schema(description = "Plot UUID") String plotId,
         @Schema(description = "Owner producer UUID") String producerId,
+        @Schema(description = "Full name of the holder from the producer profile when it was sealed, null without profile",
+                example = "Teodoro Mamani", nullable = true) String holderName,
         @Schema(description = "Sealed campaign", example = "2026") Integer campaignYear,
         @Schema(description = "Plot name", example = "La Yarada 02") String plotName,
         @Schema(description = "Olive variety", example = "SEVILLANA") String variety,

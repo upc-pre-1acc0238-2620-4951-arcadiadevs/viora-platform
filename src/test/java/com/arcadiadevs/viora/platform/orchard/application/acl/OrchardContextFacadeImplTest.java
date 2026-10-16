@@ -50,7 +50,8 @@ class OrchardContextFacadeImplTest {
                 new TreeDensity(286),
                 null,
                 PlotStatus.ACTIVE,
-                0L
+                0L,
+            null
         );
         when(plotMock.snapshot()).thenReturn(snapshot);
         when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(plotMock));
@@ -74,7 +75,8 @@ class OrchardContextFacadeImplTest {
                 new TreeDensity(286),
                 null,
                 PlotStatus.REMOVED_SOFT_DELETE,
-                1L
+                1L,
+            null
         );
         when(plotMock.snapshot()).thenReturn(snapshot);
         when(plotRepository.findById(new PlotId(plotId.toString()))).thenReturn(Optional.of(plotMock));
@@ -168,7 +170,8 @@ class OrchardContextFacadeImplTest {
                 new TreeDensity(286),
                 null,
                 status,
-                0L
+                0L,
+            null
         );
     }
 }

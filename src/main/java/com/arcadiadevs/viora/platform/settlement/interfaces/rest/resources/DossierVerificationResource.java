@@ -16,6 +16,8 @@ public record DossierVerificationResource(
         @Schema(description = "Plot name", example = "La Yarada 02") String plotName,
         @Schema(description = "Plot area in hectares", example = "2.5") Double areaHectares,
         @Schema(description = "Owner producer UUID") String producerId,
+        @Schema(description = "Full name of the holder when it was sealed, null without profile",
+                example = "Teodoro Mamani", nullable = true) String holderName,
         @Schema(description = "Sealed campaign", example = "2026") Integer campaignYear,
         @Schema(description = "Instant of the seal") Instant sealedAt,
         @Schema(description = "Pages of the PDF", example = "2") Integer pageCount,
