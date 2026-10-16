@@ -77,6 +77,9 @@ class CaliberProjectionServiceTest {
         double pre = removal == 0 ? 9.2 : 8.4;
         var projection = CaliberProjectionService.project(LoadBalance.of(pre, removal, 6), ExecutionTimeliness.OPTIMAL, EXACT);
         assertWithoutFigures(projection, CaliberProjectionStatus.OUTSIDE_CALIBRATION_RANGE);
+        // The range the model covers, so the producer reads why no figure was given
+        assertEquals(3.6, projection.calibratedLoadMin(), 1e-9);
+        assertEquals(9.0, projection.calibratedLoadMax(), 1e-9);
     }
 
     private static void assertWithoutFigures(CaliberProjection projection, CaliberProjectionStatus status) {

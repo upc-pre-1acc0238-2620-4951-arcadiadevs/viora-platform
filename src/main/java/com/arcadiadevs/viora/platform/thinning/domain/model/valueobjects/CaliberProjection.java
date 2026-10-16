@@ -14,6 +14,8 @@ package com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects;
  * @param confidenceLevel         coverage of the prediction interval, only when {@code ESTIMATED}
  * @param calibrationObservations real observations available for the variety when projecting
  * @param modelVersion            identifier of the projection method
+ * @param calibratedLoadMin       lowest residual load the variety model was fitted on, null without a model
+ * @param calibratedLoadMax       highest residual load the variety model was fitted on, null without a model
  */
 public record CaliberProjection(
         CaliberProjectionStatus status,
@@ -22,7 +24,9 @@ public record CaliberProjection(
         Double fruitsPerKgHigh,
         Double confidenceLevel,
         int calibrationObservations,
-        String modelVersion
+        String modelVersion,
+        Double calibratedLoadMin,
+        Double calibratedLoadMax
 ) {
 
     /** Identifier of the self-calibrated load-response method. */
@@ -52,7 +56,19 @@ public record CaliberProjection(
      * @return projection without numbers
      */
     public static CaliberProjection withoutEstimate(CaliberProjectionStatus status, int calibrationObservations) {
-        return new CaliberProjection(status, null, null, null, null, calibrationObservations, MODEL_VERSION);
+        return new CaliberProjection(status, null, null, null, null, calibrationObservations, MODEL_VERSION, null, null);
+    }
+
+    /**
+     * The same projection stating the loads the variety model covers, so the producer sees why an out-of-range
+     * load gets no figure.
+     *
+     * @param model the calibrated model of the variety
+     * @return the projection with the calibrated load range
+     */
+    public CaliberProjection withCalibratedRange(VarietyCaliberModel model) {
+        return new CaliberProjection(status, mostLikelyFruitsPerKg, fruitsPerKgLow, fruitsPerKgHigh, confidenceLevel,
+                calibrationObservations, modelVersion, model.minResidualLoad(), model.maxResidualLoad());
     }
 
     /** Size grade of the central estimate, or {@code null} when not estimated. */

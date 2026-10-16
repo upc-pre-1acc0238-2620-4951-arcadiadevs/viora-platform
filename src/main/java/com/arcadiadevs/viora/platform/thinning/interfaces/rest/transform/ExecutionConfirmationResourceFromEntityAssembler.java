@@ -61,7 +61,8 @@ public final class ExecutionConfirmationResourceFromEntityAssembler {
                 round(projection.fruitsPerKgHigh(), 1), projection.mostLikelySizeGrade(),
                 projection.sizeGradeLow(), projection.sizeGradeHigh(), projection.confidenceLevel(),
                 projection.calibrationObservations(), CaliberModelFittingService.MIN_OBSERVATIONS,
-                projection.modelVersion());
+                projection.modelVersion(), round(projection.calibratedLoadMin(), 2),
+                round(projection.calibratedLoadMax(), 2));
     }
 
     private static Double round(Double value, int decimals) {

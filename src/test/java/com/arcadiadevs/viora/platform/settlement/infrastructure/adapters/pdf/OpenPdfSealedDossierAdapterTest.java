@@ -55,7 +55,7 @@ class OpenPdfSealedDossierAdapterTest {
     private static DossierFacts fullFacts() {
         return new DossierFacts("La Yarada 02", "SEVILLANA", 2.5, 0.57, 0.40, 30.0, LocalDate.of(2026, 11, 3),
                 LocalDate.of(2026, 11, 30), 30.0, LocalDate.of(2026, 11, 14), "EXECUTED_ON_TIME", 20800.0, 12500.0,
-                8300.0, "VR-26-0142", LocalDate.of(2026, 5, 14), 2, 182, 2024, 2026, 3);
+                8300.0, "VR-26-0142", LocalDate.of(2026, 5, 14), 2, 182, 2024, 2026, 3, "Teodoro Mamani");
     }
 
     private static String text(byte[] pdf) throws IOException {
@@ -76,6 +76,7 @@ class OpenPdfSealedDossierAdapterTest {
         assertTrue(rendered.pageCount() >= 1);
         assertTrue(text.contains("Expediente agronómico"), text);
         assertTrue(text.contains("La Yarada 02 · Campaña 2026"), text);
+        assertTrue(text.contains("Titular Teodoro Mamani"), text);
         assertTrue(text.contains("2,50 ha"), text);
         assertTrue(text.contains("0,57 frutos por brote"), text);
         assertTrue(text.contains("+43 %"), text);
@@ -95,7 +96,7 @@ class OpenPdfSealedDossierAdapterTest {
     @DisplayName("Writes what was never recorded as such instead of estimating it")
     void writesMissingDataAsMissing() throws IOException {
         var facts = new DossierFacts("Lote Norte", null, null, null, null, null, null, null, null, null,
-                "NOT_RECORDED", 20800.0, 12500.0, 8300.0, null, null, 0, 0, 2024, 2026, 3);
+                "NOT_RECORDED", 20800.0, 12500.0, 8300.0, null, null, 0, 0, 2024, 2026, 3, null);
 
         var text = text(adapter.render(content(facts, ThinningBalance.notRecorded())).content());
 

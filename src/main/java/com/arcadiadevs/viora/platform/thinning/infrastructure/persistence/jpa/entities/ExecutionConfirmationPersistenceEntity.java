@@ -65,4 +65,8 @@ public class ExecutionConfirmationPersistenceEntity {
     private Integer caliberCalibrationObservations;
     @Column(updatable = false, length = 30)
     private String caliberModelVersion;
+    @Column(updatable = false)
+    private Double caliberCalibratedLoadMin;
+    @Column(updatable = false)
+    private Double caliberCalibratedLoadMax;
 }

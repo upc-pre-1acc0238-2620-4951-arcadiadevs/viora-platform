@@ -124,7 +124,8 @@ public final class PlotPersistenceAssembler {
                 entity.getDensity(),
                 entity.getLastPruningDate(),
                 entity.getStatus(),
-                entity.getRevision()
+                entity.getRevision(),
+                entity.getCreatedAt()
         );
 
         return Plot.reconstitute(snapshot);

@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.orchard.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
@@ -29,6 +30,7 @@ public record PlotSnapshot(
         TreeDensity density,
         LocalDate lastPruningDate,
         PlotStatus status,
-        Long revision
+        Long revision,
+        Instant registeredAt
 ) {
 }

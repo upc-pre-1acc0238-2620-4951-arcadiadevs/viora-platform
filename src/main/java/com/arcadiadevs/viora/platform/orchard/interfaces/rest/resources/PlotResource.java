@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
@@ -63,6 +64,9 @@ public record PlotResource(
         String status,
 
         @Schema(description = "Optimistic locking revision number", example = "0")
-        Long revision
+        Long revision,
+
+        @Schema(description = "When the plot was registered", example = "2026-11-18T14:05:00Z", nullable = true)
+        @Nullable Instant registeredAt
 ) {
 }

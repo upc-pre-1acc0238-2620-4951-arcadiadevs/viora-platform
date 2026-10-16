@@ -237,13 +237,36 @@ class ThinningExecutionControllerIntegrationTest {
 
     private String createPlot(String variety) throws Exception {
         var payload = """
-                {"name":"Cuartel Calibre","variety":"%s",
+                {"name":"Cuartel %s","variety":"%s",
                  "polygonGeoJson":"{\\"type\\":\\"Polygon\\",\\"coordinates\\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}",
                  "rowSpacingM":7.0,"treeSpacingM":5.0}
-                """.formatted(variety);
+                """.formatted(UUID.randomUUID().toString().substring(0, 8), variety);
         var response = mvc.perform(post("/api/v1/plots").contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return JsonPath.read(response, "$.id");
+    }
+
+    @Test
+    @DisplayName("The recorded labor can be read back with the evidence it was answered with (P63)")
+    void readsTheRecordedLaborBack() throws Exception {
+        // A real plot: reading by id answers only for prescriptions of active plots
+        var plotId = createPlot("SEVILLANA");
+        var id = transactions.execute(tx -> repository.save(prescribed(date, plotId)).snapshot().id().prescriptionId());
+        mvc.perform(get(route(id))).andExpect(status().isNotFound());
+
+        mvc.perform(post(route(id)).contentType(MediaType.APPLICATION_JSON).content(body(date)))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get(route(id)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prescriptionId").value(id))
+                .andExpect(jsonPath("$.executedDate").value(date.toString()))
+                .andExpect(jsonPath("$.actualRemovalPercentage").value(25.0))
+                .andExpect(jsonPath("$.loadBalance.residualFruitsPerShoot").value(6.3))
+                .andExpect(jsonPath("$.caliberProjection.status").exists())
+                .andExpect(jsonPath("$.caliberProjection.model").value("LOAD_RESPONSE_V1"));
+        mvc.perform(get(route("invalid-uuid"))).andExpect(status().isBadRequest());
+        mvc.perform(get(route(UUID.randomUUID().toString()))).andExpect(status().isNotFound());
     }
 
     @Test
