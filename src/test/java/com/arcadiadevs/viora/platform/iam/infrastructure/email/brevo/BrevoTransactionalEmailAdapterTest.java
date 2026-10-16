@@ -24,11 +24,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 
 @DisplayName("BrevoTransactionalEmailAdapter Infrastructure Adapter Unit Tests")
 class BrevoTransactionalEmailAdapterTest {
 
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+    private static final String ASSETS = "https://viora.example/";
     private static final String UNRECOGNISED_IP = "{\"code\":\"unauthorized\",\"message\":\"We have detected you are "
             + "using an unrecognised IP address 203.0.113.7. If you performed this action make sure to add the new IP "
             + "address in this link: https://app.brevo.com/security/authorised_ips\"}";
@@ -38,7 +40,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenApiKeyIsBlank() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject");
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -50,7 +52,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenDisabled() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject");
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -68,8 +70,10 @@ class BrevoTransactionalEmailAdapterTest {
                 .andExpect(jsonPath("$.to[0].email").value("user@viora.ag"))
                 .andExpect(jsonPath("$.subject").value("Código — Viora"))
                 .andExpect(jsonPath("$.htmlContent").value(containsString("123456")))
+                .andExpect(jsonPath("$.htmlContent").value(containsString("src=\"https://viora.example/email/olive-sprig.gif\"")))
+                .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
                 .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Código — Viora");
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Código — Viora", ASSETS);
 
         adapter.sendPasswordResetEmail("user@viora.ag", "123456");
 
@@ -84,7 +88,7 @@ class BrevoTransactionalEmailAdapterTest {
         server.expect(requestTo(BREVO_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(UNRECOGNISED_IP));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject");
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
 
         assertThatThrownBy(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .isInstanceOf(IllegalStateException.class)
