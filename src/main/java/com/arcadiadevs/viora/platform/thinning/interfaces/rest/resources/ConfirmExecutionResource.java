@@ -11,10 +11,10 @@ public record ConfirmExecutionResource(
         @Schema(description = "Execution date; cannot be in the future (UTC)", example = "2026-09-28") LocalDate executedDate,
         @NotNull @DecimalMin("0.0") @DecimalMax("100.0")
         @Schema(description = "Actual removal percentage in [0, 100]", example = "25.0") Double actualRemovalPercentage,
-        @NotNull @DecimalMin("0.0")
-        @Schema(description = "Removed biomass in kilograms", example = "420.0") Double removedKg,
-        @NotNull @Positive
-        @Schema(description = "Number of workers", example = "4") Integer laborCrewSize,
+        @DecimalMin("0.0")
+        @Schema(description = "Removed biomass in kilograms; optional, the producer rarely weighs it", example = "420.0") Double removedKg,
+        @Positive
+        @Schema(description = "Number of workers; optional", example = "4") Integer laborCrewSize,
         @Size(max = 2000, message = "{thinning.execution.notes.too_long}")
         @Schema(description = "Optional field notes, up to 2000 characters") String notes) {
 }

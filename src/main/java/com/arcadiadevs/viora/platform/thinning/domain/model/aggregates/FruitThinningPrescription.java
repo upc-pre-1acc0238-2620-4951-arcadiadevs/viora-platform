@@ -249,15 +249,15 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
     }
 
     /** Records field execution using the current UTC date and no caliber calibration. */
-    public void confirmExecution(LocalDate executionDate, double removedKg,
-            double actualRemovalPercentage, int laborCrewSize, String notes) {
+    public void confirmExecution(LocalDate executionDate, Double removedKg,
+            double actualRemovalPercentage, Integer laborCrewSize, String notes) {
         confirmExecution(executionDate, removedKg, actualRemovalPercentage, laborCrewSize, notes,
                 CaliberCalibration.none(), Clock.systemUTC());
     }
 
     /** Records field execution with an explicit clock and no caliber calibration. */
-    public void confirmExecution(LocalDate executionDate, double removedKg,
-            double actualRemovalPercentage, int laborCrewSize, String notes, Clock clock) {
+    public void confirmExecution(LocalDate executionDate, Double removedKg,
+            double actualRemovalPercentage, Integer laborCrewSize, String notes, Clock clock) {
         confirmExecution(executionDate, removedKg, actualRemovalPercentage, laborCrewSize, notes,
                 CaliberCalibration.none(), clock);
     }
@@ -267,15 +267,15 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
      * commercial caliber projection allowed by the calibration of the plot variety.
      *
      * @param executionDate           date the labor was completed
-     * @param removedKg               removed biomass in kilograms
+     * @param removedKg               removed biomass in kilograms, or null when it was not weighed
      * @param actualRemovalPercentage percentage of fruits actually removed
-     * @param laborCrewSize           number of workers
+     * @param laborCrewSize           number of workers, or null when it was not recorded
      * @param notes                   optional field notes
      * @param calibration             caliber model calibration of the plot variety
      * @param clock                   clock used to reject future dates
      */
-    public void confirmExecution(LocalDate executionDate, double removedKg,
-            double actualRemovalPercentage, int laborCrewSize, String notes,
+    public void confirmExecution(LocalDate executionDate, Double removedKg,
+            double actualRemovalPercentage, Integer laborCrewSize, String notes,
             CaliberCalibration calibration, Clock clock) {
         if (status != PrescriptionStatus.PRESCRIBED || executionConfirmation != null) {
             throw new IllegalStateException("thinning.prescription.not_prescribed");
@@ -290,7 +290,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             throw new IllegalArgumentException("thinning.execution.before_window");
         }
         var biomass = new RemovedBiomass(removedKg, actualRemovalPercentage);
-        var crew = new LaborCrewSize(laborCrewSize);
+        var crew = laborCrewSize == null ? null : new LaborCrewSize(laborCrewSize);
         if (!SamplingCoverageEvaluator.isRepresentative(samplingRounds)) {
             throw new IllegalStateException("thinning.sampling.not_representative");
         }

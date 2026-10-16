@@ -55,7 +55,7 @@ class ConfirmThinningExecutionCommandServiceImplTest {
     @Test
     void rejectsRepeatWithoutSaveOrEvent() {
         var prescription = prescribed(date);
-        prescription.confirmExecution(date, 1, 25, 1, null);
+        prescription.confirmExecution(date, 1.0, 25, 1, null);
         prescription.clearDomainEvents();
         when(repository.findByIdForUpdate(any())).thenReturn(Optional.of(prescription));
         assertTrue(service.handle(command).failure().orElseThrow().code().endsWith("_CONFLICT"));

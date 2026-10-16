@@ -44,5 +44,8 @@ class PasswordResetEmailConfigurationIntegrationTest {
         mvc.perform(get("/email/viora-logo.png"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("image/png"));
+        mvc.perform(get("/email/copy.png"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"));
     }
 }

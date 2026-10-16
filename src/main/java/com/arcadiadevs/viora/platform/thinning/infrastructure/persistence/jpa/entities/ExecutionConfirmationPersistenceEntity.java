@@ -25,9 +25,9 @@ public class ExecutionConfirmationPersistenceEntity {
     private LocalDate executionDate;
     @Column(nullable = false, updatable = false)
     private Double actualRemovalPercentage;
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private Double removedKg;
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private Integer laborCrewSize;
     @Column(nullable = false, updatable = false, length = 10)
     private String timeliness;
