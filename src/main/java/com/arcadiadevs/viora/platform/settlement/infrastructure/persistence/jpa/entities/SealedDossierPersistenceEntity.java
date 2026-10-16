@@ -60,6 +60,9 @@ public class SealedDossierPersistenceEntity implements Persistable<UUID> {
     @Column(name = "plot_name", updatable = false, length = 120)
     private String plotName;
 
+    @Column(name = "holder_name", updatable = false, length = 200)
+    private String holderName;
+
     @Column(name = "variety", updatable = false, length = 40)
     private String variety;
 

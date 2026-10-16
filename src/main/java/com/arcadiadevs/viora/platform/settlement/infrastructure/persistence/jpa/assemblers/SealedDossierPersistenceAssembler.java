@@ -51,6 +51,7 @@ public final class SealedDossierPersistenceAssembler {
         entity.setHistoryFromYear(facts.historyFromYear());
         entity.setHistoryToYear(facts.historyToYear());
         entity.setHarvestCampaigns(facts.harvestCampaigns());
+        entity.setHolderName(facts.holderName());
         return entity;
     }
 
@@ -61,7 +62,8 @@ public final class SealedDossierPersistenceAssembler {
                 entity.getActualRemovalPercentage(), entity.getThinnedOn(), entity.getThinningCompliance(),
                 entity.getTotalKg(), entity.getGreenKg(), entity.getBlackKg(), entity.getReceiptNumber(),
                 entity.getWeighedOn(), entity.getLinkedNodes(), entity.getDaysWithReadings(),
-                entity.getHistoryFromYear(), entity.getHistoryToYear(), entity.getHarvestCampaigns());
+                entity.getHistoryFromYear(), entity.getHistoryToYear(), entity.getHarvestCampaigns(),
+                entity.getHolderName());
         return new SealedDossierSnapshot(new SealedDossierId(entity.getId().toString()), new PlotId(entity.getPlotId()),
                 new UserId(entity.getProducerId()), new CampaignYear(entity.getCampaignYear()), facts,
                 new VerificationHash(entity.getVerificationHash()), entity.getSealedAt(), entity.getPageCount(),

@@ -24,6 +24,7 @@ public final class AgronomicDossierResourceAssembler {
                 dossier.id().value(),
                 dossier.plotId().plotId(),
                 dossier.producerId().userId(),
+                facts.holderName(),
                 dossier.campaignYear().value(),
                 facts.plotName(),
                 facts.variety(),
@@ -53,7 +54,8 @@ public final class AgronomicDossierResourceAssembler {
     public static DossierVerificationResource toVerification(SealedDossierSnapshot dossier) {
         var facts = dossier.facts();
         return new DossierVerificationResource(true, dossier.verificationHash().value(), dossier.plotId().plotId(),
-                facts.plotName(), facts.areaHectares(), dossier.producerId().userId(), dossier.campaignYear().value(),
+                facts.plotName(), facts.areaHectares(), dossier.producerId().userId(), facts.holderName(),
+                dossier.campaignYear().value(),
                 dossier.sealedAt(), dossier.pageCount(), facts.historyFromYear(), facts.historyToYear());
     }
 
