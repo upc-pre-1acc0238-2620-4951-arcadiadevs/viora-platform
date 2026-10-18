@@ -3,14 +3,15 @@ package com.arcadiadevs.viora.platform.iam.domain.model.valueobjects;
 import java.util.regex.Pattern;
 
 /**
- * Value object representing the plain 6-digit password recovery code delivered to the user.
+ * Value object representing a plain 6-digit one-time code delivered to the user by email.
  *
- * <p>It only travels between the code generator, the email delivery and the reset request; the aggregate keeps
- * just its hash inside {@link PasswordResetToken}.</p>
+ * <p>Used to verify the email address at sign-up and to recover the password. It only travels between the code
+ * generator, the email delivery and the request that submits it; the aggregate keeps just its hash, inside
+ * {@link EmailVerificationToken} or {@link PasswordResetToken}.</p>
  *
  * @param value the 6-digit numeric code
  */
-public record PasswordResetCode(String value) {
+public record VerificationCode(String value) {
 
     private static final Pattern FORMAT = Pattern.compile("\\d{6}");
 
@@ -19,7 +20,7 @@ public record PasswordResetCode(String value) {
      *
      * @throws IllegalArgumentException if the code is missing or is not exactly 6 digits
      */
-    public PasswordResetCode {
+    public VerificationCode {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("user.reset_token.null_or_empty");
         }
