@@ -1,7 +1,9 @@
 package com.arcadiadevs.viora.platform.iam.domain.model;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.EmailVerificationCooldownException;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerificationCodeException;
+import com.arcadiadevs.viora.platform.iam.domain.exceptions.WeakPasswordException;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.EmailVerificationRequestedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordChangedEvent;
@@ -165,7 +167,7 @@ class UserAccountTest {
     void shouldNotResetPasswordOfPendingAccount() {
         var account = pendingAccount(Instant.now());
 
-        assertThatThrownBy(() -> account.requestPasswordReset(HASHER.hash(CODE), Instant.now()))
+        assertThatThrownBy(() -> account.requestPasswordReset(LINK_HASH, Instant.now()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("user.email.not_verified");
     }
@@ -198,18 +200,64 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should successfully change password and emit PasswordChangedEvent")
+    @DisplayName("Should change the password after checking the current one, remember the old one and raise the version")
     void shouldSuccessfullyChangePassword() {
-        var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
-        account.clearDomainEvents();
+        var account = UserAccountFixtures.activeAccount(email.value(), FakePasswordHasher.hashOf("Password123").value(), role);
 
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$anotherhash");
-        account.changePassword(newHash);
+        account.changePassword("Password123", NEW_PASSWORD, PW, Instant.now());
 
-        assertThat(account.snapshot().passwordHash().value()).isEqualTo(newHash.value());
+        var snapshot = account.snapshot();
+        assertThat(snapshot.passwordHash()).isEqualTo(FakePasswordHasher.hashOf(NEW_PASSWORD.value()));
+        assertThat(snapshot.passwordHistory().previousHashes()).containsExactly(FakePasswordHasher.hashOf("Password123"));
+        assertThat(snapshot.credentialsVersion()).isEqualTo(1);
         assertThat(account.domainEvents()).hasSize(1);
         var event = (PasswordChangedEvent) account.domainEvents().iterator().next();
-        assertThat(event.userId()).isEqualTo(account.snapshot().id().userId());
+        assertThat(event.userId()).isEqualTo(snapshot.id().userId());
+    }
+
+    @Test
+    @DisplayName("Should reject a password change with a wrong current password")
+    void shouldRejectWrongCurrentPassword() {
+        var account = UserAccountFixtures.activeAccount(email.value(), FakePasswordHasher.hashOf("Password123").value(), role);
+
+        assertThatThrownBy(() -> account.changePassword("Otra12345", NEW_PASSWORD, PW, Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.password.current_invalid");
+        assertThat(account.snapshot().credentialsVersion()).isZero();
+    }
+
+    @Test
+    @DisplayName("Should reject any of the last 5 passwords, the current one included")
+    void shouldRejectRecentlyUsedPasswords() {
+        var account = UserAccountFixtures.activeAccount(email.value(), FakePasswordHasher.hashOf("Clave0001").value(), role);
+        for (int i = 2; i <= 6; i++) {
+            account.changePassword("Clave000" + (i - 1), new NewPassword("Clave000" + i), PW, Instant.now());
+        }
+        // Current: Clave0006; remembered: Clave0005..Clave0002; Clave0001 is the sixth and is forgotten
+        assertThat(account.snapshot().passwordHistory().previousHashes()).hasSize(PasswordHistory.REMEMBERED_PASSWORDS - 1);
+
+        for (var reused : new String[] {"Clave0006", "Clave0005", "Clave0002"}) {
+            assertThatThrownBy(() -> account.changePassword("Clave0006", new NewPassword(reused), PW, Instant.now()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessage("user.password.reused");
+        }
+        account.changePassword("Clave0006", new NewPassword("Clave0001"), PW, Instant.now());
+        assertThat(account.snapshot().credentialsVersion()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("Should report every broken password rule at once")
+    void shouldReportEveryBrokenPasswordRule() {
+        assertThatThrownBy(() -> new NewPassword("abc"))
+                .isInstanceOfSatisfying(WeakPasswordException.class, ex -> assertThat(ex.violations())
+                        .containsExactly("user.password.min_length", "user.password.letters_and_digits"));
+        assertThatThrownBy(() -> new NewPassword("12345678"))
+                .isInstanceOfSatisfying(WeakPasswordException.class, ex -> assertThat(ex.violations())
+                        .containsExactly("user.password.letters_and_digits"));
+        assertThatThrownBy(() -> new NewPassword("abc12"))
+                .isInstanceOfSatisfying(WeakPasswordException.class, ex -> assertThat(ex.violations())
+                        .containsExactly("user.password.min_length"));
+        assertThat(new NewPassword("NuevaClave456").toString()).doesNotContain("NuevaClave456");
     }
 
     @Test
@@ -230,107 +278,106 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should store only the code hash and emit PasswordResetRequestedEvent without the code")
+    @DisplayName("Should store only the link token hash and emit PasswordResetRequestedEvent without the token")
     void shouldRequestPasswordReset() {
         var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
-        account.clearDomainEvents();
         var now = Instant.now();
 
-        account.requestPasswordReset(HASHER.hash(CODE), now);
+        account.requestPasswordReset(LINK_HASH, now);
 
         var token = account.snapshot().resetToken();
-        assertThat(token.codeHash()).isEqualTo(HASHER.hash(CODE));
-        assertThat(token.expiresAt()).isEqualTo(now.plus(15, ChronoUnit.MINUTES));
-        assertThat(token.failedAttempts()).isZero();
-
+        assertThat(token.tokenHash()).isEqualTo(LINK_HASH);
+        assertThat(token.expiresAt()).isEqualTo(now.plus(30, ChronoUnit.MINUTES));
         assertThat(account.domainEvents()).hasSize(1);
         var event = (PasswordResetRequestedEvent) account.domainEvents().iterator().next();
         assertThat(event.email()).isEqualTo(email.value());
-        assertThat(event.expiresAt()).isEqualTo(token.expiresAt());
     }
 
     @Test
-    @DisplayName("Should successfully reset password with the valid code")
-    void shouldResetPasswordWithValidToken() {
-        var account = accountWithActiveCode();
+    @DisplayName("Should reset the password with the link once, then reject the used link")
+    void shouldResetPasswordWithLinkOnce() {
+        var account = accountWithResetLink(Instant.now());
 
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
-        account.resetPassword(CODE, HASHER, newHash, Instant.now());
+        account.resetPassword(LINK_HASH, NEW_PASSWORD, PW, Instant.now());
 
-        assertThat(account.snapshot().passwordHash().value()).isEqualTo(newHash.value());
+        assertThat(account.snapshot().passwordHash()).isEqualTo(FakePasswordHasher.hashOf(NEW_PASSWORD.value()));
         assertThat(account.snapshot().resetToken()).isNull();
+        assertThat(account.snapshot().credentialsVersion()).isEqualTo(1);
         assertThat(account.domainEvents()).hasSize(1);
         assertThat(account.domainEvents().iterator().next()).isInstanceOf(PasswordResetCompletedEvent.class);
+        assertThatThrownBy(() -> account.resetPassword(LINK_HASH, new NewPassword("OtraClave789"), PW, Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.password_reset.link_expired");
     }
 
     @Test
-    @DisplayName("Should reject expired password reset code")
-    void shouldRejectExpiredResetToken() {
-        var account = accountWithActiveCode();
+    @DisplayName("Should reject a link after 30 minutes, a replaced link, and a reset without link")
+    void shouldRejectExpiredReplacedOrMissingLink() {
+        var issuedAt = Instant.now();
+        var account = accountWithResetLink(issuedAt);
 
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
-        Instant future = Instant.now().plus(20, ChronoUnit.MINUTES);
-
-        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, future))
+        assertThat(account.canResetPasswordWith(LINK_HASH, issuedAt.plus(29, ChronoUnit.MINUTES))).isTrue();
+        assertThat(account.canResetPasswordWith(LINK_HASH, issuedAt.plus(31, ChronoUnit.MINUTES))).isFalse();
+        assertThatThrownBy(() -> account.resetPassword(LINK_HASH, NEW_PASSWORD, PW, issuedAt.plus(31, ChronoUnit.MINUTES)))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessage("user.password_reset.token_expired");
+                .hasMessage("user.password_reset.link_expired");
+
+        account.requestPasswordReset(UserAccountFixtures.tokenHashOf("other-link"), issuedAt);
+        assertThat(account.canResetPasswordWith(LINK_HASH, issuedAt)).isFalse();
+
+        var withoutLink = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
+        assertThatThrownBy(() -> withoutLink.resetPassword(LINK_HASH, NEW_PASSWORD, PW, Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.password_reset.link_expired");
     }
 
     @Test
-    @DisplayName("Should reject a reset when no code was requested")
-    void shouldRejectResetWithoutActiveCode() {
-        var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
+    @DisplayName("Should reject a reset to a recent password without consuming the link")
+    void shouldRejectResetToRecentPassword() {
+        var account = UserAccountFixtures.activeAccount(email.value(), FakePasswordHasher.hashOf("Password123").value(), role);
+        account.requestPasswordReset(LINK_HASH, Instant.now());
 
-        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, Instant.now()))
+        assertThatThrownBy(() -> account.resetPassword(LINK_HASH, new NewPassword("Password123"), PW, Instant.now()))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessage("user.password_reset.no_active_token");
-    }
+                .hasMessage("user.password.reused");
+        assertThat(account.snapshot().resetToken()).isNotNull();
 
-    @Test
-    @DisplayName("Should count wrong codes and lock the token after the maximum attempts")
-    void shouldLockResetTokenAfterMaxFailedAttempts() {
-        var account = accountWithActiveCode();
-        var wrongCode = new VerificationCode("000000");
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$resetpasswordhash");
-
-        for (int attempt = 1; attempt <= PasswordResetToken.MAX_FAILED_ATTEMPTS; attempt++) {
-            assertThatThrownBy(() -> account.resetPassword(wrongCode, HASHER, newHash, Instant.now()))
-                    .isInstanceOf(BusinessRuleException.class)
-                    .hasMessage("user.password_reset.invalid_token");
-            assertThat(account.snapshot().resetToken().failedAttempts()).isEqualTo(attempt);
-        }
-
-        assertThatThrownBy(() -> account.resetPassword(CODE, HASHER, newHash, Instant.now()))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessage("user.password_reset.attempts_exceeded");
-        assertThat(account.snapshot().passwordHash().value()).isEqualTo(hash.value());
+        account.resetPassword(LINK_HASH, NEW_PASSWORD, PW, Instant.now());
+        assertThat(account.snapshot().credentialsVersion()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("Should validate VerificationCode format and PasswordResetToken invariants")
     void shouldValidateResetValueObjects() {
-        var now = Instant.now();
-
         assertThat(new VerificationCode(" 012345 ").value()).isEqualTo("012345");
         assertThatThrownBy(() -> new VerificationCode("12345"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("user.reset_token.format");
+                .hasMessage("user.verification_code.format");
         assertThatThrownBy(() -> new VerificationCode("abcdef"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("user.reset_token.format");
-        assertThatThrownBy(() -> new PasswordResetToken(" ", now, 0))
+                .hasMessage("user.verification_code.format");
+        assertThatThrownBy(() -> new PasswordResetToken(null, Instant.now()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("user.reset_token.null_or_empty");
-        assertThatThrownBy(() -> new PasswordResetToken("hash", now, -1))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("user.reset_token.failed_attempts.negative");
-        assertThatThrownBy(() -> PasswordResetToken.issue("hash", null))
+        assertThatThrownBy(() -> PasswordResetToken.issue(LINK_HASH, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("user.clock.now.null");
+        assertThat(PasswordResetToken.issue(LINK_HASH, Instant.now()).matches(LINK_HASH)).isTrue();
+        assertThat(PasswordResetToken.issue(LINK_HASH, Instant.now()).matches(UserAccountFixtures.tokenHashOf("other"))).isFalse();
+    }
+
+    private static final TokenHash LINK_HASH = UserAccountFixtures.tokenHashOf("link-token");
+
+    private UserAccount accountWithResetLink(Instant issuedAt) {
+        var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
+        account.requestPasswordReset(LINK_HASH, issuedAt);
+        account.clearDomainEvents();
+        return account;
     }
 
     private static final VerificationCode CODE = new VerificationCode("482913");
+    private static final NewPassword NEW_PASSWORD = new NewPassword("NuevaClave456");
+    private static final FakePasswordHasher PW = new FakePasswordHasher();
 
     /** Deterministic stand-in for the Argon2 adapter: the domain only needs hash/matches semantics. */
     private static final VerificationCodeHasher HASHER = new VerificationCodeHasher() {
@@ -353,10 +400,18 @@ class UserAccountTest {
         return account;
     }
 
-    private UserAccount accountWithActiveCode() {
-        var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
-        account.requestPasswordReset(HASHER.hash(CODE), Instant.now());
-        account.clearDomainEvents();
-        return account;
+
+    @Test
+    @DisplayName("Should accept only 64 hexadecimal characters as a token hash")
+    void shouldValidateTokenHash() {
+        assertThat(new TokenHash(" " + LINK_HASH.value().toUpperCase() + " ")).isEqualTo(LINK_HASH);
+        assertThat(LINK_HASH.matches(UserAccountFixtures.tokenHashOf("link-token"))).isTrue();
+        assertThat(LINK_HASH.matches(null)).isFalse();
+        assertThatThrownBy(() -> new TokenHash("link-token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.token_hash.invalid");
+        assertThatThrownBy(() -> new TokenHash(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("user.token_hash.null_or_empty");
     }
 }

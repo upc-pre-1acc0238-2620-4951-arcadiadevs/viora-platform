@@ -9,7 +9,6 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.CalibrateI
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.DeactivateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
-import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers.IoTDeviceController;
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDeviceQueryService;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
@@ -50,8 +49,6 @@ class IoTDeviceControllerIntegrationTest {
     @Mock
     private IoTDeviceQueryService ioTDeviceQueryService;
 
-    @Mock
-    private IoTDeviceRepository ioTDeviceRepository;
 
     private final UUID plotId = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
@@ -59,8 +56,7 @@ class IoTDeviceControllerIntegrationTest {
     void setUp() {
         var controller = new IoTDeviceController(
                 ioTDeviceCommandService,
-                ioTDeviceQueryService,
-                ioTDeviceRepository
+                ioTDeviceQueryService
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -81,7 +77,7 @@ class IoTDeviceControllerIntegrationTest {
 
         when(ioTDeviceCommandService.handle(any(RegisterIoTDeviceCommand.class)))
                 .thenReturn(Result.success(device.snapshot().id().deviceId()));
-        when(ioTDeviceRepository.findById(eq(device.snapshot().id())))
+        when(ioTDeviceQueryService.handle(eq(new com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDeviceByIdQuery(device.snapshot().id()))))
                 .thenReturn(Optional.of(device));
 
         String payload = """
@@ -197,7 +193,7 @@ class IoTDeviceControllerIntegrationTest {
 
         when(ioTDeviceCommandService.handle(any(CalibrateIoTDeviceCommand.class)))
                 .thenReturn(Result.success(deviceId));
-        when(ioTDeviceRepository.findById(eq(new DeviceId(deviceId))))
+        when(ioTDeviceQueryService.handle(eq(new com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDeviceByIdQuery(deviceId))))
                 .thenReturn(Optional.of(device));
 
         String payload = """

@@ -10,7 +10,6 @@ import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarv
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HarvestYield;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
-import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.controllers.HarvestRecordController;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
@@ -55,14 +54,12 @@ class HarvestRecordControllerIntegrationTest {
     @Mock
     private HarvestRecordQueryService harvestRecordQueryService;
 
-    @Mock
-    private ChillAccumulationTrackerRepository trackerRepository;
 
     private final UUID plotId = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
-        var controller = new HarvestRecordController(harvestRecordCommandService, harvestRecordQueryService, trackerRepository);
+        var controller = new HarvestRecordController(harvestRecordCommandService, harvestRecordQueryService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -77,7 +74,7 @@ class HarvestRecordControllerIntegrationTest {
 
         when(harvestRecordCommandService.handle(any(RecordHarvestYieldCommand.class)))
                 .thenReturn(Result.success(entryId));
-        when(trackerRepository.findByPlotId(any(PlotId.class)))
+        when(harvestRecordQueryService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery.class)))
                 .thenReturn(Optional.of(tracker));
 
         String payload = """
@@ -172,7 +169,7 @@ class HarvestRecordControllerIntegrationTest {
 
         when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
                 .thenReturn(Result.success(List.of(entry1.snapshot(), entry2.snapshot())));
-        when(trackerRepository.findByPlotId(any(PlotId.class)))
+        when(harvestRecordQueryService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery.class)))
                 .thenReturn(Optional.of(tracker));
 
         mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records", plotId)
@@ -193,7 +190,7 @@ class HarvestRecordControllerIntegrationTest {
 
         when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
                 .thenReturn(Result.success(List.of(entry.snapshot())));
-        when(trackerRepository.findByPlotId(any(PlotId.class)))
+        when(harvestRecordQueryService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery.class)))
                 .thenReturn(Optional.of(tracker));
 
         mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records?campaignYear=2025", plotId)
@@ -209,7 +206,7 @@ class HarvestRecordControllerIntegrationTest {
     void shouldReturnEmptyListWhenNoRecords() throws Exception {
         when(harvestRecordQueryService.handle(any(GetHarvestRecordsByPlotIdQuery.class)))
                 .thenReturn(Result.success(Collections.emptyList()));
-        when(trackerRepository.findByPlotId(any(PlotId.class)))
+        when(harvestRecordQueryService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery.class)))
                 .thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/plots/{plotId}/harvest-records", plotId)
@@ -246,7 +243,7 @@ class HarvestRecordControllerIntegrationTest {
 
         when(harvestRecordCommandService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.commands.RectifyHarvestYieldCommand.class)))
                 .thenReturn(Result.success(recordId));
-        when(trackerRepository.findByPlotId(any(PlotId.class)))
+        when(harvestRecordQueryService.handle(any(com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery.class)))
                 .thenReturn(Optional.of(tracker));
 
         String payload = """

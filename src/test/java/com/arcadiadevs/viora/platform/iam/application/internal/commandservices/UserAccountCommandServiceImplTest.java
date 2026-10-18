@@ -1,9 +1,13 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.VerificationCodeGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.SecureTokenGenerator;
+import com.arcadiadevs.viora.platform.iam.domain.model.FakePasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.UserAccountFixtures;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
@@ -63,6 +67,19 @@ class UserAccountCommandServiceImplTest {
         }
     };
 
+    /** Hands out "link-token" and hashes it as UserAccountFixtures.tokenHashOf("link-token"). */
+    private static final SecureTokenGenerator LINK_TOKENS = new SecureTokenGenerator() {
+        @Override
+        public String generate() {
+            return "link-token";
+        }
+
+        @Override
+        public TokenHash hash(String token) {
+            return UserAccountFixtures.tokenHashOf(token);
+        }
+    };
+
     @Mock
     private UserAccountRepository userAccountRepository;
 
@@ -78,7 +95,7 @@ class UserAccountCommandServiceImplTest {
     void setUp() {
         VerificationCodeGenerator fixedGenerator = () -> CODE;
         service = new UserAccountCommandServiceImpl(userAccountRepository, eventPublisher, fixedGenerator, HASHER,
-                emailService, "2026-10");
+                new FakePasswordHasher(), LINK_TOKENS, emailService, "2026-10");
     }
 
     @Test
@@ -209,17 +226,17 @@ class UserAccountCommandServiceImplTest {
     }
 
     @Test
-    @DisplayName("Stores only the reset code hash, publishes the domain event and emails the plain code")
-    void requestStoresHashAndEmailsCode() {
+    @DisplayName("Stores only the reset link token hash, publishes the domain event and emails the plain token")
+    void requestStoresHashAndEmailsToken() {
         var account = UserAccountFixtures.activeAccount(EMAIL, NEW_HASH, UserRole.ROLE_PRODUCER);
         when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(account));
 
         var result = service.handle(new RequestPasswordResetCommand(EMAIL));
 
         assertThat(result).isInstanceOf(Result.Success.class);
-        assertThat(account.snapshot().resetToken().codeHash()).isEqualTo("hashed:482913");
+        assertThat(account.snapshot().resetToken().tokenHash()).isEqualTo(UserAccountFixtures.tokenHashOf("link-token"));
         verify(eventPublisher).publishEvent(any(PasswordResetRequestedEvent.class));
-        verify(emailService).sendPasswordResetEmail(EMAIL, "482913");
+        verify(emailService).sendPasswordResetEmail(EMAIL, "link-token");
     }
 
     @Test
@@ -235,42 +252,87 @@ class UserAccountCommandServiceImplTest {
     }
 
     @Test
-    @DisplayName("Answers an unknown email exactly like a wrong reset code")
-    void unknownEmailLooksLikeWrongCode() {
-        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.empty());
+    @DisplayName("Answers an unknown, used or replaced link as an expired link")
+    void unknownLinkLooksExpired() {
+        when(userAccountRepository.findByResetTokenHash(UserAccountFixtures.tokenHashOf("unknown"))).thenReturn(Optional.empty());
 
-        var result = service.handle(new ResetUserPasswordCommand(EMAIL, "123456", NEW_HASH));
+        var result = service.handle(new ResetUserPasswordCommand("unknown", "NuevaClave456"));
 
-        assertThat(failure(result).details()).isEqualTo("user.password_reset.invalid_token");
+        assertThat(failure(result).code()).isEqualTo("PASSWORD_RESET_TOKEN_NOT_FOUND");
+        assertThat(failure(result).details()).isEqualTo("user.password_reset.link_expired");
         verify(userAccountRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Persists the failed reset attempt when the code is wrong")
-    void wrongCodeIsPersisted() {
-        var account = accountWithActiveResetCode();
-        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(account));
+    @DisplayName("Resets the password with the link found by its token hash")
+    void linkResetsPassword() {
+        var account = accountWithResetLink();
+        when(userAccountRepository.findByResetTokenHash(UserAccountFixtures.tokenHashOf("link-token"))).thenReturn(Optional.of(account));
 
-        var result = service.handle(new ResetUserPasswordCommand(EMAIL, "000000", NEW_HASH));
+        var result = service.handle(new ResetUserPasswordCommand("link-token", "NuevaClave456"));
 
-        assertThat(result).isInstanceOf(Result.Failure.class);
+        assertThat(result).isInstanceOf(Result.Success.class);
+        assertThat(account.snapshot().passwordHash()).isEqualTo(FakePasswordHasher.hashOf("NuevaClave456"));
+        assertThat(account.snapshot().resetToken()).isNull();
         verify(userAccountRepository).save(account);
-        assertThat(account.snapshot().resetToken().failedAttempts()).isEqualTo(1);
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher).publishEvent(any(Object.class));
     }
 
     @Test
-    @DisplayName("Resets the password with the right code for the right email")
-    void rightCodeResetsPassword() {
-        var account = accountWithActiveResetCode();
-        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(account));
+    @DisplayName("Rejects a weak password before looking the link up")
+    void weakResetPasswordListsViolations() {
+        var result = service.handle(new ResetUserPasswordCommand("link-token", "abc"));
 
-        var result = service.handle(new ResetUserPasswordCommand(EMAIL, CODE.value(), NEW_HASH));
+        assertThat(failure(result).properties()).containsKey("violations");
+        verify(userAccountRepository, never()).findByResetTokenHash(any());
+    }
 
-        assertThat(result).isInstanceOf(Result.Success.class);
-        assertThat(account.snapshot().passwordHash().value()).isEqualTo(NEW_HASH);
-        assertThat(account.snapshot().resetToken()).isNull();
-        verify(eventPublisher).publishEvent(any(Object.class));
+    @Test
+    @DisplayName("Rejects a weak sign-up password listing every broken rule, and stores nothing")
+    void weakSignUpPasswordListsViolations() {
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.empty());
+
+        var result = service.handle(new RegisterUserAccountCommand(EMAIL, "abc", "ROLE_PRODUCER", true,
+                null, null, null));
+
+        var error = failure(result);
+        assertThat(error.code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.properties()).containsEntry("violations",
+                java.util.List.of("user.password.min_length", "user.password.letters_and_digits"));
+        verify(userAccountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Stores the plain sign-up password only as its hash")
+    void signUpHashesThePassword() {
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.empty());
+        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.handle(new RegisterUserAccountCommand(EMAIL, "Password123", "ROLE_PRODUCER", true, null, null, null));
+
+        var captor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(userAccountRepository).save(captor.capture());
+        assertThat(captor.getValue().snapshot().passwordHash()).isEqualTo(FakePasswordHasher.hashOf("Password123"));
+    }
+
+    @Test
+    @DisplayName("Changes the password only with the right current password")
+    void changePasswordChecksCurrentPassword() {
+        var account = UserAccountFixtures.activeAccount(EMAIL, FakePasswordHasher.hashOf("Password123").value(),
+                UserRole.ROLE_PRODUCER);
+        var userId = account.snapshot().id().userId();
+        when(userAccountRepository.findById(any())).thenReturn(Optional.of(account));
+        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var wrong = service.handle(new ChangeUserPasswordCommand(userId, "Otra12345", "NuevaClave456"));
+        assertThat(failure(wrong).properties()).containsEntry("reason", "user.password.current_invalid");
+
+        var reused = service.handle(new ChangeUserPasswordCommand(userId, "Password123", "Password123"));
+        assertThat(failure(reused).properties()).containsEntry("reason", "user.password.reused");
+
+        var changed = service.handle(new ChangeUserPasswordCommand(userId, "Password123", "NuevaClave456"));
+        assertThat(changed).isInstanceOf(Result.Success.class);
+        assertThat(account.snapshot().credentialsVersion()).isEqualTo(1);
     }
 
     private static RegisterUserAccountCommand signUpCommand(boolean termsAccepted) {
@@ -291,10 +353,10 @@ class UserAccountCommandServiceImplTest {
         return account;
     }
 
-    private static UserAccount accountWithActiveResetCode() {
+    private static UserAccount accountWithResetLink() {
         var account = UserAccountFixtures.activeAccount(EMAIL, "$argon2id$v=19$m=65536,t=3,p=4$oldhash",
                 UserRole.ROLE_PRODUCER);
-        account.requestPasswordReset(HASHER.hash(CODE), Instant.now());
+        account.requestPasswordReset(LINK_TOKENS.hash("link-token"), Instant.now());
         account.clearDomainEvents();
         return account;
     }

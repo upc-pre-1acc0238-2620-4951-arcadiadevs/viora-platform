@@ -5,7 +5,9 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccountSna
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailVerificationToken;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHistory;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TermsAcceptance;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
@@ -32,6 +34,8 @@ public final class UserAccountFixtures {
                 new UserId(),
                 new EmailAddress(email),
                 new PasswordHash(passwordHash),
+                PasswordHistory.empty(),
+                0L,
                 role,
                 UserAccountStatus.ACTIVE,
                 null,
@@ -55,6 +59,8 @@ public final class UserAccountFixtures {
                 new UserId(),
                 new EmailAddress(email),
                 new PasswordHash(passwordHash),
+                PasswordHistory.empty(),
+                0L,
                 UserRole.ROLE_PRODUCER,
                 UserAccountStatus.PENDING_VERIFICATION,
                 EmailVerificationToken.issue("hashed:482913", now),
@@ -63,5 +69,21 @@ public final class UserAccountFixtures {
                 now,
                 now
         ));
+    }
+
+    /**
+     * Returns the SHA-256 token hash of a plain test token, as the real token generator would.
+     *
+     * @param token the plain token
+     * @return its hash
+     */
+    public static TokenHash tokenHashOf(String token) {
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return new TokenHash(java.util.HexFormat.of().formatHex(digest));
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }

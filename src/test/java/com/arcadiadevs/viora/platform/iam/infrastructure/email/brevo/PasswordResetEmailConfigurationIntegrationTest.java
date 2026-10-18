@@ -30,7 +30,7 @@ class PasswordResetEmailConfigurationIntegrationTest {
     @Test
     @DisplayName("The default subject keeps its accents and the em dash")
     void subjectKeepsItsAccents() {
-        assertThat(resetSubject).isEqualTo("Código de recuperación de contraseña — Viora");
+        assertThat(resetSubject).isEqualTo("Restablece tu contraseña — Viora");
     }
 
     @Test
@@ -47,5 +47,15 @@ class PasswordResetEmailConfigurationIntegrationTest {
         mvc.perform(get("/email/copy.png"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("image/png"));
+    }
+
+    @Test
+    @DisplayName("The Android asset links file is served without a session, empty until the app is configured")
+    void assetLinksAreServed() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+
+        mvc.perform(get("/.well-known/assetlinks.json"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
     }
 }
