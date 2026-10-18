@@ -9,11 +9,14 @@ import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetReque
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountActivatedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountRegisteredEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.ports.VerificationCodeHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailVerificationToken;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.OnboardingProfileDetails;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHistory;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.VerificationCode;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordResetToken;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TermsAcceptance;
@@ -30,13 +33,17 @@ import java.time.Instant;
  *
  * <p>Enforces identity assignment, the email verification lifecycle ({@link UserAccountStatus}), password update
  * invariants, and recovery code lifecycles. An account is born pending and can only sign in once its email address
- * is verified. Contains zero JPA, framework, or presentation annotations.</p>
+ * is verified. A new password cannot repeat the last {@link PasswordHistory#REMEMBERED_PASSWORDS} ones, and every
+ * password change raises the credentials version, which invalidates the sessions issued before it. Contains zero
+ * JPA, framework, or presentation annotations.</p>
  */
 public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
 
     private final UserId id;
     private final EmailAddress email;
     private PasswordHash passwordHash;
+    private PasswordHistory passwordHistory;
+    private long credentialsVersion;
     private final UserRole role;
     private UserAccountStatus status;
     private EmailVerificationToken emailVerification;
@@ -49,6 +56,8 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
             UserId id,
             EmailAddress email,
             PasswordHash passwordHash,
+            PasswordHistory passwordHistory,
+            long credentialsVersion,
             UserRole role,
             UserAccountStatus status,
             EmailVerificationToken emailVerification,
@@ -60,6 +69,8 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
         this.id = id;
         this.email = email;
         this.passwordHash = passwordHash;
+        this.passwordHistory = passwordHistory;
+        this.credentialsVersion = credentialsVersion;
         this.role = role;
         this.status = status;
         this.emailVerification = emailVerification;
@@ -116,7 +127,8 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
 
         var id = new UserId();
         var verification = EmailVerificationToken.issue(verificationCodeHash, now);
-        var account = new UserAccount(id, email, passwordHash, role, UserAccountStatus.PENDING_VERIFICATION,
+        var account = new UserAccount(id, email, passwordHash, PasswordHistory.empty(), 0L, role,
+                UserAccountStatus.PENDING_VERIFICATION,
                 verification, termsAcceptance, null, now, now);
         account.registerDomainEvent(new UserAccountRegisteredEvent(id.userId(), email.value(), role.name(), now));
         account.registerSignUpDetails(onboardingProfileDetails, now);
@@ -139,6 +151,8 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
                 snapshot.id(),
                 snapshot.email(),
                 snapshot.passwordHash(),
+                snapshot.passwordHistory(),
+                snapshot.credentialsVersion(),
                 snapshot.role(),
                 snapshot.status(),
                 snapshot.emailVerification(),
@@ -253,34 +267,57 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
     }
 
     /**
-     * Modifies the account password.
+     * Changes the password of an active account, after checking the current one.
      *
-     * @param newPasswordHash new hashed password
+     * <p>The new password cannot repeat any of the last {@link PasswordHistory#REMEMBERED_PASSWORDS} passwords. The
+     * change raises the credentials version, so the sessions issued before it stop working.</p>
+     *
+     * @param currentPassword the current plain password, as typed by the user
+     * @param newPassword     the new password, already checked against the password rules
+     * @param hasher          the port hashing and checking passwords
+     * @param now             the instant of the change
+     * @throws IllegalArgumentException if an argument is missing
+     * @throws BusinessRuleException    if the account is not active, the current password is wrong, or the new one
+     *                                  was used recently
      */
-    public void changePassword(PasswordHash newPasswordHash) {
-        if (newPasswordHash == null) {
-            throw new IllegalArgumentException("user.password_hash.null");
+    public void changePassword(String currentPassword, NewPassword newPassword, PasswordHasher hasher, Instant now) {
+        if (currentPassword == null) {
+            throw new IllegalArgumentException("user.password.current.null");
         }
-        this.passwordHash = newPasswordHash;
-        this.resetToken = null;
-        this.updatedAt = Instant.now();
-        registerDomainEvent(new PasswordChangedEvent(this.id.userId(), this.updatedAt));
-    }
-
-    /**
-     * Stores the hash of a freshly issued recovery code, replacing any previous one, and registers
-     * {@link PasswordResetRequestedEvent}.
-     *
-     * @param codeHash the hash of the issued recovery code
-     * @param now      the instant the code is issued
-     * @throws IllegalArgumentException if the hash is missing or {@code now} is null
-     * @throws BusinessRuleException    if the email address is not verified yet
-     */
-    public void requestPasswordReset(String codeHash, Instant now) {
+        if (newPassword == null) {
+            throw new IllegalArgumentException("user.password.null");
+        }
+        if (hasher == null) {
+            throw new IllegalArgumentException("user.password_hasher.null");
+        }
+        if (now == null) {
+            throw new IllegalArgumentException("user.clock.now.null");
+        }
         if (this.status != UserAccountStatus.ACTIVE) {
             throw new BusinessRuleException("user.email.not_verified");
         }
-        var token = PasswordResetToken.issue(codeHash, now);
+        if (!hasher.matches(currentPassword, this.passwordHash)) {
+            throw new BusinessRuleException("user.password.current_invalid");
+        }
+
+        replacePassword(newPassword, hasher, now);
+        registerDomainEvent(new PasswordChangedEvent(this.id.userId(), now));
+    }
+
+    /**
+     * Stores the hash of the token of a freshly issued password reset link, replacing any previous link, and
+     * registers {@link PasswordResetRequestedEvent}.
+     *
+     * @param tokenHash the hash of the token carried by the link
+     * @param now       the instant the link is issued
+     * @throws IllegalArgumentException if the hash is missing or {@code now} is null
+     * @throws BusinessRuleException    if the email address is not verified yet
+     */
+    public void requestPasswordReset(String tokenHash, Instant now) {
+        if (this.status != UserAccountStatus.ACTIVE) {
+            throw new BusinessRuleException("user.email.not_verified");
+        }
+        var token = PasswordResetToken.issue(tokenHash, now);
         this.resetToken = token;
         this.updatedAt = now;
         registerDomainEvent(new PasswordResetRequestedEvent(
@@ -292,52 +329,62 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
     }
 
     /**
-     * Consumes a valid recovery code to reset the password.
+     * Checks whether a password reset link can still be used, without consuming it.
      *
-     * <p>A wrong code is recorded on the token before the exception is thrown, so the caller must persist the
-     * aggregate even when this method fails. After {@link PasswordResetToken#MAX_FAILED_ATTEMPTS} wrong codes the
-     * token is locked until a new code is requested.</p>
-     *
-     * @param code            the code submitted by the user
-     * @param hasher          the port verifying the code against the stored hash
-     * @param newPasswordHash new hashed password
-     * @param now             current instant for expiry verification
-     * @throws IllegalArgumentException if an argument is missing
-     * @throws BusinessRuleException    if there is no active code, it expired, it is locked, or it does not match
+     * @param tokenHash hash of the token taken from the link
+     * @param now       current instant
+     * @return true if the link is the active one and has not expired
      */
-    public void resetPassword(VerificationCode code, VerificationCodeHasher hasher, PasswordHash newPasswordHash, Instant now) {
-        if (code == null) {
-            throw new IllegalArgumentException("user.reset_token.null_or_empty");
+    public boolean canResetPasswordWith(String tokenHash, Instant now) {
+        return now != null && this.resetToken != null && this.resetToken.matches(tokenHash)
+                && this.resetToken.isUsableAt(now);
+    }
+
+    /**
+     * Consumes the password reset link to set a new password. The link can be used only once.
+     *
+     * <p>The new password cannot repeat any of the last {@link PasswordHistory#REMEMBERED_PASSWORDS} passwords; a
+     * repeated one is rejected without consuming the link. The reset raises the credentials version, so the
+     * sessions issued before it stop working.</p>
+     *
+     * @param tokenHash      hash of the token taken from the link
+     * @param newPassword    the new password, already checked against the password rules
+     * @param passwordHasher the port hashing and checking passwords
+     * @param now            the instant of the reset
+     * @throws IllegalArgumentException if an argument is missing
+     * @throws BusinessRuleException    if the link is not the active one, expired or was already used, or the new
+     *                                  password was used recently
+     */
+    public void resetPassword(String tokenHash, NewPassword newPassword, PasswordHasher passwordHasher, Instant now) {
+        if (newPassword == null) {
+            throw new IllegalArgumentException("user.password.null");
         }
-        if (hasher == null) {
-            throw new IllegalArgumentException("user.reset_code_hasher.null");
-        }
-        if (newPasswordHash == null) {
-            throw new IllegalArgumentException("user.password_hash.null");
+        if (passwordHasher == null) {
+            throw new IllegalArgumentException("user.password_hasher.null");
         }
         if (now == null) {
             throw new IllegalArgumentException("user.clock.now.null");
         }
-
-        if (this.resetToken == null) {
-            throw new BusinessRuleException("user.password_reset.no_active_token");
-        }
-        if (this.resetToken.isExpired(now)) {
-            throw new BusinessRuleException("user.password_reset.token_expired");
-        }
-        if (this.resetToken.hasExhaustedAttempts()) {
-            throw new BusinessRuleException("user.password_reset.attempts_exceeded");
-        }
-        if (!hasher.matches(code, this.resetToken.codeHash())) {
-            this.resetToken = this.resetToken.withFailedAttempt();
-            this.updatedAt = now;
-            throw new BusinessRuleException("user.password_reset.invalid_token");
+        if (!canResetPasswordWith(tokenHash, now)) {
+            throw new BusinessRuleException("user.password_reset.link_expired");
         }
 
-        this.passwordHash = newPasswordHash;
+        replacePassword(newPassword, passwordHasher, now);
+        registerDomainEvent(new PasswordResetCompletedEvent(this.id.userId(), now));
+    }
+
+    private void replacePassword(NewPassword newPassword, PasswordHasher hasher, Instant now) {
+        var reused = hasher.matches(newPassword.value(), this.passwordHash)
+                || this.passwordHistory.previousHashes().stream()
+                .anyMatch(previous -> hasher.matches(newPassword.value(), previous));
+        if (reused) {
+            throw new BusinessRuleException("user.password.reused");
+        }
+        this.passwordHistory = this.passwordHistory.remember(this.passwordHash);
+        this.passwordHash = hasher.hash(newPassword);
+        this.credentialsVersion++;
         this.resetToken = null;
         this.updatedAt = now;
-        registerDomainEvent(new PasswordResetCompletedEvent(this.id.userId(), now));
     }
 
     private void ensurePendingVerification(String violationKey) {
@@ -388,6 +435,8 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
                 this.id,
                 this.email,
                 this.passwordHash,
+                this.passwordHistory,
+                this.credentialsVersion,
                 this.role,
                 this.status,
                 this.emailVerification,
