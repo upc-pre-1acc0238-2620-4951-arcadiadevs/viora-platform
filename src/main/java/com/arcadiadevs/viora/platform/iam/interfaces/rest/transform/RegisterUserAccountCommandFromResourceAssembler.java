@@ -11,14 +11,14 @@ public final class RegisterUserAccountCommandFromResourceAssembler {
     private RegisterUserAccountCommandFromResourceAssembler() {
     }
 
-    public static RegisterUserAccountCommand toCommandFromResource(SignUpResource resource, String encodedPassword) {
+    public static RegisterUserAccountCommand toCommandFromResource(SignUpResource resource) {
         if (resource == null) {
             return null;
         }
         var profile = resource.profile();
         return new RegisterUserAccountCommand(
                 resource.email(),
-                encodedPassword,
+                resource.password(),
                 resource.role(),
                 Boolean.TRUE.equals(resource.termsAccepted()),
                 profile != null ? profile.fullName() : null,

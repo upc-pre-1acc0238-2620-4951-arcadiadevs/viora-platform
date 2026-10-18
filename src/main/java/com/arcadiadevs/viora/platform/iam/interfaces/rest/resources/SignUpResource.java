@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 /**
  * Resource payload for user account registration, optionally containing profile data for mobile onboarding.
@@ -15,7 +14,6 @@ public record SignUpResource(
         String email,
 
         @NotBlank(message = "user.password.blank")
-        @Size(min = 8, message = "user.password.min_length")
         String password,
 
         @NotBlank(message = "user.role.blank")
