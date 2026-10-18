@@ -60,7 +60,7 @@ public class ProfileCommandServiceImpl implements ProfileCommandService {
         }
         try {
             var userId = new UserId(command.userId());
-            if (!externalIamService.existsActiveUser(userId)) {
+            if (!externalIamService.existsUser(userId)) {
                 return Result.failure(ApplicationError.notFound("user", command.userId()));
             }
 

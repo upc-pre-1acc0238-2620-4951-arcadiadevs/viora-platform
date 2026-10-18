@@ -20,15 +20,17 @@ public class ExternalIamService {
     }
 
     /**
-     * Checks if the referenced user account exists in active status within IAM.
+     * Checks if the referenced user account exists in IAM, verified or still pending verification.
+     *
+     * <p>The profile is created during sign-up, before the email is verified, so a pending account is accepted.</p>
      *
      * @param userId local Profiles UserId value object
      * @return true if user exists in IAM; false otherwise
      */
-    public boolean existsActiveUser(UserId userId) {
+    public boolean existsUser(UserId userId) {
         if (userId == null) {
             return false;
         }
-        return iamContextFacade.existsActiveUser(userId.userId());
+        return iamContextFacade.existsUser(userId.userId());
     }
 }

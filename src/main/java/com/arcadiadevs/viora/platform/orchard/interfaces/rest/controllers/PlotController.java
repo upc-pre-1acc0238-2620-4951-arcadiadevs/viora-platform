@@ -13,7 +13,6 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDelta
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotStatus;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.ProducerId;
-import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.CreatePlotResource;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.PlotResource;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources.UpdatePlotResource;
@@ -58,7 +57,6 @@ public class PlotController {
 
     private final PlotCommandService plotCommandService;
     private final PlotQueryService plotQueryService;
-    private final PlotRepository plotRepository;
     private final CurrentUserProvider currentUserProvider;
 
     /**
@@ -66,18 +64,15 @@ public class PlotController {
      *
      * @param plotCommandService  the plot command service
      * @param plotQueryService    the plot query service
-     * @param plotRepository      the domain plot repository port
      * @param currentUserProvider resolves the authenticated user, who acts as the plot producer
      */
     public PlotController(
             PlotCommandService plotCommandService,
             PlotQueryService plotQueryService,
-            PlotRepository plotRepository,
             CurrentUserProvider currentUserProvider
     ) {
         this.plotCommandService = plotCommandService;
         this.plotQueryService = plotQueryService;
-        this.plotRepository = plotRepository;
         this.currentUserProvider = currentUserProvider;
     }
 
@@ -117,7 +112,7 @@ public class PlotController {
                 resource
         );
         var result = plotCommandService.handle(createPlotCommand)
-                .flatMap(plotId -> plotRepository.findById(new PlotId(plotId))
+                .flatMap(plotId -> plotQueryService.handle(new GetPlotByIdQuery(new PlotId(plotId), effectiveProducerId))
                         .<Result<Plot, ApplicationError>>map(Result::success)
                         .orElseGet(() -> Result.failure(ApplicationError.notFound("Plot", plotId))));
 

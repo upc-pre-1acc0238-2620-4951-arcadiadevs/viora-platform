@@ -69,6 +69,22 @@ public record ApplicationError(
     }
 
     /**
+     * Creates a validation error carrying extra context for the client, such as every broken rule of an input.
+     *
+     * @param fieldOrConcept the field or concept that failed validation
+     * @param reason         the reason for the validation failure
+     * @param properties     extra properties copied into the problem detail
+     * @return an {@link ApplicationError} configured for validation errors
+     */
+    public static ApplicationError validationError(String fieldOrConcept, String reason, Map<String, Object> properties) {
+        return new ApplicationError(
+                "VALIDATION_ERROR",
+                "Validation failed: %s".formatted(fieldOrConcept),
+                reason,
+                properties);
+    }
+
+    /**
      * Creates a not-found error when the requested resource does not exist.
      *
      * @param resourceType the type of the resource (e.g., "item", "resource")
