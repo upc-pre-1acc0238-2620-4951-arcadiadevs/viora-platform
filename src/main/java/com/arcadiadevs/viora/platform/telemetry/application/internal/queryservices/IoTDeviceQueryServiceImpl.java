@@ -2,12 +2,14 @@ package com.arcadiadevs.viora.platform.telemetry.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDeviceQueryService;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDeviceByIdQuery;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of {@link IoTDeviceQueryService} handling IoT device queries without business side-effects.
@@ -36,5 +38,13 @@ public class IoTDeviceQueryServiceImpl implements IoTDeviceQueryService {
             throw new IllegalArgumentException("query.null");
         }
         return ioTDeviceRepository.findAllByPlotId(query.plotId());
+    }
+
+    @Override
+    public Optional<IoTDevice> handle(GetIoTDeviceByIdQuery query) {
+        if (query == null) {
+            throw new IllegalArgumentException("query.null");
+        }
+        return ioTDeviceRepository.findById(query.deviceId());
     }
 }
