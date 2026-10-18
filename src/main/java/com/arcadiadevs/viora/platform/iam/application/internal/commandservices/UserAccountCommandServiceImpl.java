@@ -1,24 +1,31 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
-import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.PasswordResetCodeGenerator;
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.VerificationCodeGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.iam.domain.exceptions.EmailVerificationCooldownException;
+import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerificationCodeException;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResetUserPasswordCommand;
-import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordResetCodeHasher;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.VerificationCodeHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.OnboardingProfileDetails;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
-import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordResetCode;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TermsAcceptance;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.VerificationCode;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +33,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Application service implementation orchestrating mutating commands on user accounts.
@@ -36,26 +45,29 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
     private final UserAccountRepository userAccountRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final PasswordResetCodeGenerator resetCodeGenerator;
-    private final PasswordResetCodeHasher resetCodeHasher;
+    private final VerificationCodeGenerator codeGenerator;
+    private final VerificationCodeHasher codeHasher;
     private final TransactionalEmailService emailService;
+    private final String termsVersion;
 
     /**
      * Creates the command service.
      *
      * @param userAccountRepository the user account repository port
      * @param eventPublisher        publisher of the domain events raised by the aggregate
-     * @param resetCodeGenerator    generator of password recovery codes
-     * @param resetCodeHasher       hasher of password recovery codes
-     * @param emailService          transactional email port delivering recovery codes
-     * @throws IllegalArgumentException if any dependency is null
+     * @param codeGenerator         generator of email verification and password recovery codes
+     * @param codeHasher            hasher of those codes
+     * @param emailService          transactional email port delivering the codes
+     * @param termsVersion          version of the terms that sign-up records as accepted
+     * @throws IllegalArgumentException if any dependency is null or the terms version is blank
      */
     public UserAccountCommandServiceImpl(
             UserAccountRepository userAccountRepository,
             ApplicationEventPublisher eventPublisher,
-            PasswordResetCodeGenerator resetCodeGenerator,
-            PasswordResetCodeHasher resetCodeHasher,
-            TransactionalEmailService emailService
+            VerificationCodeGenerator codeGenerator,
+            VerificationCodeHasher codeHasher,
+            TransactionalEmailService emailService,
+            @Value("${viora.iam.terms-version}") String termsVersion
     ) {
         if (userAccountRepository == null) {
             throw new IllegalArgumentException("user.repository.null");
@@ -63,22 +75,33 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         if (eventPublisher == null) {
             throw new IllegalArgumentException("user.event_publisher.null");
         }
-        if (resetCodeGenerator == null) {
-            throw new IllegalArgumentException("user.reset_code_generator.null");
+        if (codeGenerator == null) {
+            throw new IllegalArgumentException("user.verification_code_generator.null");
         }
-        if (resetCodeHasher == null) {
-            throw new IllegalArgumentException("user.reset_code_hasher.null");
+        if (codeHasher == null) {
+            throw new IllegalArgumentException("user.verification_code_hasher.null");
         }
         if (emailService == null) {
             throw new IllegalArgumentException("email.service.null");
         }
+        if (termsVersion == null || termsVersion.isBlank()) {
+            throw new IllegalArgumentException("user.terms.version.null_or_empty");
+        }
         this.userAccountRepository = userAccountRepository;
         this.eventPublisher = eventPublisher;
-        this.resetCodeGenerator = resetCodeGenerator;
-        this.resetCodeHasher = resetCodeHasher;
+        this.codeGenerator = codeGenerator;
+        this.codeHasher = codeHasher;
         this.emailService = emailService;
+        this.termsVersion = termsVersion.trim();
     }
 
+    /**
+     * Signs up a pending account and emails its verification code. Signing up again over a pending account that was
+     * never verified reuses it, with a fresh code.
+     *
+     * @param command registration command
+     * @return the account identifier, or a conflict when the email already belongs to an active account
+     */
     @Override
     public Result<String, ApplicationError> handle(RegisterUserAccountCommand command) {
         if (command == null) {
@@ -86,25 +109,122 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         }
         try {
             var email = new EmailAddress(command.email());
-            if (userAccountRepository.existsByEmail(email)) {
+            var existingAccount = userAccountRepository.findByEmail(email);
+            if (existingAccount.isPresent()
+                    && existingAccount.get().snapshot().status() == UserAccountStatus.ACTIVE) {
                 return Result.failure(ApplicationError.conflict("user", "user.email.already_exists"));
             }
 
+            var now = Instant.now();
             var passwordHash = new PasswordHash(command.passwordHash());
             var role = UserRole.from(command.role());
-
+            var termsAcceptance = command.termsAccepted() ? new TermsAcceptance(termsVersion, now) : null;
             var profileDetails = command.hasProfileDetails()
                     ? new OnboardingProfileDetails(command.fullName(), command.country(), command.phoneNumber())
                     : null;
-            var account = UserAccount.register(email, passwordHash, role, profileDetails);
-            var savedAccount = userAccountRepository.save(account);
+            var code = codeGenerator.generate();
+            var codeHash = codeHasher.hash(code);
 
-            for (var event : account.domainEvents()) {
-                eventPublisher.publishEvent(event);
+            UserAccount account;
+            if (existingAccount.isPresent()) {
+                account = existingAccount.get();
+                if (role != account.snapshot().role()) {
+                    return Result.failure(ApplicationError.validationError("argument", "user.role.sign_up_not_allowed"));
+                }
+                try {
+                    account.restartSignUp(passwordHash, termsAcceptance, profileDetails, codeHash, now);
+                } catch (EmailVerificationCooldownException ex) {
+                    return Result.failure(ApplicationError.tooManyRequests("email-verification", ex.getMessage(),
+                            ex.retryAfterSeconds()));
+                } catch (BusinessRuleException ex) {
+                    return Result.failure(ApplicationError.conflict("user", ex.getMessage()));
+                }
+            } else {
+                account = UserAccount.signUp(email, passwordHash, role, termsAcceptance, profileDetails, codeHash, now);
             }
-            account.clearDomainEvents();
+            var savedAccount = userAccountRepository.save(account);
+            publishDomainEvents(account);
+            afterCommit(() -> emailService.sendEmailVerificationEmail(email.value(), code.value()));
+
+            // Not caught here: a profile rejected by the Profiles context while the events are published rolls the
+            // whole sign-up back, so no account is left without its profile
+            return Result.success(savedAccount.snapshot().id().userId());
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        }
+    }
+
+    /**
+     * Verifies the email address of a pending account and activates it.
+     *
+     * @param command verification command
+     * @return the activated account identifier, or why the code was rejected
+     */
+    @Override
+    public Result<String, ApplicationError> handle(VerifyEmailCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "user.command.null"));
+        }
+        try {
+            var code = new VerificationCode(command.code());
+            var optionalAccount = userAccountRepository.findByEmail(new EmailAddress(command.email()));
+            if (optionalAccount.isEmpty()) {
+                return Result.failure(emailVerificationError("user.email_verification.no_active_code", Map.of()));
+            }
+
+            var account = optionalAccount.get();
+            try {
+                account.verifyEmail(code, codeHasher, Instant.now());
+            } catch (InvalidEmailVerificationCodeException ex) {
+                // The wrong code is counted on the aggregate, so it must be persisted even though the check failed
+                userAccountRepository.save(account);
+                return Result.failure(emailVerificationError(ex.getMessage(),
+                        Map.of("remainingAttempts", ex.remainingAttempts())));
+            } catch (BusinessRuleException ex) {
+                return Result.failure(emailVerificationError(ex.getMessage(), Map.of()));
+            }
+            var savedAccount = userAccountRepository.save(account);
+            publishDomainEvents(account);
 
             return Result.success(savedAccount.snapshot().id().userId());
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        }
+    }
+
+    /**
+     * Emails a new verification code to a pending account. Unknown and already active emails get the same empty
+     * success, so the endpoint does not reveal which addresses are pending.
+     *
+     * @param command resend command
+     * @return empty success, or a too many requests error carrying the seconds to wait
+     */
+    @Override
+    public Result<Void, ApplicationError> handle(ResendEmailVerificationCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "user.command.null"));
+        }
+        try {
+            var email = new EmailAddress(command.email());
+            var optionalAccount = userAccountRepository.findByEmail(email);
+            if (optionalAccount.isEmpty()
+                    || optionalAccount.get().snapshot().status() != UserAccountStatus.PENDING_VERIFICATION) {
+                return Result.success(null);
+            }
+
+            var account = optionalAccount.get();
+            var code = codeGenerator.generate();
+            try {
+                account.resendEmailVerification(codeHasher.hash(code), Instant.now());
+            } catch (EmailVerificationCooldownException ex) {
+                return Result.failure(ApplicationError.tooManyRequests("email-verification", ex.getMessage(),
+                        ex.retryAfterSeconds()));
+            }
+            userAccountRepository.save(account);
+            publishDomainEvents(account);
+            afterCommit(() -> emailService.sendEmailVerificationEmail(email.value(), code.value()));
+
+            return Result.success(null);
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
@@ -148,16 +268,16 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
             if (optionalAccount.isPresent()) {
                 var account = optionalAccount.get();
-                var code = resetCodeGenerator.generate();
-                account.requestPasswordReset(resetCodeHasher.hash(code), Instant.now());
-                userAccountRepository.save(account);
-
-                for (var event : account.domainEvents()) {
-                    eventPublisher.publishEvent(event);
+                var code = codeGenerator.generate();
+                try {
+                    account.requestPasswordReset(codeHasher.hash(code), Instant.now());
+                } catch (BusinessRuleException ex) {
+                    // A pending account cannot recover a password it never activated; it answers like any other
+                    return Result.success(null);
                 }
-                account.clearDomainEvents();
-
-                sendResetCodeAfterCommit(email.value(), code);
+                userAccountRepository.save(account);
+                publishDomainEvents(account);
+                afterCommit(() -> emailService.sendPasswordResetEmail(email.value(), code.value()));
             }
 
             // Always respond success to prevent user enumeration
@@ -181,7 +301,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
             var account = optionalAccount.get();
             try {
-                account.resetPassword(new PasswordResetCode(command.resetToken()), resetCodeHasher,
+                account.resetPassword(new VerificationCode(command.resetToken()), codeHasher,
                         new PasswordHash(command.newPasswordHash()), Instant.now());
             } catch (BusinessRuleException ex) {
                 // A wrong code is counted on the aggregate, so it must be persisted even though the reset failed
@@ -189,11 +309,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                 return Result.failure(ApplicationError.businessRuleViolation("password_reset", ex.getMessage()));
             }
             userAccountRepository.save(account);
-
-            for (var event : account.domainEvents()) {
-                eventPublisher.publishEvent(event);
-            }
-            account.clearDomainEvents();
+            publishDomainEvents(account);
 
             return Result.success(null);
         } catch (IllegalArgumentException ex) {
@@ -201,19 +317,32 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         }
     }
 
+    private void publishDomainEvents(UserAccount account) {
+        for (var event : account.domainEvents()) {
+            eventPublisher.publishEvent(event);
+        }
+        account.clearDomainEvents();
+    }
+
+    private static ApplicationError emailVerificationError(String reason, Map<String, Object> extra) {
+        var properties = new HashMap<String, Object>(extra);
+        properties.put("reason", reason);
+        return ApplicationError.businessRuleViolation("email_verification", reason, properties);
+    }
+
     /**
-     * Delivers the plain code only once the transaction storing its hash commits, so a rolled back request never
-     * emails a code that does not exist. Outside a transaction the code is sent right away.
+     * Runs the email delivery only once the transaction storing the code hash commits, so a rolled back request
+     * never emails a code that does not exist. Outside a transaction it runs right away.
      */
-    private void sendResetCodeAfterCommit(String recipientEmail, PasswordResetCode code) {
+    private static void afterCommit(Runnable delivery) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            emailService.sendPasswordResetEmail(recipientEmail, code.value());
+            delivery.run();
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                emailService.sendPasswordResetEmail(recipientEmail, code.value());
+                delivery.run();
             }
         });
     }

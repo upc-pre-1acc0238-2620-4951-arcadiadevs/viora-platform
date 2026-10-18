@@ -10,12 +10,28 @@ import com.arcadiadevs.viora.platform.shared.application.result.Result;
 public interface UserAccountCommandService {
 
     /**
-     * Handles new user account registration.
+     * Handles sign-up: creates a pending account, or reuses a pending one, and emails its verification code.
      *
      * @param command registration command
-     * @return created user account identifier or application error
+     * @return the account identifier or application error
      */
     Result<String, ApplicationError> handle(RegisterUserAccountCommand command);
+
+    /**
+     * Verifies the email address of a pending account and activates it.
+     *
+     * @param command verification command
+     * @return the activated account identifier or application error
+     */
+    Result<String, ApplicationError> handle(VerifyEmailCommand command);
+
+    /**
+     * Emails a new verification code to a pending account, respecting the resend cooldown.
+     *
+     * @param command resend command
+     * @return empty success or application error
+     */
+    Result<Void, ApplicationError> handle(ResendEmailVerificationCommand command);
 
     /**
      * Handles authenticated password change.
