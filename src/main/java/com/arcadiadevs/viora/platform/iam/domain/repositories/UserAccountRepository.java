@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.iam.domain.repositories;
 
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 
 import java.util.Optional;
@@ -44,4 +45,13 @@ public interface UserAccountRepository {
      * @return true if an account exists; false otherwise
      */
     boolean existsByEmail(EmailAddress email);
+
+    /**
+     * Finds the account whose current password reset link carries the given token hash. It does not check whether
+     * the link is still usable: that is decided by {@link UserAccount#canResetPasswordWith}.
+     *
+     * @param resetTokenHash hash of the token taken from the reset link
+     * @return Optional containing the aggregate if found
+     */
+    Optional<UserAccount> findByResetTokenHash(TokenHash resetTokenHash);
 }

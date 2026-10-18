@@ -5,6 +5,8 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccountSna
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.entities.UserAccountPersistenceEntity;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,6 +32,10 @@ public final class UserAccountPersistenceAssembler {
         entity.setId(UUID.fromString(snapshot.id().userId()));
         entity.setEmail(snapshot.email().value());
         entity.setPasswordHash(snapshot.passwordHash().value());
+        entity.setPasswordHistory(new ArrayList<>(snapshot.passwordHistory().previousHashes().stream()
+                .map(PasswordHash::value)
+                .toList()));
+        entity.setCredentialsVersion(snapshot.credentialsVersion());
         entity.setRole(snapshot.role().name());
         entity.setStatus(snapshot.status().name());
 
@@ -52,13 +58,11 @@ public final class UserAccountPersistenceAssembler {
         }
 
         if (snapshot.resetToken() != null) {
-            entity.setResetCodeHash(snapshot.resetToken().codeHash());
+            entity.setResetTokenHash(snapshot.resetToken().tokenHash().value());
             entity.setResetTokenExpiresAt(snapshot.resetToken().expiresAt());
-            entity.setResetFailedAttempts(snapshot.resetToken().failedAttempts());
         } else {
-            entity.setResetCodeHash(null);
+            entity.setResetTokenHash(null);
             entity.setResetTokenExpiresAt(null);
-            entity.setResetFailedAttempts(null);
         }
 
         entity.setCreatedAt(snapshot.createdAt());
@@ -78,9 +82,8 @@ public final class UserAccountPersistenceAssembler {
         }
 
         PasswordResetToken resetToken = null;
-        if (entity.getResetCodeHash() != null && entity.getResetTokenExpiresAt() != null) {
-            int failedAttempts = entity.getResetFailedAttempts() != null ? entity.getResetFailedAttempts() : 0;
-            resetToken = new PasswordResetToken(entity.getResetCodeHash(), entity.getResetTokenExpiresAt(), failedAttempts);
+        if (entity.getResetTokenHash() != null && entity.getResetTokenExpiresAt() != null) {
+            resetToken = new PasswordResetToken(new TokenHash(entity.getResetTokenHash()), entity.getResetTokenExpiresAt());
         }
 
         EmailVerificationToken emailVerification = null;
@@ -103,6 +106,9 @@ public final class UserAccountPersistenceAssembler {
                 new UserId(entity.getId().toString()),
                 new EmailAddress(entity.getEmail()),
                 new PasswordHash(entity.getPasswordHash()),
+                new PasswordHistory(entity.getPasswordHistory() == null ? List.of()
+                        : entity.getPasswordHistory().stream().map(PasswordHash::new).toList()),
+                entity.getCredentialsVersion() != null ? entity.getCredentialsVersion() : 0L,
                 UserRole.valueOf(entity.getRole()),
                 status,
                 emailVerification,

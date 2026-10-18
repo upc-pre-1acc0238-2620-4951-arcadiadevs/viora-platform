@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.email.brevo;
 
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.http.HttpClient;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -27,7 +29,7 @@ import java.util.Map;
  *
  * <p>Implements the {@link TransactionalEmailService} outbound application port, satisfying
  * Hexagonal Architecture and the Dependency Inversion Principle. Each email body is read from a classpath template
- * under {@code templates/email/}; its images are served by the platform itself
+ * under {@code templates/email/}; the password reset link is built from {@link DeepLinkProperties}; its images are served by the platform itself
  * from {@code static/email}, so they are linked with the public base URL of the platform.</p>
  */
 @Component
@@ -35,9 +37,10 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
 
     private static final Logger LOG = LoggerFactory.getLogger(BrevoTransactionalEmailAdapter.class);
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-    private static final String RESET_CODE_TEMPLATE = "templates/email/password-reset-code.html";
+    private static final String RESET_LINK_TEMPLATE = "templates/email/password-reset-link.html";
     private static final String VERIFICATION_CODE_TEMPLATE = "templates/email/email-verification-code.html";
     private static final String CODE_PLACEHOLDER = "{{code}}";
+    private static final String RESET_LINK_PLACEHOLDER = "{{resetLink}}";
     private static final String ASSETS_BASE_URL_PLACEHOLDER = "{{assetsBaseUrl}}";
 
     private final RestClient restClient;
@@ -48,7 +51,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     private final String resetSubject;
     private final String verificationSubject;
     private final String assetsBaseUrl;
-    private final String resetCodeTemplate;
+    private final DeepLinkProperties deepLinks;
+    private final String resetLinkTemplate;
     private final String verificationCodeTemplate;
 
     /**
@@ -61,6 +65,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param resetSubject        the subject of the password reset email
      * @param verificationSubject the subject of the email verification email
      * @param assetsBaseUrl public base URL of the platform, where the email images are served
+     * @param deepLinks     builds the password reset link that opens the app
      */
     @Autowired
     public BrevoTransactionalEmailAdapter(
@@ -70,10 +75,11 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             @Value("${viora.brevo.sender-name}") String senderName,
             @Value("${viora.brevo.reset-subject}") String resetSubject,
             @Value("${viora.brevo.verification-subject}") String verificationSubject,
-            @Value("${viora.brevo.assets-base-url}") String assetsBaseUrl
+            @Value("${viora.brevo.assets-base-url}") String assetsBaseUrl,
+            DeepLinkProperties deepLinks
     ) {
         this(defaultRestClient(), enabled, apiKey, senderEmail, senderName, resetSubject, verificationSubject,
-                assetsBaseUrl);
+                assetsBaseUrl, deepLinks);
     }
 
     /**
@@ -87,6 +93,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param resetSubject        the subject of the password reset email
      * @param verificationSubject the subject of the email verification email
      * @param assetsBaseUrl public base URL of the platform, where the email images are served
+     * @param deepLinks     builds the password reset link that opens the app
      */
     public BrevoTransactionalEmailAdapter(
             RestClient restClient,
@@ -96,7 +103,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             String senderName,
             String resetSubject,
             String verificationSubject,
-            String assetsBaseUrl
+            String assetsBaseUrl,
+            DeepLinkProperties deepLinks
     ) {
         this.restClient = restClient;
         this.enabled = enabled;
@@ -106,27 +114,32 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
         this.resetSubject = resetSubject;
         this.verificationSubject = verificationSubject;
         this.assetsBaseUrl = assetsBaseUrl != null ? assetsBaseUrl.trim().replaceAll("/+$", "") : "";
-        this.resetCodeTemplate = loadTemplate(RESET_CODE_TEMPLATE);
+        this.deepLinks = deepLinks;
+        this.resetLinkTemplate = loadTemplate(RESET_LINK_TEMPLATE);
         this.verificationCodeTemplate = loadTemplate(VERIFICATION_CODE_TEMPLATE);
         if (!enabled || this.apiKey.isBlank()) {
             LOG.warn("Transactional emails are not sent: Brevo needs BREVO_ENABLED=true and BREVO_API_KEY (enabled={}, api key set={})",
                     enabled, !this.apiKey.isBlank());
         }
+        if (deepLinks.baseUrl().isEmpty()) {
+            LOG.warn("Password reset links have no domain: set VIORA_DEEP_LINK_BASE_URL so the reset email opens the app");
+        }
     }
 
     /**
-     * Sends the password reset email carrying the 6-digit recovery code on the async executor, so the HTTP
-     * request that asked for the code does not wait for Brevo.
+     * Sends the password reset email, whose button carries the link that opens the app, on the async executor, so
+     * the HTTP request that asked for the link does not wait for Brevo.
      *
      * @param recipientEmail destination email address
-     * @param resetToken     the 6-digit recovery code
+     * @param resetToken     the token of the reset link
      * @throws IllegalStateException if Brevo rejects the request or cannot be reached
      */
     @Async
     @Override
     public void sendPasswordResetEmail(String recipientEmail, String resetToken) {
-        send(recipientEmail, resetSubject, resetCodeTemplate, resetToken, "password reset",
-                "email.password_reset.dispatch_failed");
+        var resetLink = deepLinks.passwordResetLink(URLEncoder.encode(resetToken, StandardCharsets.UTF_8));
+        send(recipientEmail, resetSubject, resetLinkTemplate.replace(RESET_LINK_PLACEHOLDER, resetLink), "",
+                "password reset", "email.password_reset.dispatch_failed");
     }
 
     /**

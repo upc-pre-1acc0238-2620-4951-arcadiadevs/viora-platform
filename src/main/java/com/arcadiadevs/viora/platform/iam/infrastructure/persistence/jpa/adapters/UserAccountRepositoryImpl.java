@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.adapte
 
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.assemblers.UserAccountPersistenceAssembler;
@@ -60,5 +61,14 @@ public class UserAccountRepositoryImpl implements UserAccountRepository {
             return false;
         }
         return persistenceRepository.existsByEmail(email.value());
+    }
+
+    @Override
+    public Optional<UserAccount> findByResetTokenHash(TokenHash resetTokenHash) {
+        if (resetTokenHash == null) {
+            return Optional.empty();
+        }
+        return persistenceRepository.findByResetTokenHash(resetTokenHash.value())
+                .map(UserAccountPersistenceAssembler::toDomainFromPersistence);
     }
 }
