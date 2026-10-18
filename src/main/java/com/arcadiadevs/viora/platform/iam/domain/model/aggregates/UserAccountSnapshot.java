@@ -11,6 +11,9 @@ import java.time.Instant;
  * @param email email address VO
  * @param passwordHash hashed password VO
  * @param role assigned role VO
+ * @param status lifecycle status of the account
+ * @param emailVerification active email verification code VO (null once verified)
+ * @param termsAcceptance accepted terms VO (null for accounts created before terms were recorded)
  * @param resetToken optional active reset token VO (may be null)
  * @param createdAt creation timestamp
  * @param updatedAt last modification timestamp
@@ -20,6 +23,9 @@ public record UserAccountSnapshot(
         EmailAddress email,
         PasswordHash passwordHash,
         UserRole role,
+        UserAccountStatus status,
+        EmailVerificationToken emailVerification,
+        TermsAcceptance termsAcceptance,
         PasswordResetToken resetToken,
         Instant createdAt,
         Instant updatedAt
@@ -36,6 +42,9 @@ public record UserAccountSnapshot(
         }
         if (role == null) {
             throw new IllegalArgumentException("user.snapshot.role.null");
+        }
+        if (status == null) {
+            throw new IllegalArgumentException("user.snapshot.status.null");
         }
     }
 }
