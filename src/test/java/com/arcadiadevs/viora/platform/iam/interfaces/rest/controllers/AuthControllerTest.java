@@ -1,5 +1,9 @@
 package com.arcadiadevs.viora.platform.iam.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
+import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.iam.domain.model.UserAccountFixtures;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
 import com.arcadiadevs.viora.platform.iam.application.queryservices.UserAccountQueryService;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
@@ -30,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -65,20 +70,18 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/auth/sign-up should create user and return 201 with session resource")
+    @DisplayName("POST /api/v1/auth/sign-up should accept a pending account with 202 and no session")
     void shouldSignUpSuccessfully() throws Exception {
         String userId = UUID.randomUUID().toString();
         when(passwordEncoder.encode("Password123!")).thenReturn("$argon2id$encoded");
         when(commandService.handle(any(RegisterUserAccountCommand.class))).thenReturn(Result.success(userId));
-        when(tokenService.generateAccessToken(eq(userId), eq("productor@viora.ag"), eq("ROLE_PRODUCER")))
-                .thenReturn("mock.jwt.token");
-        when(tokenService.getAccessTokenValiditySeconds()).thenReturn(900L);
 
         String json = """
                 {
                   "email": "productor@viora.ag",
                   "password": "Password123!",
                   "role": "ROLE_PRODUCER",
+                  "termsAccepted": true,
                   "profile": {
                     "fullName": "Carlos Mendoza",
                     "country": "PE",
@@ -90,20 +93,103 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.accessToken").value("mock.jwt.token"))
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.role").value("ROLE_PRODUCER"));
+                .andExpect(jsonPath("$.status").value("PENDING_VERIFICATION"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/sign-up should reject a request without termsAccepted")
+    void shouldRejectSignUpWithoutTerms() throws Exception {
+        String json = """
+                {"email": "productor@viora.ag", "password": "Password123!", "role": "ROLE_PRODUCER"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/sign-up")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/sign-in should answer 403 EMAIL_VERIFICATION_FORBIDDEN for a pending account")
+    void shouldRejectSignInOfPendingAccount() throws Exception {
+        var account = UserAccountFixtures.pendingAccount("productor@viora.ag", "$argon2id$encoded");
+        when(queryService.handle(any(com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery.class)))
+                .thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("Password123!", "$argon2id$encoded")).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/auth/sign-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\", \"password\": \"Password123!\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/email-verifications should return the session once the email is verified")
+    void shouldReturnSessionOnEmailVerification() throws Exception {
+        var account = UserAccountFixtures.activeAccount("productor@viora.ag", "$argon2id$encoded", UserRole.ROLE_PRODUCER);
+        when(commandService.handle(any(VerifyEmailCommand.class)))
+                .thenReturn(Result.success(account.snapshot().id().userId()));
+        when(queryService.handle(any(com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery.class)))
+                .thenReturn(Optional.of(account));
+        when(tokenService.generateAccessToken(any(), eq("productor@viora.ag"), eq("ROLE_PRODUCER")))
+                .thenReturn("mock.jwt.token");
+
+        mockMvc.perform(post("/api/v1/auth/email-verifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\", \"code\": \"482913\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("mock.jwt.token"))
+                .andExpect(jsonPath("$.userId").value(account.snapshot().id().userId()));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/email-verifications should report the remaining attempts on a wrong code")
+    void shouldReportRemainingAttemptsOnWrongCode() throws Exception {
+        when(commandService.handle(any(VerifyEmailCommand.class))).thenReturn(Result.failure(
+                ApplicationError.businessRuleViolation("email_verification", "user.email_verification.invalid_code",
+                        java.util.Map.of("reason", "user.email_verification.invalid_code", "remainingAttempts", 2))));
+
+        mockMvc.perform(post("/api/v1/auth/email-verifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\", \"code\": \"000000\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.reason").value("user.email_verification.invalid_code"))
+                .andExpect(jsonPath("$.remainingAttempts").value(2));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/email-verification-codes should answer 429 with Retry-After within the cooldown")
+    void shouldAnswerTooManyRequestsWithinCooldown() throws Exception {
+        when(commandService.handle(any(ResendEmailVerificationCommand.class))).thenReturn(Result.failure(
+                ApplicationError.tooManyRequests("email-verification", "user.email_verification.resend_too_soon", 30L)));
+
+        mockMvc.perform(post("/api/v1/auth/email-verification-codes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "30"))
+                .andExpect(jsonPath("$.retryAfterSeconds").value(30));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/email-verification-codes should answer 202 when the code is sent")
+    void shouldAcceptResend() throws Exception {
+        when(commandService.handle(any(ResendEmailVerificationCommand.class))).thenReturn(Result.success(null));
+
+        mockMvc.perform(post("/api/v1/auth/email-verification-codes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\"}"))
+                .andExpect(status().isAccepted());
     }
 
     @Test
     @DisplayName("POST /api/v1/auth/sign-in should return 200 with tokens on valid credentials")
     void shouldSignInSuccessfully() throws Exception {
-        var account = UserAccount.register(
-                new EmailAddress("productor@viora.ag"),
-                new PasswordHash("$argon2id$encoded"),
-                UserRole.ROLE_PRODUCER
-        );
+        var account = UserAccountFixtures.activeAccount("productor@viora.ag", "$argon2id$encoded", UserRole.ROLE_PRODUCER);
 
         when(queryService.handle(any(com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery.class)))
                 .thenReturn(Optional.of(account));

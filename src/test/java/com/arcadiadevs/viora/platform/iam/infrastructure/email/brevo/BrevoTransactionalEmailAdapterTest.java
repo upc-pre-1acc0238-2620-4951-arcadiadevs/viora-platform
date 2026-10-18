@@ -40,7 +40,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenApiKeyIsBlank() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -52,7 +52,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenDisabled() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -73,7 +73,7 @@ class BrevoTransactionalEmailAdapterTest {
                 .andExpect(jsonPath("$.htmlContent").value(containsString("src=\"https://viora.example/email/olive-sprig.gif\"")))
                 .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
                 .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Código — Viora", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Código — Viora", "Verifica — Viora", ASSETS);
 
         adapter.sendPasswordResetEmail("user@viora.ag", "123456");
 
@@ -88,7 +88,7 @@ class BrevoTransactionalEmailAdapterTest {
         server.expect(requestTo(BREVO_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(UNRECOGNISED_IP));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS);
 
         assertThatThrownBy(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .isInstanceOf(IllegalStateException.class)
@@ -126,5 +126,25 @@ class BrevoTransactionalEmailAdapterTest {
         } finally {
             brevo.stop(0);
         }
+    }
+
+    @Test
+    @DisplayName("Should post the verification code with its own subject and template")
+    void shouldPostVerificationCodeToBrevo() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(BREVO_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.subject").value("Verifica — Viora"))
+                .andExpect(jsonPath("$.htmlContent").value(containsString("654321")))
+                .andExpect(jsonPath("$.htmlContent").value(containsString("verificar tu correo")))
+                .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
+                .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com",
+                "Viora", "Código — Viora", "Verifica — Viora", ASSETS);
+
+        adapter.sendEmailVerificationEmail("user@viora.ag", "654321");
+
+        server.verify();
     }
 }

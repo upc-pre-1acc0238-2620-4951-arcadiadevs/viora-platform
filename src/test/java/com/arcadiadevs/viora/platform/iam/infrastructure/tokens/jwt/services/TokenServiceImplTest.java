@@ -1,6 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.services;
 
-import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
+import com.arcadiadevs.viora.platform.iam.domain.model.UserAccountFixtures;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
@@ -80,11 +80,7 @@ class TokenServiceImplTest {
     @Test
     @DisplayName("generateToken with username only should lookup repository and include role")
     void shouldGenerateTokenLookingUpUserAccountRole() {
-        var account = UserAccount.register(
-                new EmailAddress("productor@viora.ag"),
-                new PasswordHash("$argon2id$hash"),
-                UserRole.ROLE_PRODUCER
-        );
+        var account = UserAccountFixtures.activeAccount("productor@viora.ag", "$argon2id$hash", UserRole.ROLE_PRODUCER);
         when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(account));
 
         String token = tokenService.generateToken("productor@viora.ag");
