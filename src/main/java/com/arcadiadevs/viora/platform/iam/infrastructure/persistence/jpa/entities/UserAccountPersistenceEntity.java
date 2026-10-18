@@ -29,6 +29,25 @@ public class UserAccountPersistenceEntity extends AuditableAbstractPersistenceEn
     @Column(name = "role", nullable = false, length = 50)
     private String role;
 
+    /** Null for the rows created before accounts had a status: those accounts are read as active. */
+    @Column(name = "status", length = 30)
+    private String status;
+
+    @Column(name = "email_verification_code_hash")
+    private String emailVerificationCodeHash;
+
+    @Column(name = "email_verification_issued_at")
+    private Instant emailVerificationIssuedAt;
+
+    @Column(name = "email_verification_failed_attempts")
+    private Integer emailVerificationFailedAttempts;
+
+    @Column(name = "terms_version", length = 50)
+    private String termsVersion;
+
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
     @Column(name = "reset_code_hash")
     private String resetCodeHash;
 

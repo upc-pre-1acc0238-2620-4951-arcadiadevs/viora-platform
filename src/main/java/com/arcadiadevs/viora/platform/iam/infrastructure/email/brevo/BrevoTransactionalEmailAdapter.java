@@ -26,8 +26,8 @@ import java.util.Map;
  * Infrastructure adapter integrating with Brevo REST API v3 for transactional email delivery.
  *
  * <p>Implements the {@link TransactionalEmailService} outbound application port, satisfying
- * Hexagonal Architecture and the Dependency Inversion Principle. The email body is read from the
- * {@code templates/email/password-reset-code.html} classpath template; its images are served by the platform itself
+ * Hexagonal Architecture and the Dependency Inversion Principle. Each email body is read from a classpath template
+ * under {@code templates/email/}; its images are served by the platform itself
  * from {@code static/email}, so they are linked with the public base URL of the platform.</p>
  */
 @Component
@@ -36,6 +36,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     private static final Logger LOG = LoggerFactory.getLogger(BrevoTransactionalEmailAdapter.class);
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String RESET_CODE_TEMPLATE = "templates/email/password-reset-code.html";
+    private static final String VERIFICATION_CODE_TEMPLATE = "templates/email/email-verification-code.html";
     private static final String CODE_PLACEHOLDER = "{{code}}";
     private static final String ASSETS_BASE_URL_PLACEHOLDER = "{{assetsBaseUrl}}";
 
@@ -45,8 +46,10 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     private final String senderEmail;
     private final String senderName;
     private final String resetSubject;
+    private final String verificationSubject;
     private final String assetsBaseUrl;
     private final String resetCodeTemplate;
+    private final String verificationCodeTemplate;
 
     /**
      * Primary constructor for Spring injection, building a {@link RestClient} with connection and read timeouts.
@@ -55,7 +58,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param apiKey       the Brevo API key; when blank every call is a no-op
      * @param senderEmail  the sender address
      * @param senderName   the sender display name
-     * @param resetSubject  the subject of the password reset email
+     * @param resetSubject        the subject of the password reset email
+     * @param verificationSubject the subject of the email verification email
      * @param assetsBaseUrl public base URL of the platform, where the email images are served
      */
     @Autowired
@@ -65,9 +69,11 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             @Value("${viora.brevo.sender-email}") String senderEmail,
             @Value("${viora.brevo.sender-name}") String senderName,
             @Value("${viora.brevo.reset-subject}") String resetSubject,
+            @Value("${viora.brevo.verification-subject}") String verificationSubject,
             @Value("${viora.brevo.assets-base-url}") String assetsBaseUrl
     ) {
-        this(defaultRestClient(), enabled, apiKey, senderEmail, senderName, resetSubject, assetsBaseUrl);
+        this(defaultRestClient(), enabled, apiKey, senderEmail, senderName, resetSubject, verificationSubject,
+                assetsBaseUrl);
     }
 
     /**
@@ -78,7 +84,8 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      * @param apiKey       the Brevo API key
      * @param senderEmail  the sender address
      * @param senderName   the sender display name
-     * @param resetSubject  the subject of the password reset email
+     * @param resetSubject        the subject of the password reset email
+     * @param verificationSubject the subject of the email verification email
      * @param assetsBaseUrl public base URL of the platform, where the email images are served
      */
     public BrevoTransactionalEmailAdapter(
@@ -88,6 +95,7 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
             String senderEmail,
             String senderName,
             String resetSubject,
+            String verificationSubject,
             String assetsBaseUrl
     ) {
         this.restClient = restClient;
@@ -96,10 +104,12 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
         this.senderEmail = senderEmail;
         this.senderName = senderName;
         this.resetSubject = resetSubject;
+        this.verificationSubject = verificationSubject;
         this.assetsBaseUrl = assetsBaseUrl != null ? assetsBaseUrl.trim().replaceAll("/+$", "") : "";
         this.resetCodeTemplate = loadTemplate(RESET_CODE_TEMPLATE);
+        this.verificationCodeTemplate = loadTemplate(VERIFICATION_CODE_TEMPLATE);
         if (!enabled || this.apiKey.isBlank()) {
-            LOG.warn("Password reset emails are not sent: Brevo needs BREVO_ENABLED=true and BREVO_API_KEY (enabled={}, api key set={})",
+            LOG.warn("Transactional emails are not sent: Brevo needs BREVO_ENABLED=true and BREVO_API_KEY (enabled={}, api key set={})",
                     enabled, !this.apiKey.isBlank());
         }
     }
@@ -115,6 +125,27 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
     @Async
     @Override
     public void sendPasswordResetEmail(String recipientEmail, String resetToken) {
+        send(recipientEmail, resetSubject, resetCodeTemplate, resetToken, "password reset",
+                "email.password_reset.dispatch_failed");
+    }
+
+    /**
+     * Sends the email verification email carrying the 6-digit code on the async executor, so the sign-up request
+     * does not wait for Brevo.
+     *
+     * @param recipientEmail   destination email address
+     * @param verificationCode the 6-digit verification code
+     * @throws IllegalStateException if Brevo rejects the request or cannot be reached
+     */
+    @Async
+    @Override
+    public void sendEmailVerificationEmail(String recipientEmail, String verificationCode) {
+        send(recipientEmail, verificationSubject, verificationCodeTemplate, verificationCode, "email verification",
+                "email.email_verification.dispatch_failed");
+    }
+
+    private void send(String recipientEmail, String subject, String template, String code, String kind,
+                      String failureKey) {
         if (!enabled || apiKey.isBlank()) {
             return;
         }
@@ -122,9 +153,9 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
         var payload = Map.of(
                 "sender", Map.of("name", senderName, "email", senderEmail),
                 "to", List.of(Map.of("email", recipientEmail)),
-                "subject", resetSubject,
-                "htmlContent", resetCodeTemplate
-                        .replace(CODE_PLACEHOLDER, resetToken)
+                "subject", subject,
+                "htmlContent", template
+                        .replace(CODE_PLACEHOLDER, code)
                         .replace(ASSETS_BASE_URL_PLACEHOLDER, assetsBaseUrl)
         );
 
@@ -137,14 +168,14 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
                     .body(payload)
                     .retrieve()
                     .toBodilessEntity();
-            LOG.info("Password reset email accepted by Brevo");
+            LOG.info("The {} email was accepted by Brevo", kind);
         } catch (RestClientResponseException ex) {
             // Brevo says why in the body, e.g. an API key used from an IP that is not in its authorized IPs list
-            LOG.warn("Brevo rejected the password reset email with {}: {}",
-                    ex.getStatusCode().value(), ex.getResponseBodyAsString());
-            throw new IllegalStateException("email.password_reset.dispatch_failed", ex);
+            LOG.warn("Brevo rejected the {} email with {}: {}",
+                    kind, ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            throw new IllegalStateException(failureKey, ex);
         } catch (RestClientException ex) {
-            throw new IllegalStateException("email.password_reset.dispatch_failed", ex);
+            throw new IllegalStateException(failureKey, ex);
         }
     }
 
