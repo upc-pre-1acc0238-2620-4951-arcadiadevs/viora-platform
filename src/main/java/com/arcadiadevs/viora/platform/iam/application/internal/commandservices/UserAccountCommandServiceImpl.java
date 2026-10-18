@@ -3,8 +3,10 @@ package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.VerificationCodeGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.SecureTokenGenerator;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.EmailVerificationCooldownException;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerificationCodeException;
+import com.arcadiadevs.viora.platform.iam.domain.exceptions.WeakPasswordException;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
@@ -12,10 +14,11 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordR
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResetUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.ports.VerificationCodeHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.OnboardingProfileDetails;
-import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TermsAcceptance;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
@@ -47,6 +50,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
     private final ApplicationEventPublisher eventPublisher;
     private final VerificationCodeGenerator codeGenerator;
     private final VerificationCodeHasher codeHasher;
+    private final PasswordHasher passwordHasher;
+    private final SecureTokenGenerator tokenGenerator;
     private final TransactionalEmailService emailService;
     private final String termsVersion;
 
@@ -55,8 +60,10 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
      *
      * @param userAccountRepository the user account repository port
      * @param eventPublisher        publisher of the domain events raised by the aggregate
-     * @param codeGenerator         generator of email verification and password recovery codes
+     * @param codeGenerator         generator of email verification codes
      * @param codeHasher            hasher of those codes
+     * @param passwordHasher        hasher of passwords
+     * @param tokenGenerator        generator and hasher of the tokens carried by password reset links
      * @param emailService          transactional email port delivering the codes
      * @param termsVersion          version of the terms that sign-up records as accepted
      * @throws IllegalArgumentException if any dependency is null or the terms version is blank
@@ -66,6 +73,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             ApplicationEventPublisher eventPublisher,
             VerificationCodeGenerator codeGenerator,
             VerificationCodeHasher codeHasher,
+            PasswordHasher passwordHasher,
+            SecureTokenGenerator tokenGenerator,
             TransactionalEmailService emailService,
             @Value("${viora.iam.terms-version}") String termsVersion
     ) {
@@ -81,6 +90,12 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         if (codeHasher == null) {
             throw new IllegalArgumentException("user.verification_code_hasher.null");
         }
+        if (passwordHasher == null) {
+            throw new IllegalArgumentException("user.password_hasher.null");
+        }
+        if (tokenGenerator == null) {
+            throw new IllegalArgumentException("user.token_generator.null");
+        }
         if (emailService == null) {
             throw new IllegalArgumentException("email.service.null");
         }
@@ -91,6 +106,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         this.eventPublisher = eventPublisher;
         this.codeGenerator = codeGenerator;
         this.codeHasher = codeHasher;
+        this.passwordHasher = passwordHasher;
+        this.tokenGenerator = tokenGenerator;
         this.emailService = emailService;
         this.termsVersion = termsVersion.trim();
     }
@@ -116,7 +133,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             }
 
             var now = Instant.now();
-            var passwordHash = new PasswordHash(command.passwordHash());
+            var passwordHash = passwordHasher.hash(new NewPassword(command.password()));
             var role = UserRole.from(command.role());
             var termsAcceptance = command.termsAccepted() ? new TermsAcceptance(termsVersion, now) : null;
             var profileDetails = command.hasProfileDetails()
@@ -149,6 +166,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             // Not caught here: a profile rejected by the Profiles context while the events are published rolls the
             // whole sign-up back, so no account is left without its profile
             return Result.success(savedAccount.snapshot().id().userId());
+        } catch (WeakPasswordException ex) {
+            return Result.failure(weakPasswordError(ex));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
@@ -243,15 +262,18 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             }
 
             var account = optionalAccount.get();
-            account.changePassword(new PasswordHash(command.newPasswordHash()));
-            var savedAccount = userAccountRepository.save(account);
-
-            for (var event : account.domainEvents()) {
-                eventPublisher.publishEvent(event);
+            var newPassword = new NewPassword(command.newPassword());
+            try {
+                account.changePassword(command.currentRawPassword(), newPassword, passwordHasher, Instant.now());
+            } catch (BusinessRuleException ex) {
+                return Result.failure(passwordRuleError(ex.getMessage()));
             }
-            account.clearDomainEvents();
+            var savedAccount = userAccountRepository.save(account);
+            publishDomainEvents(account);
 
             return Result.success(savedAccount.snapshot().id().userId());
+        } catch (WeakPasswordException ex) {
+            return Result.failure(weakPasswordError(ex));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
@@ -268,16 +290,16 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
             if (optionalAccount.isPresent()) {
                 var account = optionalAccount.get();
-                var code = codeGenerator.generate();
+                var resetToken = tokenGenerator.generate();
                 try {
-                    account.requestPasswordReset(codeHasher.hash(code), Instant.now());
+                    account.requestPasswordReset(tokenGenerator.hash(resetToken), Instant.now());
                 } catch (BusinessRuleException ex) {
                     // A pending account cannot recover a password it never activated; it answers like any other
                     return Result.success(null);
                 }
                 userAccountRepository.save(account);
                 publishDomainEvents(account);
-                afterCommit(() -> emailService.sendPasswordResetEmail(email.value(), code.value()));
+                afterCommit(() -> emailService.sendPasswordResetEmail(email.value(), resetToken));
             }
 
             // Always respond success to prevent user enumeration
@@ -287,34 +309,55 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         }
     }
 
+    /**
+     * Consumes a password reset link to set a new password. An unknown, expired or already used link gets the
+     * same answer, so the client shows that the link is no longer valid.
+     *
+     * @param command reset command carrying the token of the link
+     * @return empty success, or why the link or the new password was rejected
+     */
     @Override
     public Result<Void, ApplicationError> handle(ResetUserPasswordCommand command) {
         if (command == null) {
             return Result.failure(ApplicationError.validationError("command", "user.command.null"));
         }
         try {
-            var optionalAccount = userAccountRepository.findByEmail(new EmailAddress(command.email()));
+            var newPassword = new NewPassword(command.newPassword());
+            var tokenHash = tokenGenerator.hash(command.resetToken().trim());
+            var optionalAccount = userAccountRepository.findByResetTokenHash(tokenHash);
             if (optionalAccount.isEmpty()) {
-                // Same answer as a wrong code, so the endpoint does not reveal which emails are registered
-                return Result.failure(ApplicationError.businessRuleViolation("password_reset", "user.password_reset.invalid_token"));
+                return Result.failure(expiredResetLinkError());
             }
 
             var account = optionalAccount.get();
             try {
-                account.resetPassword(new VerificationCode(command.resetToken()), codeHasher,
-                        new PasswordHash(command.newPasswordHash()), Instant.now());
+                account.resetPassword(tokenHash, newPassword, passwordHasher, Instant.now());
             } catch (BusinessRuleException ex) {
-                // A wrong code is counted on the aggregate, so it must be persisted even though the reset failed
-                userAccountRepository.save(account);
-                return Result.failure(ApplicationError.businessRuleViolation("password_reset", ex.getMessage()));
+                return Result.failure("user.password.reused".equals(ex.getMessage())
+                        ? passwordRuleError(ex.getMessage())
+                        : expiredResetLinkError());
             }
             userAccountRepository.save(account);
             publishDomainEvents(account);
 
             return Result.success(null);
+        } catch (WeakPasswordException ex) {
+            return Result.failure(weakPasswordError(ex));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
+    }
+
+    private static ApplicationError expiredResetLinkError() {
+        return ApplicationError.notFound("password_reset_token", "user.password_reset.link_expired");
+    }
+
+    private static ApplicationError weakPasswordError(WeakPasswordException ex) {
+        return ApplicationError.validationError("password", ex.getMessage(), Map.of("violations", ex.violations()));
+    }
+
+    private static ApplicationError passwordRuleError(String reason) {
+        return ApplicationError.businessRuleViolation("password", reason, Map.of("reason", reason));
     }
 
     private void publishDomainEvents(UserAccount account) {

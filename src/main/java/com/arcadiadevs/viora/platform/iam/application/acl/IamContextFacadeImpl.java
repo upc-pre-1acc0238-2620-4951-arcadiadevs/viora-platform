@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.application.acl;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.iam.interfaces.acl.IamContextFacade;
@@ -25,15 +27,15 @@ public class IamContextFacadeImpl implements IamContextFacade {
     }
 
     @Override
+    public boolean existsUser(String userId) {
+        return findAccount(userId).isPresent();
+    }
+
+    @Override
     public boolean existsActiveUser(String userId) {
-        if (userId == null || userId.isBlank()) {
-            return false;
-        }
-        try {
-            return userAccountRepository.findById(new UserId(userId)).isPresent();
-        } catch (IllegalArgumentException ex) {
-            return false;
-        }
+        return findAccount(userId)
+                .map(account -> account.snapshot().status() == UserAccountStatus.ACTIVE)
+                .orElse(false);
     }
 
     @Override
@@ -57,6 +59,17 @@ public class IamContextFacadeImpl implements IamContextFacade {
         try {
             return userAccountRepository.findById(new UserId(userId))
                     .map(account -> account.snapshot().email().value());
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<UserAccount> findAccount(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return userAccountRepository.findById(new UserId(userId));
         } catch (IllegalArgumentException ex) {
             return Optional.empty();
         }

@@ -1,36 +1,28 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens;
 
 /**
- * Outbound port for bearer token issuance and validation used by IAM commands and queries.
+ * Outbound port for issuing and validating the bearer access tokens of IAM sessions.
  */
 public interface TokenService {
 
     /**
-     * Generates a token for a username.
+     * Generates a signed access token carrying the credentials version of the account, so the token stops working
+     * once the password changes.
      *
-     * @param username principal identifier
+     * @param userId             unique user identifier
+     * @param email              user email address
+     * @param role               assigned platform role
+     * @param credentialsVersion credentials version of the account
      * @return signed token value
      */
-    String generateToken(String username);
+    String generateAccessToken(String userId, String email, String role, long credentialsVersion);
 
     /**
-     * Generates a signed access token for a username and role.
+     * Returns how long an access token is valid.
      *
-     * @param username principal identifier
-     * @param role assigned platform role
-     * @return signed token value
+     * @return validity in seconds
      */
-    String generateToken(String username, String role);
-
-    /**
-     * Generates a signed access token containing user identity and role claims.
-     *
-     * @param userId unique user identifier
-     * @param email user email address
-     * @param role assigned platform role
-     * @return signed token value
-     */
-    String generateToken(String userId, String email, String role);
+    long getAccessTokenValiditySeconds();
 
     /**
      * Extracts the username from a token.
