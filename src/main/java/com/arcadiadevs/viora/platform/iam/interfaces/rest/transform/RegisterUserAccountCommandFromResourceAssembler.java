@@ -20,6 +20,7 @@ public final class RegisterUserAccountCommandFromResourceAssembler {
                 resource.email(),
                 encodedPassword,
                 resource.role(),
+                Boolean.TRUE.equals(resource.termsAccepted()),
                 profile != null ? profile.fullName() : null,
                 profile != null ? profile.country() : null,
                 profile != null ? profile.phoneNumber() : null

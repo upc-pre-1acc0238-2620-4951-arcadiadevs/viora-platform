@@ -2,12 +2,16 @@ package com.arcadiadevs.viora.platform.iam.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
 import com.arcadiadevs.viora.platform.iam.application.queryservices.UserAccountQueryService;
+import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccountSnapshot;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResetUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.RefreshToken;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
 import com.arcadiadevs.viora.platform.iam.interfaces.rest.resources.*;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
@@ -55,7 +59,9 @@ public class AuthController {
     }
 
     @PostMapping("/sign-up")
-    @Operation(summary = "Register user account", description = "Creates a new user account and optionally formalizes profile details for mobile onboarding", security = {})
+    @Operation(summary = "Sign up a user account",
+            description = "Creates an account pending email verification, with its onboarding profile, and emails a 6-digit verification code. No session is issued until the email is verified. Signing up again with the email of a pending account reuses it with a new code.",
+            security = {})
     public ResponseEntity<?> signUp(@Valid @RequestBody SignUpResource resource) {
         String encodedPassword = passwordEncoder.encode(resource.password());
         var command = com.arcadiadevs.viora.platform.iam.interfaces.rest.transform.RegisterUserAccountCommandFromResourceAssembler
@@ -63,29 +69,47 @@ public class AuthController {
         var result = userAccountCommandService.handle(command);
 
         return switch (result) {
-            case Result.Success<String, ApplicationError> success -> {
-                String userId = success.value();
+            case Result.Success<String, ApplicationError> success -> ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(new SignUpAcceptedResource(success.value(), resource.email(),
+                            UserAccountStatus.PENDING_VERIFICATION.name()));
+            case Result.Failure<String, ApplicationError> failure -> ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
 
-                String accessToken = tokenService.generateAccessToken(userId, resource.email(), resource.role());
-                String refreshToken = RefreshToken.issue().token();
-                var sessionResource = new AuthenticatedSessionResource(
-                        accessToken,
-                        refreshToken,
-                        "Bearer",
-                        tokenService.getAccessTokenValiditySeconds(),
-                        userId,
-                        resource.email(),
-                        resource.role()
-                );
-                yield ResponseEntity.status(HttpStatus.CREATED).body(sessionResource);
-            }
-            case Result.Failure<String, ApplicationError> failure ->
-                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+    @PostMapping("/email-verifications")
+    @Operation(summary = "Verify the account email",
+            description = "Checks the 6-digit code sent at sign-up, activates the account and returns the session. A wrong code answers 422 with the remaining attempts; after 3 wrong codes a new one must be requested.",
+            security = {})
+    public ResponseEntity<?> verifyEmail(@Valid @RequestBody VerifyEmailResource resource) {
+        var result = userAccountCommandService.handle(new VerifyEmailCommand(resource.email(), resource.code()));
+
+        return switch (result) {
+            case Result.Success<String, ApplicationError> ignored ->
+                    userAccountQueryService.handle(new GetUserAccountByEmailQuery(resource.email()))
+                            .<ResponseEntity<?>>map(account -> ResponseEntity.ok(toSessionResource(account.snapshot())))
+                            .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
+                                    ApplicationError.notFound("user", resource.email())));
+            case Result.Failure<String, ApplicationError> failure -> ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
+
+    @PostMapping("/email-verification-codes")
+    @Operation(summary = "Resend the email verification code",
+            description = "Emails a new 6-digit code to a pending account. Answers 202 for unknown or already verified emails too, and 429 with Retry-After when asked again within 45 seconds.",
+            security = {})
+    public ResponseEntity<?> resendEmailVerificationCode(@Valid @RequestBody EmailVerificationCodeResource resource) {
+        var result = userAccountCommandService.handle(new ResendEmailVerificationCommand(resource.email()));
+
+        return switch (result) {
+            case Result.Success<Void, ApplicationError> ignored -> ResponseEntity.accepted().build();
+            case Result.Failure<Void, ApplicationError> failure -> ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
     }
 
     @PostMapping("/sign-in")
-    @Operation(summary = "Authenticate user credentials", description = "Validates credentials and returns JWT access and refresh token pair", security = {})
+    @Operation(summary = "Authenticate user credentials",
+            description = "Validates credentials and returns JWT access and refresh token pair. An account whose email is not verified yet answers 403 with code EMAIL_VERIFICATION_FORBIDDEN.",
+            security = {})
     public ResponseEntity<?> signIn(@Valid @RequestBody SignInResource resource) {
         var query = new GetUserAccountByEmailQuery(resource.email());
         var optionalAccount = userAccountQueryService.handle(query);
@@ -95,31 +119,20 @@ public class AuthController {
             );
         }
 
-        var account = optionalAccount.get();
-        if (!passwordEncoder.matches(resource.password(), account.snapshot().passwordHash().value())) {
+        var snapshot = optionalAccount.get().snapshot();
+        if (!passwordEncoder.matches(resource.password(), snapshot.passwordHash().value())) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(
                     ApplicationError.forbidden("user", "user.credentials.invalid")
             );
         }
+        // Checked after the password, so it only tells the account owner that the email still needs verifying
+        if (snapshot.status() != UserAccountStatus.ACTIVE) {
+            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
+                    ApplicationError.forbidden("email-verification", "user.email.not_verified")
+            );
+        }
 
-        var snapshot = account.snapshot();
-        String accessToken = tokenService.generateAccessToken(
-                snapshot.id().userId(),
-                snapshot.email().value(),
-                snapshot.role().name()
-        );
-        String refreshToken = RefreshToken.issue().token();
-        var sessionResource = new AuthenticatedSessionResource(
-                accessToken,
-                refreshToken,
-                "Bearer",
-                tokenService.getAccessTokenValiditySeconds(),
-                snapshot.id().userId(),
-                snapshot.email().value(),
-                snapshot.role().name()
-        );
-
-        return ResponseEntity.ok(sessionResource);
+        return ResponseEntity.ok(toSessionResource(snapshot));
     }
 
     @PostMapping("/refresh-tokens")
@@ -198,5 +211,22 @@ public class AuthController {
             case Result.Failure<Void, ApplicationError> failure ->
                     ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
+    }
+
+    private AuthenticatedSessionResource toSessionResource(UserAccountSnapshot snapshot) {
+        String accessToken = tokenService.generateAccessToken(
+                snapshot.id().userId(),
+                snapshot.email().value(),
+                snapshot.role().name()
+        );
+        return new AuthenticatedSessionResource(
+                accessToken,
+                RefreshToken.issue().token(),
+                "Bearer",
+                tokenService.getAccessTokenValiditySeconds(),
+                snapshot.id().userId(),
+                snapshot.email().value(),
+                snapshot.role().name()
+        );
     }
 }

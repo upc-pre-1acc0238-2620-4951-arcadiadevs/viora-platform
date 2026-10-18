@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.iam.interfaces.rest.resources;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -19,6 +20,8 @@ public record SignUpResource(
 
         @NotBlank(message = "user.role.blank")
         String role,
+        @NotNull(message = "user.terms.not_accepted")
+        Boolean termsAccepted,
 
         @Valid
         ProfileDataResource profile

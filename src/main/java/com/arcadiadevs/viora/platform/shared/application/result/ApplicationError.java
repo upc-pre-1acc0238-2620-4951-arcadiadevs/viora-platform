@@ -97,6 +97,22 @@ public record ApplicationError(
     }
 
     /**
+     * Creates a business rule violation error carrying extra context for the client, such as the attempts left.
+     *
+     * @param rule       the violated business rule description
+     * @param reason     detailed reason or context for the violation
+     * @param properties extra properties copied into the problem detail
+     * @return an {@link ApplicationError} configured for business rule violations
+     */
+    public static ApplicationError businessRuleViolation(String rule, String reason, Map<String, Object> properties) {
+        return new ApplicationError(
+                "BUSINESS_RULE_VIOLATION",
+                "Business rule violation: %s".formatted(rule),
+                reason,
+                properties);
+    }
+
+    /**
      * Creates a conflict error when an operation cannot be completed due to conflicting state.
      *
      * @param resource the name of the conflicting resource
@@ -126,6 +142,22 @@ public record ApplicationError(
                 "Conflict with %s".formatted(resource),
                 reason,
                 properties);
+    }
+
+    /**
+     * Creates a too many requests error when an operation is repeated before its waiting time elapses.
+     *
+     * @param resource          the resource being requested
+     * @param reason            the reason why the request is rejected
+     * @param retryAfterSeconds seconds the client must wait before trying again
+     * @return an {@link ApplicationError} mapped to 429 Too Many Requests, carrying {@code retryAfterSeconds}
+     */
+    public static ApplicationError tooManyRequests(String resource, String reason, long retryAfterSeconds) {
+        return new ApplicationError(
+                "%s_TOO_MANY_REQUESTS".formatted(resource.toUpperCase().replace('-', '_')),
+                "Too many requests for %s".formatted(resource),
+                reason,
+                Map.of("retryAfterSeconds", retryAfterSeconds));
     }
 
     /**
