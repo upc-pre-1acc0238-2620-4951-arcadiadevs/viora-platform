@@ -1,7 +1,5 @@
 package com.arcadiadevs.viora.platform.iam.domain.model.valueobjects;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -14,7 +12,7 @@ import java.time.Instant;
  * @param tokenHash the hash of the token carried by the reset link
  * @param expiresAt the instant after which the link cannot be used
  */
-public record PasswordResetToken(String tokenHash, Instant expiresAt) {
+public record PasswordResetToken(TokenHash tokenHash, Instant expiresAt) {
 
     private static final Duration LIFESPAN = Duration.ofMinutes(30);
 
@@ -24,7 +22,7 @@ public record PasswordResetToken(String tokenHash, Instant expiresAt) {
      * @throws IllegalArgumentException if the hash is missing or the expiry is null
      */
     public PasswordResetToken {
-        if (tokenHash == null || tokenHash.isBlank()) {
+        if (tokenHash == null) {
             throw new IllegalArgumentException("user.reset_token.null_or_empty");
         }
         if (expiresAt == null) {
@@ -40,7 +38,7 @@ public record PasswordResetToken(String tokenHash, Instant expiresAt) {
      * @return a new token
      * @throws IllegalArgumentException if the hash is missing or the instant is null
      */
-    public static PasswordResetToken issue(String tokenHash, Instant issuedAt) {
+    public static PasswordResetToken issue(TokenHash tokenHash, Instant issuedAt) {
         if (issuedAt == null) {
             throw new IllegalArgumentException("user.clock.now.null");
         }
@@ -53,9 +51,8 @@ public record PasswordResetToken(String tokenHash, Instant expiresAt) {
      * @param presentedTokenHash hash of the token taken from the link
      * @return true if it is this link's token; false otherwise
      */
-    public boolean matches(String presentedTokenHash) {
-        return presentedTokenHash != null && MessageDigest.isEqual(
-                tokenHash.getBytes(StandardCharsets.US_ASCII), presentedTokenHash.getBytes(StandardCharsets.US_ASCII));
+    public boolean matches(TokenHash presentedTokenHash) {
+        return tokenHash.matches(presentedTokenHash);
     }
 
     /**

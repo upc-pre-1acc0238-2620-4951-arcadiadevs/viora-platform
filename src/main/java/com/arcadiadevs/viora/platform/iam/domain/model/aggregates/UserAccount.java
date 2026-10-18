@@ -20,6 +20,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHist
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.VerificationCode;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordResetToken;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TermsAcceptance;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
@@ -313,7 +314,7 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
      * @throws IllegalArgumentException if the hash is missing or {@code now} is null
      * @throws BusinessRuleException    if the email address is not verified yet
      */
-    public void requestPasswordReset(String tokenHash, Instant now) {
+    public void requestPasswordReset(TokenHash tokenHash, Instant now) {
         if (this.status != UserAccountStatus.ACTIVE) {
             throw new BusinessRuleException("user.email.not_verified");
         }
@@ -335,7 +336,7 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
      * @param now       current instant
      * @return true if the link is the active one and has not expired
      */
-    public boolean canResetPasswordWith(String tokenHash, Instant now) {
+    public boolean canResetPasswordWith(TokenHash tokenHash, Instant now) {
         return now != null && this.resetToken != null && this.resetToken.matches(tokenHash)
                 && this.resetToken.isUsableAt(now);
     }
@@ -355,7 +356,7 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
      * @throws BusinessRuleException    if the link is not the active one, expired or was already used, or the new
      *                                  password was used recently
      */
-    public void resetPassword(String tokenHash, NewPassword newPassword, PasswordHasher passwordHasher, Instant now) {
+    public void resetPassword(TokenHash tokenHash, NewPassword newPassword, PasswordHasher passwordHasher, Instant now) {
         if (newPassword == null) {
             throw new IllegalArgumentException("user.password.null");
         }

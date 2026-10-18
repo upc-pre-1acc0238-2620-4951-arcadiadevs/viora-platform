@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
+
 /**
  * Outbound application port producing unguessable opaque tokens and the hash stored for them.
  *
@@ -21,5 +23,5 @@ public interface SecureTokenGenerator {
      * @param token the plain token
      * @return the hash of the token
      */
-    String hash(String token);
+    TokenHash hash(String token);
 }

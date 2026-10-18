@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserSessionId;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
@@ -22,13 +23,13 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
 
     private final UserSessionId id;
     private final UserId userId;
-    private final String refreshTokenHash;
+    private final TokenHash refreshTokenHash;
     private final long credentialsVersion;
     private final Instant createdAt;
     private final Instant expiresAt;
     private Instant revokedAt;
 
-    private UserSession(UserSessionId id, UserId userId, String refreshTokenHash, long credentialsVersion,
+    private UserSession(UserSessionId id, UserId userId, TokenHash refreshTokenHash, long credentialsVersion,
                         Instant createdAt, Instant expiresAt, Instant revokedAt) {
         this.id = id;
         this.userId = userId;
@@ -49,12 +50,12 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
      * @return the new session
      * @throws IllegalArgumentException if an argument is missing or the version is negative
      */
-    public static UserSession start(UserId userId, String refreshTokenHash, long credentialsVersion, Instant now) {
+    public static UserSession start(UserId userId, TokenHash refreshTokenHash, long credentialsVersion, Instant now) {
         if (userId == null) {
             throw new IllegalArgumentException("user.session.user_id.null");
         }
-        if (refreshTokenHash == null || refreshTokenHash.isBlank()) {
-            throw new IllegalArgumentException("user.session.refresh_token_hash.null_or_empty");
+        if (refreshTokenHash == null) {
+            throw new IllegalArgumentException("user.session.refresh_token_hash.null");
         }
         if (credentialsVersion < 0) {
             throw new IllegalArgumentException("user.session.credentials_version.negative");

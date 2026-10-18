@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserSessionId;
 
@@ -19,7 +20,7 @@ import java.time.Instant;
 public record UserSessionSnapshot(
         UserSessionId id,
         UserId userId,
-        String refreshTokenHash,
+        TokenHash refreshTokenHash,
         long credentialsVersion,
         Instant createdAt,
         Instant expiresAt,
@@ -32,7 +33,7 @@ public record UserSessionSnapshot(
         if (userId == null) {
             throw new IllegalArgumentException("user.session.snapshot.user_id.null");
         }
-        if (refreshTokenHash == null || refreshTokenHash.isBlank()) {
+        if (refreshTokenHash == null) {
             throw new IllegalArgumentException("user.session.snapshot.refresh_token_hash.null");
         }
         if (createdAt == null || expiresAt == null) {
