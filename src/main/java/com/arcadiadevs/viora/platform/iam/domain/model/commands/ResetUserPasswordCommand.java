@@ -1,26 +1,21 @@
 package com.arcadiadevs.viora.platform.iam.domain.model.commands;
 
 /**
- * Domain command for consuming a recovery code and setting a new password.
+ * Domain command for consuming a password reset link and setting a new password.
  *
- * @param email           the email address of the account being recovered
- * @param resetToken      the 6-digit recovery code
- * @param newPasswordHash the pre-hashed new password
+ * @param resetToken  the token carried by the reset link
+ * @param newPassword the new plain password
  */
 public record ResetUserPasswordCommand(
-        String email,
         String resetToken,
-        String newPasswordHash
+        String newPassword
 ) {
     public ResetUserPasswordCommand {
-        if (email == null) {
-            throw new IllegalArgumentException("user.command.email.null");
-        }
         if (resetToken == null) {
             throw new IllegalArgumentException("user.command.reset_token.null");
         }
-        if (newPasswordHash == null) {
-            throw new IllegalArgumentException("user.command.new_password_hash.null");
+        if (newPassword == null) {
+            throw new IllegalArgumentException("user.command.new_password.null");
         }
     }
 }

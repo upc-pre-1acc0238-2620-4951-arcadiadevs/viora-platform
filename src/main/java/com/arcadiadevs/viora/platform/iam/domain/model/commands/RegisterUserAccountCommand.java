@@ -6,7 +6,7 @@ package com.arcadiadevs.viora.platform.iam.domain.model.commands;
  * <p>The three profile fields are optional onboarding details: they are either all present or all null.</p>
  *
  * @param email         raw email string
- * @param passwordHash  derived password hash string
+ * @param password      the plain password chosen by the user
  * @param role          target role string
  * @param termsAccepted whether the user accepted the terms and privacy policy
  * @param fullName      optional full civil name captured at sign-up
@@ -15,7 +15,7 @@ package com.arcadiadevs.viora.platform.iam.domain.model.commands;
  */
 public record RegisterUserAccountCommand(
         String email,
-        String passwordHash,
+        String password,
         String role,
         boolean termsAccepted,
         String fullName,
@@ -26,8 +26,8 @@ public record RegisterUserAccountCommand(
         if (email == null) {
             throw new IllegalArgumentException("user.command.email.null");
         }
-        if (passwordHash == null) {
-            throw new IllegalArgumentException("user.command.password_hash.null");
+        if (password == null) {
+            throw new IllegalArgumentException("user.command.password.null");
         }
         if (role == null) {
             throw new IllegalArgumentException("user.command.role.null");

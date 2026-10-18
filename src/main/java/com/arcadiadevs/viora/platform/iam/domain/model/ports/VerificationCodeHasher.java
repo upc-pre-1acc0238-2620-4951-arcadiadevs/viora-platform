@@ -3,7 +3,7 @@ package com.arcadiadevs.viora.platform.iam.domain.model.ports;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.VerificationCode;
 
 /**
- * Domain port for hashing and verifying one-time verification codes.
+ * Domain port for hashing and verifying the one-time codes that verify an email address.
  *
  * <p>Implemented by an infrastructure adapter so the hashing algorithm stays out of the domain core, the same way
  * passwords are hashed outside it. {@code UserAccount} receives this port when consuming a code, which keeps the
