@@ -51,7 +51,8 @@ class CreateProfileOnUserSignedUpHandlerTest {
     @Test
     @DisplayName("Should create the profile on the first sign-up")
     void shouldDispatchCreateProfileCommand() {
-        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class))).thenReturn(Optional.empty());
+        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("profile", "x")));
         when(profileCommandService.handle(any(CreateProfileCommand.class))).thenReturn(Result.success("profile-1"));
 
         assertThatCode(() -> handler.on(event)).doesNotThrowAnyException();
@@ -63,7 +64,7 @@ class CreateProfileOnUserSignedUpHandlerTest {
     @DisplayName("Should update the existing profile when a pending account signs up again")
     void shouldUpdateExistingProfile() {
         var profile = Mockito.mock(Profile.class);
-        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class))).thenReturn(Optional.of(profile));
+        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class))).thenReturn(Result.success(profile));
         when(profileCommandService.handle(any(UpdateContactProfileCommand.class))).thenReturn(Result.success(profile));
 
         assertThatCode(() -> handler.on(event)).doesNotThrowAnyException();
@@ -74,7 +75,8 @@ class CreateProfileOnUserSignedUpHandlerTest {
     @Test
     @DisplayName("Should throw BusinessRuleException when profile creation fails")
     void shouldThrowWhenCreationFails() {
-        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class))).thenReturn(Optional.empty());
+        when(profileQueryService.handle(any(GetProfileByUserIdQuery.class)))
+                .thenReturn(Result.failure(ApplicationError.notFound("profile", "x")));
         when(profileCommandService.handle(any(CreateProfileCommand.class)))
                 .thenReturn(Result.failure(ApplicationError.businessRuleViolation("profile.failed", "Error")));
 

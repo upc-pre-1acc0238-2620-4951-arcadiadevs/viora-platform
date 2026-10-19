@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.AuthenticatedSession;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserSessionCommandService;
@@ -239,16 +240,52 @@ class AuthControllerTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()));
         when(commandService.handle(any(ChangeUserPasswordCommand.class))).thenReturn(Result.success(USER_ID));
+        when(sessionService.handle(any(OpenUserSessionCommand.class))).thenReturn(Result.success(SESSION));
 
+        // This device stays signed in: the change answers a new session while every other one is closed
         mockMvc.perform(patch("/api/v1/auth/passwords")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\": \"Password123\", \"newPassword\": \"NuevaClave456\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("mock.jwt.token"))
+                .andExpect(jsonPath("$.refreshToken").value("mock-refresh-token"));
 
         var captor = ArgumentCaptor.forClass(ChangeUserPasswordCommand.class);
         verify(commandService).handle(captor.capture());
         assertThat(captor.getValue().userId()).isEqualTo(USER_ID);
         assertThat(captor.getValue().currentRawPassword()).isEqualTo("Password123");
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/auth/passwords should not open a session when the change is rejected")
+    void shouldNotOpenSessionWhenPasswordChangeFails() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()));
+        when(commandService.handle(any(ChangeUserPasswordCommand.class))).thenReturn(Result.failure(
+                ApplicationError.businessRuleViolation("password", "user.password.current_invalid",
+                        Map.of("reason", "user.password.current_invalid"))));
+
+        mockMvc.perform(patch("/api/v1/auth/passwords")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\": \"Otra12345\", \"newPassword\": \"NuevaClave456\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.reason").value("user.password.current_invalid"));
+        verify(sessionService, never()).handle(any(OpenUserSessionCommand.class));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/sign-out should close the session of the refresh token and answer 204")
+    void shouldSignOut() throws Exception {
+        when(sessionService.handle(any(SignOutUserSessionCommand.class))).thenReturn(Result.success(null));
+
+        mockMvc.perform(post("/api/v1/auth/sign-out")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\": \"mock-refresh-token\"}"))
+                .andExpect(status().isNoContent());
+
+        var captor = ArgumentCaptor.forClass(SignOutUserSessionCommand.class);
+        verify(sessionService).handle(captor.capture());
+        assertThat(captor.getValue().refreshToken()).isEqualTo("mock-refresh-token");
     }
 
     @Test
