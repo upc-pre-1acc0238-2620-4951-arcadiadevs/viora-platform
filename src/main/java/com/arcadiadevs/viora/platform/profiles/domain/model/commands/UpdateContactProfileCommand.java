@@ -3,9 +3,9 @@ package com.arcadiadevs.viora.platform.profiles.domain.model.commands;
 /**
  * Domain command for updating user profile contact information.
  *
- * @param userId the user identity reference
- * @param fullName raw full name
- * @param country raw country code
+ * @param userId      the account whose profile is changed
+ * @param fullName    raw full name
+ * @param country     raw country code
  * @param phoneNumber raw phone number
  */
 public record UpdateContactProfileCommand(
