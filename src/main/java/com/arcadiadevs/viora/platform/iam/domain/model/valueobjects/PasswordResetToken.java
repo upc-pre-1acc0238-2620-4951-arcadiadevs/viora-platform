@@ -4,79 +4,64 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Value object representing the active password recovery code of an account, with a 15-minute lifespan.
+ * Value object representing the active password reset link of an account, valid for 30 minutes and single use.
  *
- * <p>Holds only the hash of the code, never the code itself. It also counts wrong codes submitted against it:
- * once {@link #MAX_FAILED_ATTEMPTS} is reached it can no longer be used and a new code must be requested.</p>
+ * <p>Holds only the hash of the random token carried by the link, never the token itself. The token is long and
+ * random, so it cannot be guessed and needs no attempt counter. Issuing a new link replaces this one.</p>
  *
- * @param codeHash       the hash of the recovery code
- * @param expiresAt      the instant after which the code cannot be used
- * @param failedAttempts number of wrong codes submitted against this token
+ * @param tokenHash the hash of the token carried by the reset link
+ * @param expiresAt the instant after which the link cannot be used
  */
-public record PasswordResetToken(String codeHash, Instant expiresAt, int failedAttempts) {
+public record PasswordResetToken(TokenHash tokenHash, Instant expiresAt) {
 
-    /** Wrong codes tolerated before the token is locked. */
-    public static final int MAX_FAILED_ATTEMPTS = 5;
-
-    private static final Duration LIFESPAN = Duration.ofMinutes(15);
+    private static final Duration LIFESPAN = Duration.ofMinutes(30);
 
     /**
      * Compact constructor validating the token invariants.
      *
-     * @throws IllegalArgumentException if the hash is missing, the expiry is null, or the attempt count is negative
+     * @throws IllegalArgumentException if the hash is missing or the expiry is null
      */
     public PasswordResetToken {
-        if (codeHash == null || codeHash.isBlank()) {
+        if (tokenHash == null) {
             throw new IllegalArgumentException("user.reset_token.null_or_empty");
         }
         if (expiresAt == null) {
             throw new IllegalArgumentException("user.reset_token_expiry.null");
         }
-        if (failedAttempts < 0) {
-            throw new IllegalArgumentException("user.reset_token.failed_attempts.negative");
-        }
     }
 
     /**
-     * Creates the token for a freshly hashed code, valid for 15 minutes from {@code issuedAt}.
+     * Creates the token for a freshly issued link, valid for 30 minutes from {@code issuedAt}.
      *
-     * @param codeHash the hash of the issued code
-     * @param issuedAt the instant the code is issued
-     * @return a new token with no failed attempts
+     * @param tokenHash the hash of the token carried by the link
+     * @param issuedAt  the instant the link is issued
+     * @return a new token
      * @throws IllegalArgumentException if the hash is missing or the instant is null
      */
-    public static PasswordResetToken issue(String codeHash, Instant issuedAt) {
+    public static PasswordResetToken issue(TokenHash tokenHash, Instant issuedAt) {
         if (issuedAt == null) {
             throw new IllegalArgumentException("user.clock.now.null");
         }
-        return new PasswordResetToken(codeHash, issuedAt.plus(LIFESPAN), 0);
+        return new PasswordResetToken(tokenHash, issuedAt.plus(LIFESPAN));
     }
 
     /**
-     * Returns a copy of this token with one more failed attempt recorded.
+     * Checks whether a presented token hash is the one of this link, in constant time.
      *
-     * @return the updated token
+     * @param presentedTokenHash hash of the token taken from the link
+     * @return true if it is this link's token; false otherwise
      */
-    public PasswordResetToken withFailedAttempt() {
-        return new PasswordResetToken(codeHash, expiresAt, failedAttempts + 1);
+    public boolean matches(TokenHash presentedTokenHash) {
+        return tokenHash.matches(presentedTokenHash);
     }
 
     /**
-     * Checks whether too many wrong codes were submitted against this token.
-     *
-     * @return true if the token is locked
-     */
-    public boolean hasExhaustedAttempts() {
-        return failedAttempts >= MAX_FAILED_ATTEMPTS;
-    }
-
-    /**
-     * Checks if this token is currently expired against the provided instant.
+     * Checks whether the link is still usable at the given instant.
      *
      * @param now current instant
-     * @return true if expired; false otherwise
+     * @return true if not expired; false otherwise
      */
-    public boolean isExpired(Instant now) {
-        return now.isAfter(expiresAt);
+    public boolean isUsableAt(Instant now) {
+        return !now.isAfter(expiresAt);
     }
 }

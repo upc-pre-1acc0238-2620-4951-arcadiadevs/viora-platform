@@ -10,10 +10,21 @@ import java.util.Optional;
 public interface IamContextFacade {
 
     /**
-     * Checks if a user exists and is active.
+     * Checks if a user account exists, whether or not its email is verified yet.
+     *
+     * <p>Meant for what happens during sign-up itself, such as creating the profile, while the account is still
+     * pending verification.</p>
      *
      * @param userId user account identifier string
-     * @return true if account exists; false otherwise
+     * @return true if the account exists; false otherwise
+     */
+    boolean existsUser(String userId);
+
+    /**
+     * Checks if a user account exists and is active, that is, its email address is verified.
+     *
+     * @param userId user account identifier string
+     * @return true if the account exists and is active; false otherwise
      */
     boolean existsActiveUser(String userId);
 

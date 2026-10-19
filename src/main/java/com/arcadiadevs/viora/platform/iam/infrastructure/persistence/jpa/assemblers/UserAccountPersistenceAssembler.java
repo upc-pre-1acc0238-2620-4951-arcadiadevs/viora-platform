@@ -5,6 +5,8 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccountSna
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.entities.UserAccountPersistenceEntity;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,16 +32,37 @@ public final class UserAccountPersistenceAssembler {
         entity.setId(UUID.fromString(snapshot.id().userId()));
         entity.setEmail(snapshot.email().value());
         entity.setPasswordHash(snapshot.passwordHash().value());
+        entity.setPasswordHistory(new ArrayList<>(snapshot.passwordHistory().previousHashes().stream()
+                .map(PasswordHash::value)
+                .toList()));
+        entity.setCredentialsVersion(snapshot.credentialsVersion());
         entity.setRole(snapshot.role().name());
+        entity.setStatus(snapshot.status().name());
+
+        if (snapshot.emailVerification() != null) {
+            entity.setEmailVerificationCodeHash(snapshot.emailVerification().codeHash());
+            entity.setEmailVerificationIssuedAt(snapshot.emailVerification().issuedAt());
+            entity.setEmailVerificationFailedAttempts(snapshot.emailVerification().failedAttempts());
+        } else {
+            entity.setEmailVerificationCodeHash(null);
+            entity.setEmailVerificationIssuedAt(null);
+            entity.setEmailVerificationFailedAttempts(null);
+        }
+
+        if (snapshot.termsAcceptance() != null) {
+            entity.setTermsVersion(snapshot.termsAcceptance().version());
+            entity.setTermsAcceptedAt(snapshot.termsAcceptance().acceptedAt());
+        } else {
+            entity.setTermsVersion(null);
+            entity.setTermsAcceptedAt(null);
+        }
 
         if (snapshot.resetToken() != null) {
-            entity.setResetCodeHash(snapshot.resetToken().codeHash());
+            entity.setResetTokenHash(snapshot.resetToken().tokenHash().value());
             entity.setResetTokenExpiresAt(snapshot.resetToken().expiresAt());
-            entity.setResetFailedAttempts(snapshot.resetToken().failedAttempts());
         } else {
-            entity.setResetCodeHash(null);
+            entity.setResetTokenHash(null);
             entity.setResetTokenExpiresAt(null);
-            entity.setResetFailedAttempts(null);
         }
 
         entity.setCreatedAt(snapshot.createdAt());
@@ -59,16 +82,37 @@ public final class UserAccountPersistenceAssembler {
         }
 
         PasswordResetToken resetToken = null;
-        if (entity.getResetCodeHash() != null && entity.getResetTokenExpiresAt() != null) {
-            int failedAttempts = entity.getResetFailedAttempts() != null ? entity.getResetFailedAttempts() : 0;
-            resetToken = new PasswordResetToken(entity.getResetCodeHash(), entity.getResetTokenExpiresAt(), failedAttempts);
+        if (entity.getResetTokenHash() != null && entity.getResetTokenExpiresAt() != null) {
+            resetToken = new PasswordResetToken(new TokenHash(entity.getResetTokenHash()), entity.getResetTokenExpiresAt());
         }
+
+        EmailVerificationToken emailVerification = null;
+        if (entity.getEmailVerificationCodeHash() != null && entity.getEmailVerificationIssuedAt() != null) {
+            int failedAttempts = entity.getEmailVerificationFailedAttempts() != null
+                    ? entity.getEmailVerificationFailedAttempts() : 0;
+            emailVerification = new EmailVerificationToken(entity.getEmailVerificationCodeHash(),
+                    entity.getEmailVerificationIssuedAt(), failedAttempts);
+        }
+
+        TermsAcceptance termsAcceptance = null;
+        if (entity.getTermsVersion() != null && entity.getTermsAcceptedAt() != null) {
+            termsAcceptance = new TermsAcceptance(entity.getTermsVersion(), entity.getTermsAcceptedAt());
+        }
+
+        // Accounts created before the email verification existed have no status and stay active
+        var status = entity.getStatus() != null ? UserAccountStatus.valueOf(entity.getStatus()) : UserAccountStatus.ACTIVE;
 
         var snapshot = new UserAccountSnapshot(
                 new UserId(entity.getId().toString()),
                 new EmailAddress(entity.getEmail()),
                 new PasswordHash(entity.getPasswordHash()),
+                new PasswordHistory(entity.getPasswordHistory() == null ? List.of()
+                        : entity.getPasswordHistory().stream().map(PasswordHash::new).toList()),
+                entity.getCredentialsVersion() != null ? entity.getCredentialsVersion() : 0L,
                 UserRole.valueOf(entity.getRole()),
+                status,
+                emailVerification,
+                termsAcceptance,
                 resetToken,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()

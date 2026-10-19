@@ -95,4 +95,22 @@ class ErrorResponseAssemblerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
     }
+
+    @Test
+    void toErrorResponseFromApplicationError_addsRetryAfterToTooManyRequests() {
+        var error = ApplicationError.tooManyRequests("email-verification", "user.email_verification.resend_too_soon", 30L);
+        var response = ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
+        assertEquals("30", response.getHeaders().getFirst("Retry-After"));
+        assertEquals(30L, response.getBody().getProperties().get("retryAfterSeconds"));
+    }
+
+    @Test
+    void toErrorResponseFromApplicationError_addsNoRetryAfterToOtherErrors() {
+        var error = ApplicationError.validationError("plotName", "plot.name.blank");
+        var response = ErrorResponseAssembler.toErrorResponseFromApplicationError(error);
+
+        assertEquals(null, response.getHeaders().getFirst("Retry-After"));
+    }
 }

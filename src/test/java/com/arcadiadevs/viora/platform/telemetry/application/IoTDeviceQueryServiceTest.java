@@ -73,7 +73,10 @@ class IoTDeviceQueryServiceTest {
     @DisplayName("Should enforce null query guard")
     @SuppressWarnings("DataFlowIssue")
     void shouldEnforceNullQueryGuard() {
-        assertThatThrownBy(() -> queryService.handle(null))
+        assertThatThrownBy(() -> queryService.handle((GetIoTDevicesByPlotIdQuery) null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("query.null");
+        assertThatThrownBy(() -> queryService.handle((com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDeviceByIdQuery) null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("query.null");
     }

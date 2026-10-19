@@ -7,8 +7,6 @@ import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResp
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.phenology.application.commandservices.HarvestRecordCommandService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.commands.RemoveHarvestRecordCommand;
-import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
-import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.HarvestRecordResource;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.RecordHarvestYieldResource;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.resources.RectifyHarvestYieldResource;
@@ -16,6 +14,7 @@ import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.Harves
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.RecordHarvestYieldCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.phenology.interfaces.rest.transform.RectifyHarvestYieldCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
+import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -46,23 +45,19 @@ public class HarvestRecordController {
 
     private final HarvestRecordCommandService harvestRecordCommandService;
     private final HarvestRecordQueryService harvestRecordQueryService;
-    private final ChillAccumulationTrackerRepository trackerRepository;
 
     /**
-     * Constructs the controller injecting required services and repositories.
+     * Constructs the controller injecting the command and query services.
      *
      * @param harvestRecordCommandService the command service orchestrating harvest mutations
      * @param harvestRecordQueryService   the query service retrieving harvest entries
-     * @param trackerRepository           the domain repository port
      */
     public HarvestRecordController(
             HarvestRecordCommandService harvestRecordCommandService,
-            HarvestRecordQueryService harvestRecordQueryService,
-            ChillAccumulationTrackerRepository trackerRepository
+            HarvestRecordQueryService harvestRecordQueryService
     ) {
         this.harvestRecordCommandService = harvestRecordCommandService;
         this.harvestRecordQueryService = harvestRecordQueryService;
-        this.trackerRepository = trackerRepository;
     }
 
     /**
@@ -94,7 +89,7 @@ public class HarvestRecordController {
     ) {
         var command = RecordHarvestYieldCommandFromResourceAssembler.toCommandFromResource(plotId, resource);
         var result = harvestRecordCommandService.handle(command)
-                .flatMap(entryId -> trackerRepository.findByPlotId(new PlotId(plotId))
+                .flatMap(entryId -> harvestRecordQueryService.handle(new GetChillAccumulationTrackerByPlotIdQuery(plotId))
                         .<Result<HarvestRecordResource, ApplicationError>>map(tracker -> {
                             var snap = tracker.snapshot();
                             var entrySnapOpt = snap.harvestHistory().stream()
@@ -151,7 +146,7 @@ public class HarvestRecordController {
         var query = new GetHarvestRecordsByPlotIdQuery(plotId, campaignYear);
         var result = harvestRecordQueryService.handle(query)
                 .map(entries -> {
-                    var bbi = trackerRepository.findByPlotId(new PlotId(plotId))
+                    var bbi = harvestRecordQueryService.handle(new GetChillAccumulationTrackerByPlotIdQuery(plotId))
                             .map(t -> t.snapshot().calculatedBbi().value())
                             .orElse(0.0);
                     return HarvestRecordResourceFromEntityAssembler.toResourceList(entries, plotId, bbi);
@@ -211,7 +206,7 @@ public class HarvestRecordController {
                 .toCommandFromResource(plotId, recordId, expectedRevision, resource);
 
         var result = harvestRecordCommandService.handle(command)
-                .flatMap(id -> trackerRepository.findByPlotId(new PlotId(plotId))
+                .flatMap(id -> harvestRecordQueryService.handle(new GetChillAccumulationTrackerByPlotIdQuery(plotId))
                         .<Result<HarvestRecordResource, ApplicationError>>map(tracker -> {
                             var snap = tracker.snapshot();
                             var entrySnapOpt = snap.harvestHistory().stream()

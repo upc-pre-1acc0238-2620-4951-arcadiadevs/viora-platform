@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -65,14 +66,20 @@ public final class ErrorResponseAssembler {
 
     /**
      * Maps an {@link ApplicationError} to an appropriate HTTP {@link ResponseEntity} containing a {@link ProblemDetail}.
-     * Automatically selects the correct HTTP status code based on the error code.
+     * Automatically selects the correct HTTP status code based on the error code. A too many requests error that
+     * carries {@code retryAfterSeconds} also gets the {@code Retry-After} header.
      *
      * @param error the ApplicationError to map
      * @return a ResponseEntity with the appropriate HTTP status and ProblemDetail resource
      */
     public static ResponseEntity<ProblemDetail> toErrorResponseFromApplicationError(ApplicationError error) {
         ProblemDetail problemDetail = toProblemDetail(error);
-        return ResponseEntity.status(problemDetail.getStatus()).body(problemDetail);
+        var response = ResponseEntity.status(problemDetail.getStatus());
+        if (problemDetail.getStatus() == HttpStatus.TOO_MANY_REQUESTS.value()
+                && error.properties().get("retryAfterSeconds") instanceof Number retryAfterSeconds) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds.longValue()));
+        }
+        return response.body(problemDetail);
     }
 
     private static URI toTypeUriFromErrorCode(String errorCode) {
@@ -91,6 +98,7 @@ public final class ErrorResponseAssembler {
             case 404 -> "Not Found";
             case 409 -> "Conflict";
             case 422 -> "Unprocessable Entity";
+            case 429 -> "Too Many Requests";
             case 500 -> "Internal Server Error";
             default -> "Error";
         };
@@ -237,6 +245,7 @@ public final class ErrorResponseAssembler {
             case "BUSINESS_RULE_VIOLATION" -> HttpStatus.UNPROCESSABLE_CONTENT;
             case String s when s.endsWith("_CONFLICT") -> HttpStatus.CONFLICT;
             case String s when s.endsWith("_UNAVAILABLE") -> HttpStatus.SERVICE_UNAVAILABLE;
+            case String s when s.endsWith("_TOO_MANY_REQUESTS") -> HttpStatus.TOO_MANY_REQUESTS;
             case "UNEXPECTED_ERROR" -> HttpStatus.INTERNAL_SERVER_ERROR;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

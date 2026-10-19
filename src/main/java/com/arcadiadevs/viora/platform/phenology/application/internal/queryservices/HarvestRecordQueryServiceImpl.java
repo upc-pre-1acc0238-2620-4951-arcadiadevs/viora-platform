@@ -4,13 +4,16 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
+import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.ChillAccumulationTracker;
 import com.arcadiadevs.viora.platform.phenology.domain.model.aggregates.HistoricalHarvestEntrySnapshot;
+import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
 import com.arcadiadevs.viora.platform.phenology.domain.repositories.ChillAccumulationTrackerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application service implementation for querying historical harvest records.
@@ -60,5 +63,13 @@ public class HarvestRecordQueryServiceImpl implements HarvestRecordQueryService 
                 .toList();
 
         return Result.success(filtered);
+    }
+
+    @Override
+    public Optional<ChillAccumulationTracker> handle(GetChillAccumulationTrackerByPlotIdQuery query) {
+        if (query == null) {
+            return Optional.empty();
+        }
+        return trackerRepository.findByPlotId(query.plotId());
     }
 }

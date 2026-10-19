@@ -12,7 +12,6 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetAllActiveP
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsByProducerIdAndStatusQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotsDeltaSyncByProducerIdAndUpdatedSinceQuery;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
-import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.interfaces.rest.controllers.PlotController;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -61,8 +60,6 @@ class PlotControllerIntegrationTest {
     @Mock
     private PlotQueryService plotQueryService;
 
-    @Mock
-    private PlotRepository plotRepository;
 
     private final UUID producerId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     private final String validGeoJson = "{\"type\":\"Polygon\",\"coordinates\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}";
@@ -72,7 +69,7 @@ class PlotControllerIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(producerId.toString(), null, List.of())
         );
-        var plotController = new PlotController(plotCommandService, plotQueryService, plotRepository,
+        var plotController = new PlotController(plotCommandService, plotQueryService,
                 new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
         mockMvc = MockMvcBuilders.standaloneSetup(plotController)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -97,7 +94,7 @@ class PlotControllerIntegrationTest {
 
         when(plotCommandService.handle(any(DelimitPlotCommand.class)))
                 .thenReturn(Result.success(plot.snapshot().id().plotId()));
-        when(plotRepository.findById(eq(plot.snapshot().id())))
+        when(plotQueryService.handle(any(com.arcadiadevs.viora.platform.orchard.domain.model.queries.GetPlotByIdQuery.class)))
                 .thenReturn(Optional.of(plot));
 
         String payload = """

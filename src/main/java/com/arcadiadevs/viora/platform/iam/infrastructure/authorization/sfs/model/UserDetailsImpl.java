@@ -26,11 +26,19 @@ public class UserDetailsImpl implements UserDetails {
     private final boolean credentialsNonExpired;
     private final boolean enabled;
     private final Collection<? extends GrantedAuthority> authorities;
+    /** Credentials version of the account: a bearer token issued with another version is rejected. */
+    private final long credentialsVersion;
 
     public UserDetailsImpl(String username, String password, Collection<? extends GrantedAuthority> authorities) {
+        this(username, password, authorities, 0L);
+    }
+
+    public UserDetailsImpl(String username, String password, Collection<? extends GrantedAuthority> authorities,
+                           long credentialsVersion) {
         this.username = username;
         this.password = password;
         this.authorities = authorities;
+        this.credentialsVersion = credentialsVersion;
         this.accountNonExpired = true;
         this.accountNonLocked = true;
         this.credentialsNonExpired = true;
@@ -49,7 +57,8 @@ public class UserDetailsImpl implements UserDetails {
         return new UserDetailsImpl(
                 snapshot.id().userId(),
                 snapshot.passwordHash().value(),
-                authorities
+                authorities,
+                snapshot.credentialsVersion()
         );
     }
 }

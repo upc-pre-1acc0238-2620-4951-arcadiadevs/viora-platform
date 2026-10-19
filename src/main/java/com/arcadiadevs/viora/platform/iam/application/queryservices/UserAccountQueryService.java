@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.application.queryservices;
 
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
+import com.arcadiadevs.viora.platform.iam.domain.model.queries.CheckPasswordResetTokenQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.CheckUserAccountExistsByEmailQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByIdQuery;
@@ -36,4 +37,12 @@ public interface UserAccountQueryService {
      * @return true if registered; false otherwise
      */
     boolean handle(CheckUserAccountExistsByEmailQuery query);
+
+    /**
+     * Checks whether a password reset link can still be used, without consuming it.
+     *
+     * @param query the query carrying the token of the link
+     * @return true if the link is the active one and has not expired; false otherwise
+     */
+    boolean handle(CheckPasswordResetTokenQuery query);
 }

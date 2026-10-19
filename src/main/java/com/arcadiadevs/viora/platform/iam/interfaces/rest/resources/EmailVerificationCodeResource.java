@@ -1,0 +1,16 @@
+package com.arcadiadevs.viora.platform.iam.interfaces.rest.resources;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+/**
+ * Resource payload for requesting a new email verification code.
+ *
+ * @param email the email address of the pending account
+ */
+public record EmailVerificationCodeResource(
+        @NotBlank(message = "user.email.blank")
+        @Email(message = "user.email.invalid")
+        String email
+) {
+}

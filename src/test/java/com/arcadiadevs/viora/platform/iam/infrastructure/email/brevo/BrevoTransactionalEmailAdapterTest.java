@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.email.brevo;
 
+import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpServer;
@@ -13,6 +14,8 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -31,6 +34,8 @@ class BrevoTransactionalEmailAdapterTest {
 
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String ASSETS = "https://viora.example/";
+    private static final DeepLinkProperties DEEP_LINKS = new DeepLinkProperties("https://links.viora.example/",
+            "/password-resets", new DeepLinkProperties.Android("", List.of()));
     private static final String UNRECOGNISED_IP = "{\"code\":\"unauthorized\",\"message\":\"We have detected you are "
             + "using an unrecognised IP address 203.0.113.7. If you performed this action make sure to add the new IP "
             + "address in this link: https://app.brevo.com/security/authorised_ips\"}";
@@ -40,7 +45,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenApiKeyIsBlank() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -52,7 +57,7 @@ class BrevoTransactionalEmailAdapterTest {
     void shouldReturnSilentlyWhenDisabled() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
         assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .doesNotThrowAnyException();
@@ -60,22 +65,23 @@ class BrevoTransactionalEmailAdapterTest {
     }
 
     @Test
-    @DisplayName("Should post the recovery code to Brevo rendered inside the HTML template")
-    void shouldPostCodeToBrevo() {
+    @DisplayName("Should post the reset link that opens the app, rendered as the button of the HTML template")
+    void shouldPostResetLinkToBrevo() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo(BREVO_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("api-key", "test-key"))
                 .andExpect(jsonPath("$.to[0].email").value("user@viora.ag"))
-                .andExpect(jsonPath("$.subject").value("Código — Viora"))
-                .andExpect(jsonPath("$.htmlContent").value(containsString("123456")))
+                .andExpect(jsonPath("$.subject").value("Restablece — Viora"))
+                .andExpect(jsonPath("$.htmlContent").value(containsString(
+                        "href=\"https://links.viora.example/password-resets/Ab9_x-Z\"")))
                 .andExpect(jsonPath("$.htmlContent").value(containsString("src=\"https://viora.example/email/olive-sprig.gif\"")))
                 .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
                 .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Código — Viora", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Restablece — Viora", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
-        adapter.sendPasswordResetEmail("user@viora.ag", "123456");
+        adapter.sendPasswordResetEmail("user@viora.ag", "Ab9_x-Z");
 
         server.verify();
     }
@@ -88,7 +94,7 @@ class BrevoTransactionalEmailAdapterTest {
         server.expect(requestTo(BREVO_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(UNRECOGNISED_IP));
-        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", ASSETS);
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
         assertThatThrownBy(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
                 .isInstanceOf(IllegalStateException.class)
@@ -126,5 +132,25 @@ class BrevoTransactionalEmailAdapterTest {
         } finally {
             brevo.stop(0);
         }
+    }
+
+    @Test
+    @DisplayName("Should post the verification code with its own subject and template")
+    void shouldPostVerificationCodeToBrevo() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(BREVO_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.subject").value("Verifica — Viora"))
+                .andExpect(jsonPath("$.htmlContent").value(containsString("654321")))
+                .andExpect(jsonPath("$.htmlContent").value(containsString("verificar tu correo")))
+                .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
+                .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com",
+                "Viora", "Código — Viora", "Verifica — Viora", ASSETS, DEEP_LINKS);
+
+        adapter.sendEmailVerificationEmail("user@viora.ag", "654321");
+
+        server.verify();
     }
 }
