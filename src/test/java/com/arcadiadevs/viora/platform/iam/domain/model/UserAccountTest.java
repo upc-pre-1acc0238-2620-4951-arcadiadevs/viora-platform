@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.events.EmailVerificationR
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordChangedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetCompletedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetRequestedEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UnverifiedUserAccountDiscardedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountActivatedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountRegisteredEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
@@ -413,5 +414,27 @@ class UserAccountTest {
         assertThatThrownBy(() -> new TokenHash(" "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("user.token_hash.null_or_empty");
+    }
+
+    @Test
+    @DisplayName("Should discard only a pending account with no activity for 7 days")
+    void shouldDiscardOnlyAbandonedPendingAccounts() {
+        var signedUpAt = Instant.now().minus(8, ChronoUnit.DAYS);
+        var abandoned = pendingAccount(signedUpAt);
+        assertThat(abandoned.isAbandonedUnverified(Instant.now())).isTrue();
+
+        abandoned.discardUnverified(Instant.now());
+        assertThat(abandoned.domainEvents()).hasSize(1);
+        var event = (UnverifiedUserAccountDiscardedEvent) abandoned.domainEvents().iterator().next();
+        assertThat(event.userId()).isEqualTo(abandoned.snapshot().id().userId());
+
+        var recent = pendingAccount(Instant.now().minus(6, ChronoUnit.DAYS));
+        assertThat(recent.isAbandonedUnverified(Instant.now())).isFalse();
+        assertThatThrownBy(() -> recent.discardUnverified(Instant.now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("user.account.not_discardable");
+
+        var active = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
+        assertThat(active.isAbandonedUnverified(Instant.now().plus(30, ChronoUnit.DAYS))).isFalse();
     }
 }

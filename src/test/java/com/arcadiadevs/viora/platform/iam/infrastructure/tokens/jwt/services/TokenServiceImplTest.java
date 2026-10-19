@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("TokenServiceImpl JWT Generation & Claims Unit Tests")
 class TokenServiceImplTest {
 
-    private static final String SECRET = "viora-secret-super-secure-key-for-jwt-token-generation-2026-very-long-string";
+    private static final String SECRET = "test-only-jwt-secret-that-is-long-enough-for-hmac-sha256";
     private static final long EXPIRATION_MINUTES = 15;
 
     private final TokenServiceImpl tokenService = new TokenServiceImpl(SECRET, EXPIRATION_MINUTES);
@@ -66,5 +66,16 @@ class TokenServiceImplTest {
 
         request.addHeader("Authorization", "Bearer abc.def.ghi");
         assertThat(tokenService.getBearerTokenFrom(request)).isEqualTo("abc.def.ghi");
+    }
+
+    @Test
+    @DisplayName("Should refuse to start without a secret or with one shorter than 32 bytes")
+    void shouldRejectMissingOrShortSecret() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new TokenServiceImpl(null, 15))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new TokenServiceImpl("too-short-secret", 15))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("at least 32 bytes");
     }
 }

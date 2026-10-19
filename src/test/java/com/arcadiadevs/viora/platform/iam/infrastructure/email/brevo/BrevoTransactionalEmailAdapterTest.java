@@ -35,7 +35,7 @@ class BrevoTransactionalEmailAdapterTest {
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String ASSETS = "https://viora.example/";
     private static final DeepLinkProperties DEEP_LINKS = new DeepLinkProperties("https://links.viora.example/",
-            "/reset-password", new DeepLinkProperties.Android("", List.of()));
+            "/password-resets", new DeepLinkProperties.Android("", List.of()));
     private static final String UNRECOGNISED_IP = "{\"code\":\"unauthorized\",\"message\":\"We have detected you are "
             + "using an unrecognised IP address 203.0.113.7. If you performed this action make sure to add the new IP "
             + "address in this link: https://app.brevo.com/security/authorised_ips\"}";
@@ -75,7 +75,7 @@ class BrevoTransactionalEmailAdapterTest {
                 .andExpect(jsonPath("$.to[0].email").value("user@viora.ag"))
                 .andExpect(jsonPath("$.subject").value("Restablece — Viora"))
                 .andExpect(jsonPath("$.htmlContent").value(containsString(
-                        "href=\"https://links.viora.example/reset-password?token=Ab9_x-Z\"")))
+                        "href=\"https://links.viora.example/password-resets/Ab9_x-Z\"")))
                 .andExpect(jsonPath("$.htmlContent").value(containsString("src=\"https://viora.example/email/olive-sprig.gif\"")))
                 .andExpect(jsonPath("$.htmlContent").value(not(containsString("{{"))))
                 .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));

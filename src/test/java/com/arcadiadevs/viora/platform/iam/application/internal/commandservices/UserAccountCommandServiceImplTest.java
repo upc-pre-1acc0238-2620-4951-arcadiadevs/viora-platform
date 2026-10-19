@@ -8,6 +8,8 @@ import com.arcadiadevs.viora.platform.iam.domain.model.FakePasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.UserAccountFixtures;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.DiscardUnverifiedUserAccountsCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UnverifiedUserAccountDiscardedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
@@ -333,6 +335,23 @@ class UserAccountCommandServiceImplTest {
         var changed = service.handle(new ChangeUserPasswordCommand(userId, "Password123", "NuevaClave456"));
         assertThat(changed).isInstanceOf(Result.Success.class);
         assertThat(account.snapshot().credentialsVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Discards the abandoned pending accounts, publishing the discard before deleting each one")
+    void discardsAbandonedPendingAccounts() {
+        var abandoned = pendingAccount(Instant.now().minus(UserAccount.UNVERIFIED_RETENTION).minusSeconds(60));
+        var recent = pendingAccount(Instant.now());
+        when(userAccountRepository.findPendingVerificationNotUpdatedSince(any(Instant.class)))
+                .thenReturn(java.util.List.of(abandoned, recent));
+
+        var result = service.handle(new DiscardUnverifiedUserAccountsCommand());
+
+        assertThat(((Result.Success<Integer, ApplicationError>) result).value()).isEqualTo(1);
+        var order = org.mockito.Mockito.inOrder(eventPublisher, userAccountRepository);
+        order.verify(eventPublisher).publishEvent(any(UnverifiedUserAccountDiscardedEvent.class));
+        order.verify(userAccountRepository).delete(abandoned);
+        verify(userAccountRepository, never()).delete(recent);
     }
 
     private static RegisterUserAccountCommand signUpCommand(boolean termsAccepted) {

@@ -10,6 +10,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserSession;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUserCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
@@ -143,6 +144,26 @@ class UserSessionCommandServiceImplTest {
                 .isEqualTo("user.refresh_token.invalid");
     }
 
+    @Test
+    @DisplayName("Removes only the sessions that ended more than 30 days ago")
+    void purgesSessionsEndedLongAgo() {
+        var userId = account.snapshot().id();
+        var longAgo = Instant.now().minus(UserSession.LIFESPAN).minus(UserSession.RETENTION_AFTER_END).minusSeconds(60);
+        var expiredLongAgo = UserSession.start(userId, UserAccountFixtures.tokenHashOf("old"), 0L, longAgo);
+        var revokedLongAgo = UserSession.start(userId, UserAccountFixtures.tokenHashOf("revoked"), 0L, Instant.now().minusSeconds(60));
+        revokedLongAgo.revoke(Instant.now().minus(UserSession.RETENTION_AFTER_END).minusSeconds(60));
+        var revokedRecently = UserSession.start(userId, UserAccountFixtures.tokenHashOf("recent"), 0L, Instant.now());
+        revokedRecently.revoke(Instant.now());
+        var active = UserSession.start(userId, UserAccountFixtures.tokenHashOf("active"), 0L, Instant.now());
+        List.of(expiredLongAgo, revokedLongAgo, revokedRecently, active).forEach(sessions::save);
+
+        var result = service.handle(new PurgeEndedUserSessionsCommand());
+
+        assertThat(((Result.Success<Integer, ApplicationError>) result).value()).isEqualTo(2);
+        assertThat(sessions.byHash).containsOnlyKeys(
+                UserAccountFixtures.tokenHashOf("recent"), UserAccountFixtures.tokenHashOf("active"));
+    }
+
     private static AuthenticatedSession success(Result<AuthenticatedSession, ApplicationError> result) {
         assertThat(result).isInstanceOf(Result.Success.class);
         return ((Result.Success<AuthenticatedSession, ApplicationError>) result).value();
@@ -191,6 +212,20 @@ class UserSessionCommandServiceImplTest {
                 }
             }
             return result;
+        }
+
+        @Override
+        public int deleteEndedBefore(Instant cutoff) {
+            var ended = byHash.entrySet().stream()
+                    .filter(entry -> {
+                        var snapshot = entry.getValue().snapshot();
+                        return snapshot.expiresAt().isBefore(cutoff)
+                                || (snapshot.revokedAt() != null && snapshot.revokedAt().isBefore(cutoff));
+                    })
+                    .map(Map.Entry::getKey)
+                    .toList();
+            ended.forEach(byHash::remove);
+            return ended.size();
         }
     }
 }

@@ -19,7 +19,7 @@ class AndroidAssetLinksControllerTest {
     @Test
     @DisplayName("Publishes the app package and fingerprints so Android opens the links in the app")
     void publishesConfiguredApp() throws Exception {
-        var properties = new DeepLinkProperties("https://viora.example", "/reset-password",
+        var properties = new DeepLinkProperties("https://viora.example", "/password-resets",
                 new DeepLinkProperties.Android("com.arcadiadevs.viora", List.of("AB:CD:EF", " ")));
         var mockMvc = MockMvcBuilders.standaloneSetup(new AndroidAssetLinksController(properties)).build();
 
@@ -49,7 +49,7 @@ class AndroidAssetLinksControllerTest {
         var properties = new DeepLinkProperties("https://viora.example/", null,
                 new DeepLinkProperties.Android(null, Arrays.asList((String) null)));
 
-        assertThat(properties.passwordResetLink("Ab9_x-Z")).isEqualTo("https://viora.example/reset-password?token=Ab9_x-Z");
+        assertThat(properties.passwordResetLink("Ab9_x-Z")).isEqualTo("https://viora.example/password-resets/Ab9_x-Z");
         assertThat(properties.android().isConfigured()).isFalse();
     }
 }
