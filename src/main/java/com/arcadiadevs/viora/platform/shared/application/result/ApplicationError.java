@@ -177,6 +177,20 @@ public record ApplicationError(
     }
 
     /**
+     * Creates a method not allowed error when a path exists but does not accept the HTTP method used.
+     *
+     * @param resource the resource being requested
+     * @param reason   the reason why the method is rejected
+     * @return an {@link ApplicationError} mapped to 405 Method Not Allowed
+     */
+    public static ApplicationError methodNotAllowed(String resource, String reason) {
+        return new ApplicationError(
+                "%s_METHOD_NOT_ALLOWED".formatted(resource.toUpperCase().replace('-', '_')),
+                "Method not allowed for %s".formatted(resource),
+                reason);
+    }
+
+    /**
      * Creates an unauthorized error when the request carries no authenticated user.
      *
      * @param resource the resource being accessed

@@ -10,6 +10,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUser
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
@@ -175,6 +176,26 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
         }
         return Result.success(userSessionRepository.deleteEndedBefore(
                 Instant.now().minus(UserSession.RETENTION_AFTER_END)));
+    }
+
+    /**
+     * Closes the session held by the refresh token, so the token cannot renew it again. An unknown or already closed
+     * session answers the same empty success.
+     *
+     * @param command sign-out command
+     * @return empty success
+     */
+    @Override
+    public Result<Void, ApplicationError> handle(SignOutUserSessionCommand command) {
+        if (command == null || command.refreshToken().isBlank()) {
+            return Result.success(null);
+        }
+        userSessionRepository.findByRefreshTokenHash(tokenGenerator.hash(command.refreshToken().trim()))
+                .ifPresent(session -> {
+                    session.revoke(Instant.now());
+                    userSessionRepository.save(session);
+                });
+        return Result.success(null);
     }
 
     private Result<AuthenticatedSession, ApplicationError> openSessionFor(UserAccount account, Instant now) {

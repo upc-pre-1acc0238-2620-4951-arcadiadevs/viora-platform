@@ -48,7 +48,7 @@ public class CreateProfileOnUserSignedUpHandler {
         if (event == null) {
             return;
         }
-        var profileExists = profileQueryService.handle(new GetProfileByUserIdQuery(event.userId())).isPresent();
+        var profileExists = profileQueryService.handle(new GetProfileByUserIdQuery(event.userId())).isSuccess();
         if (profileExists) {
             var result = profileCommandService.handle(new UpdateContactProfileCommand(
                     event.userId(), event.fullName(), event.country(), event.phoneNumber()));

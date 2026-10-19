@@ -3,6 +3,8 @@ package com.arcadiadevs.viora.platform.profiles.application.queryservices;
 import com.arcadiadevs.viora.platform.profiles.domain.model.aggregates.Profile;
 import com.arcadiadevs.viora.platform.profiles.domain.model.queries.GetProfileByIdQuery;
 import com.arcadiadevs.viora.platform.profiles.domain.model.queries.GetProfileByUserIdQuery;
+import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.shared.application.result.Result;
 
 import java.util.Optional;
 
@@ -21,10 +23,10 @@ public interface ProfileQueryService {
     Optional<Profile> handle(GetProfileByIdQuery query);
 
     /**
-     * Resolves a profile by its owner user identifier query.
+     * Resolves the profile of a user account.
      *
      * @param query the get profile by user ID domain query
-     * @return Optional containing the profile aggregate if found
+     * @return the profile, or a not found error when the account has none
      */
-    Optional<Profile> handle(GetProfileByUserIdQuery query);
+    Result<Profile, ApplicationError> handle(GetProfileByUserIdQuery query);
 }

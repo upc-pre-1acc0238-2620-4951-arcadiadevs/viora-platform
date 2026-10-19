@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.profiles.application.queryservices.Profile
 import com.arcadiadevs.viora.platform.profiles.domain.model.aggregates.Profile;
 import com.arcadiadevs.viora.platform.profiles.domain.model.queries.GetProfileByIdQuery;
 import com.arcadiadevs.viora.platform.profiles.domain.model.queries.GetProfileByUserIdQuery;
+import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.profiles.domain.repositories.ProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +37,12 @@ public class ProfileQueryServiceImpl implements ProfileQueryService {
     }
 
     @Override
-    public Optional<Profile> handle(GetProfileByUserIdQuery query) {
+    public Result<Profile, ApplicationError> handle(GetProfileByUserIdQuery query) {
         if (query == null) {
-            return Optional.empty();
+            return Result.failure(ApplicationError.validationError("query", "profile.query.null"));
         }
-        return profileRepository.findByUserId(query.userId());
+        return profileRepository.findByUserId(query.userId())
+                .<Result<Profile, ApplicationError>>map(Result::success)
+                .orElseGet(() -> Result.failure(ApplicationError.notFound("profile", query.userId().userId())));
     }
 }

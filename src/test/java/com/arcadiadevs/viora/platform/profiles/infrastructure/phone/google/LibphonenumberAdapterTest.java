@@ -38,4 +38,21 @@ class LibphonenumberAdapterTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("profile.phone.null_or_empty");
     }
+
+    @Test
+    @DisplayName("Should reject a landline, as the app needs a cell phone")
+    void shouldRejectLandlines() {
+        // Lima landline: valid Peruvian number, but not a mobile one
+        assertThatThrownBy(() -> adapter.formatToE164("014123456", "PE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("profile.phone.not_mobile");
+    }
+
+    @Test
+    @DisplayName("Should reject a number that belongs to another country than the chosen one")
+    void shouldRejectNumberOfAnotherCountry() {
+        assertThatThrownBy(() -> adapter.formatToE164("+34612345678", "PE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("profile.phone.country_mismatch");
+    }
 }

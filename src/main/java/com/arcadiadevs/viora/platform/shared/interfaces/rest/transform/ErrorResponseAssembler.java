@@ -96,6 +96,7 @@ public final class ErrorResponseAssembler {
             case 401 -> "Unauthorized";
             case 403 -> "Forbidden";
             case 404 -> "Not Found";
+            case 405 -> "Method Not Allowed";
             case 409 -> "Conflict";
             case 422 -> "Unprocessable Entity";
             case 429 -> "Too Many Requests";
@@ -246,6 +247,7 @@ public final class ErrorResponseAssembler {
             case String s when s.endsWith("_CONFLICT") -> HttpStatus.CONFLICT;
             case String s when s.endsWith("_UNAVAILABLE") -> HttpStatus.SERVICE_UNAVAILABLE;
             case String s when s.endsWith("_TOO_MANY_REQUESTS") -> HttpStatus.TOO_MANY_REQUESTS;
+            case String s when s.endsWith("_METHOD_NOT_ALLOWED") -> HttpStatus.METHOD_NOT_ALLOWED;
             case "UNEXPECTED_ERROR" -> HttpStatus.INTERNAL_SERVER_ERROR;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

@@ -18,6 +18,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -251,6 +253,32 @@ public class GlobalExceptionHandler {
         var detail = resolveMessageOrDefault("error.access_denied", "Access denied");
         var applicationError = ApplicationError.forbidden("user", detail);
         return ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+    }
+
+    /**
+     * Handles requests whose HTTP method a path does not accept, which would otherwise fall through to the generic
+     * handler and answer 500. The response lists the accepted methods in the {@code Allow} header.
+     *
+     * @param ex the exception raised when the path exists but not for the method used
+     * @return ProblemDetail response with METHOD_NOT_ALLOWED status
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        var applicationError = ApplicationError.methodNotAllowed(
+                "Route",
+                resolveMessageOrDefault("error.route.method-not-allowed",
+                        "The " + ex.getMethod() + " method is not allowed for this path.", ex.getMethod())
+        );
+        var response = ErrorResponseAssembler.toErrorResponseFromApplicationError(applicationError);
+        var supportedMethods = ex.getSupportedHttpMethods();
+        if (supportedMethods == null || supportedMethods.isEmpty()) {
+            return response;
+        }
+        return ResponseEntity.status(response.getStatusCode())
+                .headers(response.getHeaders())
+                .header(HttpHeaders.ALLOW, supportedMethods.stream().map(Object::toString).sorted()
+                        .reduce((a, b) -> a + ", " + b).orElse(""))
+                .body(response.getBody());
     }
 
     /**
