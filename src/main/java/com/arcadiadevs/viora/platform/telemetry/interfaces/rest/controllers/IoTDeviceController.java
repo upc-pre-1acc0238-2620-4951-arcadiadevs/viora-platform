@@ -10,8 +10,7 @@ import com.arcadiadevs.viora.platform.telemetry.application.queryservices.IoTDev
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.DeactivateIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDevicesByPlotIdQuery;
-import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceId;
-import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetIoTDeviceByIdQuery;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.CalibrateIoTDeviceResource;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.IoTDeviceResource;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources.RegisterIoTDeviceResource;
@@ -46,23 +45,19 @@ public class IoTDeviceController {
 
     private final IoTDeviceCommandService ioTDeviceCommandService;
     private final IoTDeviceQueryService ioTDeviceQueryService;
-    private final IoTDeviceRepository ioTDeviceRepository;
 
     /**
-     * Constructs the controller injecting required service and repository ports.
+     * Constructs the controller injecting the command and query services.
      *
      * @param ioTDeviceCommandService the command service orchestrating device mutations
      * @param ioTDeviceQueryService   the query service retrieving device representations
-     * @param ioTDeviceRepository     the domain device repository port
      */
     public IoTDeviceController(
             IoTDeviceCommandService ioTDeviceCommandService,
-            IoTDeviceQueryService ioTDeviceQueryService,
-            IoTDeviceRepository ioTDeviceRepository
+            IoTDeviceQueryService ioTDeviceQueryService
     ) {
         this.ioTDeviceCommandService = ioTDeviceCommandService;
         this.ioTDeviceQueryService = ioTDeviceQueryService;
-        this.ioTDeviceRepository = ioTDeviceRepository;
     }
 
     /**
@@ -93,7 +88,7 @@ public class IoTDeviceController {
     ) {
         var command = RegisterIoTDeviceCommandFromResourceAssembler.toCommandFromResource(plotId, resource);
         var result = ioTDeviceCommandService.handle(command)
-                .flatMap(deviceId -> ioTDeviceRepository.findById(new DeviceId(deviceId))
+                .flatMap(deviceId -> ioTDeviceQueryService.handle(new GetIoTDeviceByIdQuery(deviceId))
                         .<Result<IoTDevice, ApplicationError>>map(Result::success)
                         .orElseGet(() -> Result.failure(ApplicationError.notFound("IoTDevice", deviceId))));
 
@@ -184,7 +179,7 @@ public class IoTDeviceController {
         );
 
         var result = ioTDeviceCommandService.handle(command)
-                .flatMap(id -> ioTDeviceRepository.findById(new DeviceId(id))
+                .flatMap(id -> ioTDeviceQueryService.handle(new GetIoTDeviceByIdQuery(id))
                         .<Result<IoTDevice, ApplicationError>>map(Result::success)
                         .orElseGet(() -> Result.failure(ApplicationError.notFound("IoTDevice", id))));
 

@@ -30,7 +30,7 @@ class PasswordResetEmailConfigurationIntegrationTest {
     @Test
     @DisplayName("The default subject keeps its accents and the em dash")
     void subjectKeepsItsAccents() {
-        assertThat(resetSubject).isEqualTo("Código de recuperación de contraseña — Viora");
+        assertThat(resetSubject).isEqualTo("Restablece tu contraseña — Viora");
     }
 
     @Test
@@ -47,5 +47,18 @@ class PasswordResetEmailConfigurationIntegrationTest {
         mvc.perform(get("/email/copy.png"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("image/png"));
+    }
+
+    @Test
+    @DisplayName("The Android asset links file is served without a session, with the app package and fingerprint")
+    void assetLinksAreServed() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+
+        mvc.perform(get("/.well-known/assetlinks.json"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        [{"target": {"namespace": "android_app", "package_name": "pe.edu.upc.viora",
+                          "sha256_cert_fingerprints": ["8C:B1:E1:62:88:15:5E:46:61:0D:A7:C8:60:BA:E7:2B:A2:42:48:49:C4:2C:C3:88:C6:02:21:FA:04:B4:F4:12"]}}]
+                        """));
     }
 }

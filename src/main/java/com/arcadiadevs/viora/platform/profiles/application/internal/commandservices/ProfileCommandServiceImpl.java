@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.profiles.application.commandservices.Profi
 import com.arcadiadevs.viora.platform.profiles.application.internal.outboundservices.acl.ExternalIamService;
 import com.arcadiadevs.viora.platform.profiles.domain.model.aggregates.Profile;
 import com.arcadiadevs.viora.platform.profiles.domain.model.commands.CreateProfileCommand;
+import com.arcadiadevs.viora.platform.profiles.domain.model.commands.DeleteProfileCommand;
 import com.arcadiadevs.viora.platform.profiles.domain.model.commands.UpdateContactProfileCommand;
 import com.arcadiadevs.viora.platform.profiles.domain.model.valueobjects.CountryCode;
 import com.arcadiadevs.viora.platform.profiles.domain.model.valueobjects.FullName;
@@ -60,7 +61,7 @@ public class ProfileCommandServiceImpl implements ProfileCommandService {
         }
         try {
             var userId = new UserId(command.userId());
-            if (!externalIamService.existsActiveUser(userId)) {
+            if (!externalIamService.existsUser(userId)) {
                 return Result.failure(ApplicationError.notFound("user", command.userId()));
             }
 
@@ -114,6 +115,23 @@ public class ProfileCommandServiceImpl implements ProfileCommandService {
             profile.clearDomainEvents();
 
             return Result.success(savedProfile);
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<Boolean, ApplicationError> handle(DeleteProfileCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "profile.command.null"));
+        }
+        try {
+            var optionalProfile = profileRepository.findByUserId(new UserId(command.userId()));
+            if (optionalProfile.isEmpty()) {
+                return Result.success(false);
+            }
+            profileRepository.delete(optionalProfile.get());
+            return Result.success(true);
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }

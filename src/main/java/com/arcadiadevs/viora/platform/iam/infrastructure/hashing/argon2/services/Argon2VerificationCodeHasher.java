@@ -1,17 +1,17 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.hashing.argon2.services;
 
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.hashing.HashingService;
-import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordResetCodeHasher;
-import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordResetCode;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.VerificationCodeHasher;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.VerificationCode;
 import org.springframework.stereotype.Component;
 
 /**
- * Infrastructure adapter hashing password recovery codes with the same Argon2id encoder used for passwords.
+ * Infrastructure adapter hashing one-time verification codes with the same Argon2id encoder used for passwords.
  *
  * <p>A slow salted hash matters here because a 6-digit code has only a million possible values.</p>
  */
 @Component
-public class Argon2PasswordResetCodeHasher implements PasswordResetCodeHasher {
+public class Argon2VerificationCodeHasher implements VerificationCodeHasher {
 
     private final HashingService hashingService;
 
@@ -21,7 +21,7 @@ public class Argon2PasswordResetCodeHasher implements PasswordResetCodeHasher {
      * @param hashingService the Argon2id hashing service
      * @throws IllegalArgumentException if the hashing service is null
      */
-    public Argon2PasswordResetCodeHasher(HashingService hashingService) {
+    public Argon2VerificationCodeHasher(HashingService hashingService) {
         if (hashingService == null) {
             throw new IllegalArgumentException("hashing.service.null");
         }
@@ -29,12 +29,12 @@ public class Argon2PasswordResetCodeHasher implements PasswordResetCodeHasher {
     }
 
     @Override
-    public String hash(PasswordResetCode code) {
+    public String hash(VerificationCode code) {
         return hashingService.encode(code.value());
     }
 
     @Override
-    public boolean matches(PasswordResetCode code, String codeHash) {
+    public boolean matches(VerificationCode code, String codeHash) {
         return hashingService.matches(code.value(), codeHash);
     }
 }

@@ -9,13 +9,24 @@ package com.arcadiadevs.viora.platform.iam.application.internal.outboundservices
 public interface TransactionalEmailService {
 
     /**
-     * Sends an email with the 6-digit password recovery code.
+     * Sends an email with the single-use link that opens the app to set a new password.
      *
      * <p>Implementations may deliver asynchronously, so callers must not rely on the email being sent when the
      * method returns.</p>
      *
      * @param recipientEmail destination email address
-     * @param resetToken     the 6-digit recovery code
+     * @param resetToken     the token of the reset link; the implementation builds the link around it
      */
     void sendPasswordResetEmail(String recipientEmail, String resetToken);
+
+    /**
+     * Sends an email with the 6-digit code that verifies the address of a new account.
+     *
+     * <p>Implementations may deliver asynchronously, so callers must not rely on the email being sent when the
+     * method returns.</p>
+     *
+     * @param recipientEmail   destination email address
+     * @param verificationCode the 6-digit verification code
+     */
+    void sendEmailVerificationEmail(String recipientEmail, String verificationCode);
 }

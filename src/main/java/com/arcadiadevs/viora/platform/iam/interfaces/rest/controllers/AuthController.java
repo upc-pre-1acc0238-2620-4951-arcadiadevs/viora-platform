@@ -1,17 +1,25 @@
 package com.arcadiadevs.viora.platform.iam.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.iam.application.commandservices.AuthenticatedSession;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
+import com.arcadiadevs.viora.platform.iam.application.commandservices.UserSessionCommandService;
 import com.arcadiadevs.viora.platform.iam.application.queryservices.UserAccountQueryService;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUserCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
-import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResetUserPasswordCommand;
-import com.arcadiadevs.viora.platform.iam.domain.model.queries.GetUserAccountByEmailQuery;
-import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.RefreshToken;
-import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.queries.CheckPasswordResetTokenQuery;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.interfaces.rest.resources.*;
+import com.arcadiadevs.viora.platform.iam.interfaces.rest.transform.AuthenticatedSessionResourceFromSessionAssembler;
+import com.arcadiadevs.viora.platform.iam.interfaces.rest.transform.RegisterUserAccountCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -20,8 +28,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -33,140 +39,113 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserAccountCommandService userAccountCommandService;
+    private final UserSessionCommandService userSessionCommandService;
     private final UserAccountQueryService userAccountQueryService;
-    private final PasswordEncoder passwordEncoder;
-    private final BearerTokenService tokenService;
+    private final CurrentUserProvider currentUserProvider;
 
+    /**
+     * Creates the controller.
+     *
+     * @param userAccountCommandService account use cases: sign-up, email verification and passwords
+     * @param userSessionCommandService session use cases: sign-in, opening and renewing sessions
+     * @param userAccountQueryService   account queries, such as whether a reset link can still be used
+     * @param currentUserProvider       resolves the authenticated user of each request
+     */
     public AuthController(
             UserAccountCommandService userAccountCommandService,
+            UserSessionCommandService userSessionCommandService,
             UserAccountQueryService userAccountQueryService,
-            PasswordEncoder passwordEncoder,
-            BearerTokenService tokenService
+            CurrentUserProvider currentUserProvider
     ) {
-        if (userAccountCommandService == null) throw new IllegalArgumentException("user.command_service.null");
-        if (userAccountQueryService == null) throw new IllegalArgumentException("user.query_service.null");
-        if (passwordEncoder == null) throw new IllegalArgumentException("password.encoder.null");
-        if (tokenService == null) throw new IllegalArgumentException("jwt.provider.null");
-
+        if (userAccountCommandService == null) {
+            throw new IllegalArgumentException("user.command_service.null");
+        }
+        if (userSessionCommandService == null) {
+            throw new IllegalArgumentException("user.session_command_service.null");
+        }
+        if (userAccountQueryService == null) {
+            throw new IllegalArgumentException("user.query_service.null");
+        }
+        if (currentUserProvider == null) {
+            throw new IllegalArgumentException("security.current_user_provider.null");
+        }
         this.userAccountCommandService = userAccountCommandService;
+        this.userSessionCommandService = userSessionCommandService;
         this.userAccountQueryService = userAccountQueryService;
-        this.passwordEncoder = passwordEncoder;
-        this.tokenService = tokenService;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @PostMapping("/sign-up")
-    @Operation(summary = "Register user account", description = "Creates a new user account and optionally formalizes profile details for mobile onboarding", security = {})
+    @Operation(summary = "Sign up a user account",
+            description = "Creates an account pending email verification, with its onboarding profile, and emails a 6-digit verification code. No session is issued until the email is verified. Signing up again with the email of a pending account reuses it with a new code. A weak password answers 400 with every broken rule in violations.",
+            security = {})
     public ResponseEntity<?> signUp(@Valid @RequestBody SignUpResource resource) {
-        String encodedPassword = passwordEncoder.encode(resource.password());
-        var command = com.arcadiadevs.viora.platform.iam.interfaces.rest.transform.RegisterUserAccountCommandFromResourceAssembler
-                .toCommandFromResource(resource, encodedPassword);
+        var command = RegisterUserAccountCommandFromResourceAssembler.toCommandFromResource(resource);
         var result = userAccountCommandService.handle(command);
 
         return switch (result) {
-            case Result.Success<String, ApplicationError> success -> {
-                String userId = success.value();
-
-                String accessToken = tokenService.generateAccessToken(userId, resource.email(), resource.role());
-                String refreshToken = RefreshToken.issue().token();
-                var sessionResource = new AuthenticatedSessionResource(
-                        accessToken,
-                        refreshToken,
-                        "Bearer",
-                        tokenService.getAccessTokenValiditySeconds(),
-                        userId,
-                        resource.email(),
-                        resource.role()
-                );
-                yield ResponseEntity.status(HttpStatus.CREATED).body(sessionResource);
-            }
+            case Result.Success<String, ApplicationError> success -> ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(new SignUpAcceptedResource(success.value(), resource.email(),
+                            UserAccountStatus.PENDING_VERIFICATION.name()));
             case Result.Failure<String, ApplicationError> failure ->
                     ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
     }
 
+    @PostMapping("/email-verifications")
+    @Operation(summary = "Verify the account email",
+            description = "Checks the 6-digit code sent at sign-up, activates the account and returns the session. A wrong code answers 422 with the remaining attempts; after 3 wrong codes a new one must be requested.",
+            security = {})
+    public ResponseEntity<?> verifyEmail(@Valid @RequestBody VerifyEmailResource resource) {
+        var result = userAccountCommandService.handle(new VerifyEmailCommand(resource.email(), resource.code()));
+
+        return switch (result) {
+            case Result.Success<String, ApplicationError> success ->
+                    toSessionResponse(userSessionCommandService.handle(new OpenUserSessionCommand(success.value())));
+            case Result.Failure<String, ApplicationError> failure ->
+                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
+
+    @PostMapping("/email-verification-codes")
+    @Operation(summary = "Resend the email verification code",
+            description = "Emails a new 6-digit code to a pending account. Answers 202 for unknown or already verified emails too, and 429 with Retry-After when asked again within 45 seconds.",
+            security = {})
+    public ResponseEntity<?> resendEmailVerificationCode(@Valid @RequestBody EmailVerificationCodeResource resource) {
+        var result = userAccountCommandService.handle(new ResendEmailVerificationCommand(resource.email()));
+
+        return switch (result) {
+            case Result.Success<Void, ApplicationError> ignored -> ResponseEntity.accepted().build();
+            case Result.Failure<Void, ApplicationError> failure ->
+                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
+
     @PostMapping("/sign-in")
-    @Operation(summary = "Authenticate user credentials", description = "Validates credentials and returns JWT access and refresh token pair", security = {})
+    @Operation(summary = "Authenticate user credentials",
+            description = "Validates credentials and returns the access token and a refresh token. A wrong email and a wrong password get the same answer; an account whose email is not verified yet answers 403 with code EMAIL_VERIFICATION_FORBIDDEN.",
+            security = {})
     public ResponseEntity<?> signIn(@Valid @RequestBody SignInResource resource) {
-        var query = new GetUserAccountByEmailQuery(resource.email());
-        var optionalAccount = userAccountQueryService.handle(query);
-        if (optionalAccount.isEmpty()) {
-            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                    ApplicationError.forbidden("user", "user.credentials.invalid")
-            );
-        }
-
-        var account = optionalAccount.get();
-        if (!passwordEncoder.matches(resource.password(), account.snapshot().passwordHash().value())) {
-            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                    ApplicationError.forbidden("user", "user.credentials.invalid")
-            );
-        }
-
-        var snapshot = account.snapshot();
-        String accessToken = tokenService.generateAccessToken(
-                snapshot.id().userId(),
-                snapshot.email().value(),
-                snapshot.role().name()
-        );
-        String refreshToken = RefreshToken.issue().token();
-        var sessionResource = new AuthenticatedSessionResource(
-                accessToken,
-                refreshToken,
-                "Bearer",
-                tokenService.getAccessTokenValiditySeconds(),
-                snapshot.id().userId(),
-                snapshot.email().value(),
-                snapshot.role().name()
-        );
-
-        return ResponseEntity.ok(sessionResource);
+        return toSessionResponse(userSessionCommandService.handle(
+                new AuthenticateUserCommand(resource.email(), resource.password())));
     }
 
     @PostMapping("/refresh-tokens")
-    @Operation(summary = "Renew session tokens", description = "Rotates refresh token and issues a fresh access token", security = {})
+    @Operation(summary = "Renew session tokens",
+            description = "Rotates the refresh token: the one sent stops working and a new pair is returned. A refresh token used twice closes every session of the account.",
+            security = {})
     public ResponseEntity<?> refreshTokens(@Valid @RequestBody RefreshTokenResource resource) {
-        // Parse refresh token / access token claims
-        var claims = tokenService.parseClaims(resource.refreshToken());
-        if (claims.isEmpty()) {
-            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                    ApplicationError.forbidden("user", "user.refresh_token.invalid")
-            );
-        }
-
-        String userId = claims.get().getSubject();
-        String email = claims.get().get("email", String.class);
-        String role = claims.get().get("role", String.class);
-
-        String newAccessToken = tokenService.generateAccessToken(userId, email, role);
-        String newRefreshToken = RefreshToken.issue().token();
-        var sessionResource = new AuthenticatedSessionResource(
-                newAccessToken,
-                newRefreshToken,
-                "Bearer",
-                tokenService.getAccessTokenValiditySeconds(),
-                userId,
-                email,
-                role
-        );
-
-        return ResponseEntity.ok(sessionResource);
+        return toSessionResponse(userSessionCommandService.handle(
+                new RefreshUserSessionCommand(resource.refreshToken())));
     }
 
     @PatchMapping("/passwords")
-    @Operation(summary = "Change account password", description = "Updates password for currently authenticated user", security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<?> changePassword(
-            @Valid @RequestBody ChangePasswordResource resource,
-            Authentication authentication
-    ) {
-        if (authentication == null || authentication.getName() == null) {
-            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                    ApplicationError.forbidden("user", "user.unauthenticated")
-            );
-        }
-
-        String userId = authentication.getName();
-        String newEncodedPassword = passwordEncoder.encode(resource.newPassword());
-        var command = new ChangeUserPasswordCommand(userId, resource.currentPassword(), newEncodedPassword);
+    @Operation(summary = "Change account password",
+            description = "Updates the password of the authenticated user after checking the current one. The new password follows the password rules and cannot repeat the last 5; every other session is closed.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordResource resource) {
+        var command = new ChangeUserPasswordCommand(currentUserProvider.requireCurrentUserId(),
+                resource.currentPassword(), resource.newPassword());
         var result = userAccountCommandService.handle(command);
 
         return switch (result) {
@@ -177,25 +156,48 @@ public class AuthController {
     }
 
     @PostMapping("/password-reset-tokens")
-    @Operation(summary = "Request password reset", description = "Initiates email recovery token delivery via Brevo without revealing email existence", security = {})
+    @Operation(summary = "Request password reset",
+            description = "Emails a single-use link, valid for 30 minutes, that opens the app to set a new password. Always answers 202, so it does not reveal which emails are registered. A new link replaces the previous one.",
+            security = {})
     public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetResource resource) {
         userAccountCommandService.handle(new RequestPasswordResetCommand(resource.email()));
         return ResponseEntity.accepted().build();
     }
 
+    @GetMapping("/password-reset-tokens/{token}")
+    @Operation(summary = "Check a password reset link",
+            description = "Answers 204 while the link can still be used (show T08) and 404 PASSWORD_RESET_TOKEN_NOT_FOUND when it expired, was already used or replaced (show T09). It does not consume the link.",
+            security = {})
+    public ResponseEntity<?> checkPasswordResetToken(@PathVariable String token) {
+        if (userAccountQueryService.handle(new CheckPasswordResetTokenQuery(token))) {
+            return ResponseEntity.noContent().build();
+        }
+        return ErrorResponseAssembler.toErrorResponseFromApplicationError(
+                ApplicationError.notFound("password_reset_token", "user.password_reset.link_expired"));
+    }
+
     @PutMapping("/password-reset-tokens/{token}")
-    @Operation(summary = "Reset password using recovery code", description = "Consumes the single-use 6-digit code sent to the given email and updates the account password; the code is locked after 5 wrong attempts", security = {})
+    @Operation(summary = "Reset password with a reset link",
+            description = "Consumes the single-use link and sets the new password. The new password follows the password rules and cannot repeat the last 5; every session is closed. An expired, used or replaced link answers 404 PASSWORD_RESET_TOKEN_NOT_FOUND.",
+            security = {})
     public ResponseEntity<?> resetPassword(
             @PathVariable String token,
             @Valid @RequestBody ResetPasswordResource resource
     ) {
-        String newEncodedPassword = passwordEncoder.encode(resource.newPassword());
-        var command = new ResetUserPasswordCommand(resource.email(), token, newEncodedPassword);
-        var result = userAccountCommandService.handle(command);
+        var result = userAccountCommandService.handle(new ResetUserPasswordCommand(token, resource.newPassword()));
 
         return switch (result) {
             case Result.Success<Void, ApplicationError> ignored -> ResponseEntity.noContent().build();
             case Result.Failure<Void, ApplicationError> failure ->
+                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
+
+    private static ResponseEntity<?> toSessionResponse(Result<AuthenticatedSession, ApplicationError> result) {
+        return switch (result) {
+            case Result.Success<AuthenticatedSession, ApplicationError> success -> ResponseEntity.ok(
+                    AuthenticatedSessionResourceFromSessionAssembler.toResourceFromSession(success.value()));
+            case Result.Failure<AuthenticatedSession, ApplicationError> failure ->
                     ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
     }

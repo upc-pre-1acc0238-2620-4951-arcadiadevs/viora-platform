@@ -61,4 +61,12 @@ public class ProfileRepositoryImpl implements ProfileRepository {
         }
         return persistenceRepository.existsByUserId(UUID.fromString(userId.userId()));
     }
+
+    @Override
+    public void delete(Profile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("profile.aggregate.null");
+        }
+        persistenceRepository.deleteById(UUID.fromString(profile.snapshot().id().profileId()));
+    }
 }

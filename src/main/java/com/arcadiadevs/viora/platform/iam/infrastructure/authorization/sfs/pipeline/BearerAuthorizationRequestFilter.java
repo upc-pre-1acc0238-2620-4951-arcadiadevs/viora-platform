@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.pipeline;
 
+import com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.model.UserDetailsImpl;
 import com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.model.UsernamePasswordAuthenticationTokenBuilder;
 import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
 import jakarta.servlet.FilterChain;
@@ -42,6 +43,12 @@ public class BearerAuthorizationRequestFilter extends OncePerRequestFilter {
                 String username = tokenService.getUsernameFromToken(token);
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     var userDetails = userDetailsService.loadUserByUsername(username);
+                    // A token issued before the last password change carries an older credentials version
+                    if (userDetails instanceof UserDetailsImpl account
+                            && tokenService.extractCredentialsVersion(token).orElse(0L) != account.getCredentialsVersion()) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
                     var authentication = UsernamePasswordAuthenticationTokenBuilder.build(userDetails, request);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

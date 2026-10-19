@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.entitie
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +18,8 @@ public interface UserAccountPersistenceRepository extends JpaRepository<UserAcco
     Optional<UserAccountPersistenceEntity> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    Optional<UserAccountPersistenceEntity> findByResetTokenHash(String resetTokenHash);
+
+    List<UserAccountPersistenceEntity> findByStatusAndUpdatedAtBefore(String status, Instant cutoff);
 }
