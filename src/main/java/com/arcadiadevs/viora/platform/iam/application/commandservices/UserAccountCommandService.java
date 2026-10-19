@@ -56,4 +56,13 @@ public interface UserAccountCommandService {
      * @return empty success or application error
      */
     Result<Void, ApplicationError> handle(ResetUserPasswordCommand command);
+
+    /**
+     * Discards the pending accounts abandoned before verifying their email, together with what other contexts
+     * created for them.
+     *
+     * @param command discard command
+     * @return how many accounts were discarded
+     */
+    Result<Integer, ApplicationError> handle(DiscardUnverifiedUserAccountsCommand command);
 }

@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.assembl
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.repositories.UserSessionPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,5 +54,13 @@ public class UserSessionRepositoryImpl implements UserSessionRepository {
         return persistenceRepository.findByUserIdAndRevokedAtIsNull(UUID.fromString(userId.userId())).stream()
                 .map(UserSessionPersistenceAssembler::toDomainFromPersistence)
                 .toList();
+    }
+
+    @Override
+    public int deleteEndedBefore(Instant cutoff) {
+        if (cutoff == null) {
+            return 0;
+        }
+        return persistenceRepository.deleteEndedBefore(cutoff);
     }
 }

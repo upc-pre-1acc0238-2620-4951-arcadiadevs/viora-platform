@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserSession;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUserCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
@@ -159,6 +160,21 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
             return Result.failure(invalidRefreshToken());
         }
         return openSessionFor(optionalAccount.get(), now);
+    }
+
+    /**
+     * Removes the sessions that expired or were revoked more than {@link UserSession#RETENTION_AFTER_END} ago.
+     *
+     * @param command purge command
+     * @return how many sessions were removed
+     */
+    @Override
+    public Result<Integer, ApplicationError> handle(PurgeEndedUserSessionsCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "user.command.null"));
+        }
+        return Result.success(userSessionRepository.deleteEndedBefore(
+                Instant.now().minus(UserSession.RETENTION_AFTER_END)));
     }
 
     private Result<AuthenticatedSession, ApplicationError> openSessionFor(UserAccount account, Instant now) {

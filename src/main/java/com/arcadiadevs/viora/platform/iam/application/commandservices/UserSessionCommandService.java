@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.iam.application.commandservices;
 
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUserCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -37,4 +38,12 @@ public interface UserSessionCommandService {
      * @return the new session, or why the refresh token was rejected
      */
     Result<AuthenticatedSession, ApplicationError> handle(RefreshUserSessionCommand command);
+
+    /**
+     * Removes the sessions that ended longer ago than their retention.
+     *
+     * @param command purge command
+     * @return how many sessions were removed
+     */
+    Result<Integer, ApplicationError> handle(PurgeEndedUserSessionsCommand command);
 }

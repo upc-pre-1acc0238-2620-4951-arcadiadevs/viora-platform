@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserSession;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,4 +39,12 @@ public interface UserSessionRepository {
      * @return the sessions that are not revoked, possibly empty
      */
     List<UserSession> findNotRevokedByUserId(UserId userId);
+
+    /**
+     * Removes the sessions that expired or were revoked before the given instant.
+     *
+     * @param cutoff sessions that ended before this instant are removed
+     * @return how many sessions were removed
+     */
+    int deleteEndedBefore(Instant cutoff);
 }

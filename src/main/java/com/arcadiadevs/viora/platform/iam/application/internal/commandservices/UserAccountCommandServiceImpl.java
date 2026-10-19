@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerifica
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.WeakPasswordException;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.DiscardUnverifiedUserAccountsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
@@ -346,6 +347,34 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
+    }
+
+    /**
+     * Discards the pending accounts with no sign-up activity for {@link UserAccount#UNVERIFIED_RETENTION}. Each
+     * discard publishes {@code UnverifiedUserAccountDiscardedEvent} before the account is deleted, so the Profiles
+     * context removes the profile in the same transaction.
+     *
+     * @param command discard command
+     * @return how many accounts were discarded
+     */
+    @Override
+    public Result<Integer, ApplicationError> handle(DiscardUnverifiedUserAccountsCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "user.command.null"));
+        }
+        var now = Instant.now();
+        var discarded = 0;
+        for (var account : userAccountRepository.findPendingVerificationNotUpdatedSince(
+                now.minus(UserAccount.UNVERIFIED_RETENTION))) {
+            if (!account.isAbandonedUnverified(now)) {
+                continue;
+            }
+            account.discardUnverified(now);
+            publishDomainEvents(account);
+            userAccountRepository.delete(account);
+            discarded++;
+        }
+        return Result.success(discarded);
     }
 
     private static ApplicationError expiredResetLinkError() {

@@ -21,6 +21,12 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
     /** How long a refresh token can be used. */
     public static final Duration LIFESPAN = Duration.ofDays(7);
 
+    /**
+     * How long a session is kept after it ends (expires or is revoked). Keeping it a while lets a reused, already
+     * rotated refresh token still be recognized as stolen.
+     */
+    public static final Duration RETENTION_AFTER_END = Duration.ofDays(30);
+
     private final UserSessionId id;
     private final UserId userId;
     private final TokenHash refreshTokenHash;

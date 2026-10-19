@@ -3,12 +3,15 @@ package com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.adapte
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.assemblers.UserAccountPersistenceAssembler;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.repositories.UserAccountPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,5 +73,24 @@ public class UserAccountRepositoryImpl implements UserAccountRepository {
         }
         return persistenceRepository.findByResetTokenHash(resetTokenHash.value())
                 .map(UserAccountPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<UserAccount> findPendingVerificationNotUpdatedSince(Instant cutoff) {
+        if (cutoff == null) {
+            return List.of();
+        }
+        return persistenceRepository.findByStatusAndUpdatedAtBefore(UserAccountStatus.PENDING_VERIFICATION.name(), cutoff)
+                .stream()
+                .map(UserAccountPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
+    public void delete(UserAccount userAccount) {
+        if (userAccount == null) {
+            throw new IllegalArgumentException("user.aggregate.null");
+        }
+        persistenceRepository.deleteById(UUID.fromString(userAccount.snapshot().id().userId()));
     }
 }

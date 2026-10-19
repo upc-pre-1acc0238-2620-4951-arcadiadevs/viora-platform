@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.events.EmailVerificationR
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordChangedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetCompletedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetRequestedEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UnverifiedUserAccountDiscardedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountActivatedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountRegisteredEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserSignedUpWithProfileEvent;
@@ -27,6 +28,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -39,6 +41,9 @@ import java.time.Instant;
  * JPA, framework, or presentation annotations.</p>
  */
 public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
+
+    /** How long a pending account is kept without any sign-up activity before it is discarded. */
+    public static final Duration UNVERIFIED_RETENTION = Duration.ofDays(7);
 
     private final UserId id;
     private final EmailAddress email;
@@ -265,6 +270,32 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
         this.emailVerification = null;
         this.updatedAt = now;
         registerDomainEvent(new UserAccountActivatedEvent(this.id.userId(), this.email.value(), now));
+    }
+
+    /**
+     * Checks whether the account is pending and had no sign-up activity (sign-up, retried sign-up or resent code)
+     * for {@link #UNVERIFIED_RETENTION}.
+     *
+     * @param now current instant
+     * @return true if the account was abandoned before verifying its email
+     */
+    public boolean isAbandonedUnverified(Instant now) {
+        return now != null && this.status == UserAccountStatus.PENDING_VERIFICATION
+                && this.updatedAt.plus(UNVERIFIED_RETENTION).isBefore(now);
+    }
+
+    /**
+     * Marks an abandoned pending account for removal and registers {@link UnverifiedUserAccountDiscardedEvent}, so
+     * the contexts that reacted to its sign-up can remove what they created. The repository deletes it afterwards.
+     *
+     * @param now the instant of the discard
+     * @throws BusinessRuleException if the account is active or still within {@link #UNVERIFIED_RETENTION}
+     */
+    public void discardUnverified(Instant now) {
+        if (!isAbandonedUnverified(now)) {
+            throw new BusinessRuleException("user.account.not_discardable");
+        }
+        registerDomainEvent(new UnverifiedUserAccountDiscardedEvent(this.id.userId(), this.email.value(), now));
     }
 
     /**
