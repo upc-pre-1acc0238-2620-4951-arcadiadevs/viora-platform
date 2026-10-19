@@ -31,21 +31,31 @@ public class TokenServiceImpl implements BearerTokenService {
     private static final String BEARER_TOKEN_PREFIX = "Bearer ";
     private static final int BEARER_PREFIX_LENGTH = 7;
     private static final String CREDENTIALS_VERSION_CLAIM = "cv";
+    /** HMAC-SHA256 needs a key of at least 256 bits. */
+    private static final int MIN_SECRET_BYTES = 32;
 
     private final SecretKey signingKey;
     private final long accessTokenValidityMinutes;
 
+    /**
+     * Creates the token service.
+     *
+     * <p>The secret has no default on purpose: without {@code JWT_SECRET} the platform does not start, instead of
+     * signing tokens with a key anyone can read in the repository.</p>
+     *
+     * @param secret                     the HMAC signing secret, at least 32 bytes long
+     * @param accessTokenValidityMinutes how long an access token is valid
+     * @throws IllegalStateException if the secret is missing or shorter than 32 bytes
+     */
     public TokenServiceImpl(
-            @Value("${authorization.jwt.secret:${viora.security.jwt.secret:viora-secret-super-secure-key-for-jwt-token-generation-2026-very-long-string}}") String secret,
+            @Value("${authorization.jwt.secret}") String secret,
             @Value("${viora.security.jwt.access-token-validity-minutes:15}") long accessTokenValidityMinutes
     ) {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-        if (keyBytes.length < 32) {
-            byte[] padded = new byte[32];
-            System.arraycopy(keyBytes, 0, padded, 0, keyBytes.length);
-            keyBytes = padded;
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be set to a random value of at least 32 bytes (e.g. openssl rand -base64 48)");
         }
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenValidityMinutes = accessTokenValidityMinutes;
     }
 

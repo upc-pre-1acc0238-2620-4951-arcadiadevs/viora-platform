@@ -7,35 +7,36 @@ import java.util.List;
 /**
  * Configuration of the links that open the mobile app directly (Android App Links).
  *
- * <p>The password reset email carries {@code baseUrl + resetPasswordPath + "?token=..."}. Android opens the app for
- * that URL only if {@code /.well-known/assetlinks.json}, served from the same domain, names the app package and the
+ * <p>The password reset email carries {@code baseUrl + passwordResetPath + "/" + token}, such as
+ * {@code https://viora.arcadiadevs.com/password-resets/Ab9...}: the link names the reset resource, as the API does.
+ * Android opens the app for that URL only if {@code /.well-known/assetlinks.json}, served from the same domain, names the app package and the
  * SHA-256 fingerprint of the certificate that signs it.</p>
  *
  * @param baseUrl           public https URL of the domain the links point to, without trailing slash
- * @param resetPasswordPath path the app handles for password reset links
+ * @param passwordResetPath path of the password reset resource the app handles, without trailing slash
  * @param android           identity of the Android app allowed to open the links
  */
 @ConfigurationProperties(prefix = "viora.deep-link")
-public record DeepLinkProperties(String baseUrl, String resetPasswordPath, Android android) {
+public record DeepLinkProperties(String baseUrl, String passwordResetPath, Android android) {
 
     /**
      * Normalizes missing values to empty ones, so an unconfigured property never breaks the startup.
      */
     public DeepLinkProperties {
         baseUrl = baseUrl == null ? "" : baseUrl.trim().replaceAll("/+$", "");
-        resetPasswordPath = resetPasswordPath == null || resetPasswordPath.isBlank()
-                ? "/reset-password" : resetPasswordPath.trim();
+        passwordResetPath = passwordResetPath == null || passwordResetPath.isBlank()
+                ? "/password-resets" : passwordResetPath.trim().replaceAll("/+$", "");
         android = android == null ? new Android("", List.of()) : android;
     }
 
     /**
-     * Builds the password reset link carrying the given token.
+     * Builds the password reset link, with the token as the last path segment.
      *
      * @param resetToken the token of the reset link, already URL safe
      * @return the absolute link
      */
     public String passwordResetLink(String resetToken) {
-        return baseUrl + resetPasswordPath + "?token=" + resetToken;
+        return baseUrl + passwordResetPath + "/" + resetToken;
     }
 
     /**

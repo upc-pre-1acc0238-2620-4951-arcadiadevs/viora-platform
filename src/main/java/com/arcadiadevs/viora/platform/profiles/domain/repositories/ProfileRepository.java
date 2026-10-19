@@ -44,4 +44,11 @@ public interface ProfileRepository {
      * @return true if a profile exists; false otherwise
      */
     boolean existsByUserId(UserId userId);
+
+    /**
+     * Removes a profile.
+     *
+     * @param profile aggregate to remove
+     */
+    void delete(Profile profile);
 }
