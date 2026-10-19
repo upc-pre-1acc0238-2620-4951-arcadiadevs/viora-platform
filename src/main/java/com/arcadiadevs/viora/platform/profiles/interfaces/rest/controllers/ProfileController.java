@@ -2,101 +2,112 @@ package com.arcadiadevs.viora.platform.profiles.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.profiles.application.commandservices.ProfileCommandService;
 import com.arcadiadevs.viora.platform.profiles.application.queryservices.ProfileQueryService;
-import com.arcadiadevs.viora.platform.profiles.domain.model.commands.CreateProfileCommand;
-import com.arcadiadevs.viora.platform.profiles.domain.model.commands.UpdateContactProfileCommand;
 import com.arcadiadevs.viora.platform.profiles.domain.model.queries.GetProfileByUserIdQuery;
-import com.arcadiadevs.viora.platform.profiles.interfaces.rest.resources.CreateProfileResource;
-import com.arcadiadevs.viora.platform.profiles.interfaces.rest.resources.ProfileResource;
 import com.arcadiadevs.viora.platform.profiles.interfaces.rest.resources.UpdateProfileResource;
 import com.arcadiadevs.viora.platform.profiles.interfaces.rest.transform.ProfileResourceAssembler;
-import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
-import com.arcadiadevs.viora.platform.shared.application.result.Result;
-import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
+import com.arcadiadevs.viora.platform.profiles.interfaces.rest.transform.UpdateContactProfileCommandFromResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
-
 /**
- * REST controller exposing endpoints for user profiles management.
+ * REST controller exposing the profile of the authenticated user.
+ *
+ * <p>The profile is created at sign-up, so there is no endpoint to create it. Every endpoint is reachable only by the
+ * owner of the profile: method security compares the path's {@code userId} with the current user (the session, or
+ * the demo producer in the demo profile). Another user's {@code userId} answers 403, and no user at all answers 401.
+ * Each endpoint carries its own annotation, because a call from one endpoint to another inside this class does not
+ * go through the security proxy.</p>
  */
 @RestController
 @RequestMapping(value = "/api/v1/profiles", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "User Profiles", description = "Endpoints for user civil profile and contact management")
 public class ProfileController {
 
+    /** Only the owner of the profile named in the path, as resolved by {@code CurrentUserProvider}. */
+    private static final String OWNER_ONLY = "@currentUserProvider.isCurrentUser(#userId)";
+
     private final ProfileCommandService profileCommandService;
     private final ProfileQueryService profileQueryService;
 
+    /**
+     * Creates the controller.
+     *
+     * @param profileCommandService profile use cases
+     * @param profileQueryService   profile queries
+     * @throws IllegalArgumentException if any dependency is null
+     */
     public ProfileController(
             ProfileCommandService profileCommandService,
             ProfileQueryService profileQueryService
     ) {
-        if (profileCommandService == null) throw new IllegalArgumentException("profile.command_service.null");
-        if (profileQueryService == null) throw new IllegalArgumentException("profile.query_service.null");
-
+        if (profileCommandService == null) {
+            throw new IllegalArgumentException("profile.command_service.null");
+        }
+        if (profileQueryService == null) {
+            throw new IllegalArgumentException("profile.query_service.null");
+        }
         this.profileCommandService = profileCommandService;
         this.profileQueryService = profileQueryService;
     }
 
-    @PostMapping
-    @Operation(summary = "Create user profile", description = "Initializes contact and civil profile for an existing user account")
-    public ResponseEntity<?> createProfile(@Valid @RequestBody CreateProfileResource resource) {
-        var command = com.arcadiadevs.viora.platform.profiles.interfaces.rest.transform.CreateProfileCommandFromResourceAssembler
-                .toCommandFromResource(resource);
-        var result = profileCommandService.handle(command);
-
-        return switch (result) {
-            case Result.Success<String, ApplicationError> success -> {
-                var query = new GetProfileByUserIdQuery(resource.userId());
-                var profile = profileQueryService.handle(query).orElseThrow();
-                var responseResource = ProfileResourceAssembler.toResource(profile);
-                yield ResponseEntity.created(URI.create("/api/v1/profiles/" + resource.userId())).body(responseResource);
-            }
-            case Result.Failure<String, ApplicationError> failure ->
-                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
-        };
-    }
-
+    /**
+     * Retrieves the profile of the authenticated user.
+     *
+     * @param userId the user account identifier; it must be the authenticated user
+     * @return 200 with the profile, 403 for another user's profile, 404 if the user has no profile
+     */
     @GetMapping("/{userId}")
-    @Operation(summary = "Get user profile", description = "Retrieves user profile by user account identifier")
+    @Operation(summary = "Get own user profile",
+            description = "Retrieves the profile of the authenticated user. Another user's id answers 403.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize(OWNER_ONLY)
     public ResponseEntity<?> getProfileByUserId(@PathVariable String userId) {
-        try {
-            var query = new GetProfileByUserIdQuery(userId);
-            var optionalProfile = profileQueryService.handle(query);
-            if (optionalProfile.isEmpty()) {
-                return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                        ApplicationError.notFound("profile", userId)
-                );
-            }
-            return ResponseEntity.ok(ProfileResourceAssembler.toResource(optionalProfile.get()));
-        } catch (IllegalArgumentException ex) {
-            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
-                    ApplicationError.validationError("userId", ex.getMessage())
-            );
-        }
+        var query = new GetProfileByUserIdQuery(userId);
+        return ResponseEntityAssembler.toResponseEntityFromResult(profileQueryService.handle(query),
+                ProfileResourceAssembler::toResource, HttpStatus.OK);
     }
 
+    /**
+     * Updates the full name, country and phone number of the authenticated user's profile.
+     *
+     * @param userId   the user account identifier; it must be the authenticated user
+     * @param resource the new contact details
+     * @return 200 with the updated profile, or 403 for another user's profile
+     */
     @PutMapping("/{userId}")
-    @Operation(summary = "Update user profile", description = "Updates full name, country, and verified phone number")
+    @Operation(summary = "Update own user profile",
+            description = "Updates full name, country, and verified phone number of the authenticated user. Another user's id answers 403.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize(OWNER_ONLY)
     public ResponseEntity<?> updateProfile(
             @PathVariable String userId,
             @Valid @RequestBody UpdateProfileResource resource
     ) {
-        var command = com.arcadiadevs.viora.platform.profiles.interfaces.rest.transform.UpdateContactProfileCommandFromResourceAssembler
-                .toCommandFromResource(userId, resource);
+        var command = UpdateContactProfileCommandFromResourceAssembler.toCommandFromResource(userId, resource);
         var result = profileCommandService.handle(command);
         return ResponseEntityAssembler.toResponseEntityFromResult(result, ProfileResourceAssembler::toResource, HttpStatus.OK);
     }
 
+    /**
+     * Same as {@link #updateProfile}: updates the authenticated user's contact details.
+     *
+     * @param userId   the user account identifier; it must be the authenticated user
+     * @param resource the new contact details
+     * @return 200 with the updated profile, or 403 for another user's profile
+     */
     @PatchMapping("/{userId}")
-    @Operation(summary = "Partial update of user profile", description = "Updates profile contact information")
+    @Operation(summary = "Partial update of own user profile",
+            description = "Updates the contact information of the authenticated user. Another user's id answers 403.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize(OWNER_ONLY)
     public ResponseEntity<?> patchProfile(
             @PathVariable String userId,
             @Valid @RequestBody UpdateProfileResource resource

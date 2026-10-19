@@ -12,6 +12,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUser
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
@@ -162,6 +163,20 @@ class UserSessionCommandServiceImplTest {
         assertThat(((Result.Success<Integer, ApplicationError>) result).value()).isEqualTo(2);
         assertThat(sessions.byHash).containsOnlyKeys(
                 UserAccountFixtures.tokenHashOf("recent"), UserAccountFixtures.tokenHashOf("active"));
+    }
+
+    @Test
+    @DisplayName("Signs out by closing the session of the refresh token, and ignores unknown tokens")
+    void signOutClosesTheSession() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+
+        var result = service.handle(new SignOutUserSessionCommand("refresh-1"));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
+        assertThat(sessions.byHash.get(UserAccountFixtures.tokenHashOf("refresh-1")).isActive(Instant.now())).isFalse();
+        assertThat(failure(service.handle(new RefreshUserSessionCommand("refresh-1"))).details())
+                .isEqualTo("user.refresh_token.invalid");
+        assertThat(service.handle(new SignOutUserSessionCommand("unknown-token"))).isInstanceOf(Result.Success.class);
     }
 
     private static AuthenticatedSession success(Result<AuthenticatedSession, ApplicationError> result) {

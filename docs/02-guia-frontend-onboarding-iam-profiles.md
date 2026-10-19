@@ -56,7 +56,7 @@ Crea la cuenta pendiente de verificación y su perfil en una sola operación at�
 * `password`: 8 caracteres o más, con letras y números. Si no cumple, responde `400` con **todas** las reglas incumplidas en `violations` (ver la sección 2.7).
 * `role`: Obligatorio. Solo se acepta `ROLE_PRODUCER`; cualquier otro responde `400` (`user.role.sign_up_not_allowed`).
 * `termsAccepted`: Obligatorio y en `true`. El backend registra la versión vigente de los términos y la fecha (Ley 29733).
-* `profile.*`: Validados por `Profiles` con `libphonenumber`. Si el perfil es inválido, **no se crea la cuenta** (`422`).
+* `profile.*`: Validados por `Profiles` con `libphonenumber`. El teléfono debe ser un **celular del país elegido** (`profile.phone.not_mobile` si es fijo, `profile.phone.country_mismatch` si es de otro país). Si el perfil es inválido, **no se crea la cuenta**.
 
 > **Volver a registrarse con un correo pendiente** (por ejemplo, desde "Cambiar correo" o si la persona cierra la app) **reutiliza la misma cuenta**: actualiza la contraseña y el perfil y envía un código nuevo. Si se hace antes de 45 s del código anterior responde `429` con `Retry-After`.
 
@@ -154,15 +154,26 @@ La misma sesión que `sign-in`, con un **`refreshToken` nuevo**.
 
 - **Cabecera requerida:** `Authorization: Bearer <accessToken>`
 - **Payload:** `{"currentPassword": "PasswordSegura123", "newPassword": "NuevaClave456"}`
-- **Respuesta:** `204 No Content`. **Se cierran todas las sesiones**, incluida la del teléfono que hizo el cambio: la app debe pedir iniciar sesión de nuevo.
+- **Respuesta:** `200 OK` con una **sesión nueva** (los mismos campos que `sign-in`). Se cierran las **otras** sesiones; este teléfono sigue conectado, pero debe **reemplazar sus dos tokens** por los de la respuesta, porque los anteriores dejan de servir.
 - **Errores:** `401` sin token; `422` con `reason: user.password.current_invalid` si la contraseña actual es incorrecta; `400` con `violations` o `422` con `reason: user.password.reused` según las reglas de la sección 2.7.
+
+---
+
+### 2.3.2. Cerrar Sesión (`POST /api/v1/auth/sign-out`) — P95 "Cerrar sesión"
+
+- **Payload:** `{"refreshToken": "<el refresh token guardado>"}`
+- **Respuesta:** `204 No Content` siempre, aunque la sesión ya estuviera cerrada o el token no exista.
+- **Efecto:** ese refresh token deja de servir. La app debe además **borrar sus tokens** guardados. El access token vigente vence solo en, como máximo, 15 minutos.
 
 ---
 
 ### 2.4. Consulta de Perfil (`GET /api/v1/profiles/{userId}`)
 
+El perfil se crea al registrarse (sección 2.1); no hay endpoint para crearlo. **Cada usuario solo puede ver y modificar su propio perfil:** `{userId}` debe ser el `userId` de la sesión.
+
 - **URL:** `GET /api/v1/profiles/{userId}`
 - **Cabecera requerida:** `Authorization: Bearer <accessToken>`
+- **Errores:** `401` sin sesión; `403` con `code: USER_FORBIDDEN` si `{userId}` no es el usuario autenticado; `404` si la cuenta no tiene perfil.
 
 #### Respuesta Exitosa (`200 OK`):
 ```json
@@ -181,10 +192,11 @@ La misma sesión que `sign-in`, con un **`refreshToken` nuevo**.
 
 ### 2.5. Actualización de Perfil (`PUT /api/v1/profiles/{userId}`)
 
-Permite modificar los datos de contacto o completarlos si el usuario se registró sin perfil.
+Permite modificar los datos de contacto del perfil creado al registrarse. No crea perfiles: `POST /api/v1/profiles/{userId}` responde `405` (cabecera `Allow: GET, PATCH, PUT`).
 
-- **URL:** `PUT /api/v1/profiles/{userId}`
+- **URL:** `PUT /api/v1/profiles/{userId}` (o `PATCH`, con el mismo cuerpo)
 - **Cabecera requerida:** `Authorization: Bearer <accessToken>`
+- **Errores:** `401` sin sesión; `403` con `code: USER_FORBIDDEN` si `{userId}` no es el usuario autenticado; `404` si la cuenta no tiene perfil; `400` si el teléfono no es un **celular** válido del país elegido (`profile.phone.invalid_e164`, `profile.phone.not_mobile` o `profile.phone.country_mismatch`).
 
 #### Request Body:
 ```json
@@ -273,7 +285,7 @@ Ya viene configurada por defecto en `application.properties`; las variables de e
    - Limpiar el estado local solo tras verificar el correo (`200 OK` de `email-verifications`), no tras el `202` del `sign-up`.
 
 2. **Validación E.164 Previa en el Cliente:**
-   - Para evitar rechazos `400 Bad Request`, la app móvil debe validar el teléfono con librerías cliente compatibles con Google libphonenumber (ej. `phone_number_lookup` o `intl_phone_field` en Flutter).
+   - Para evitar rechazos `400 Bad Request`, la app móvil debe validar el teléfono con librerías cliente compatibles con Google libphonenumber (ej. `phone_number_lookup` o `intl_phone_field` en Flutter): debe ser un **celular** y del **país elegido** (no se aceptan fijos ni números de otro país).
    - Siempre enviar el número con prefijo internacional (`+51...`).
 
 3. **Intersector HTTP y Renovación Silenciosa (Silent Refresh):**
@@ -283,7 +295,7 @@ Ya viene configurada por defecto en `application.properties`; las variables de e
      2. Invocar `POST /api/v1/auth/refresh-tokens` con el `refreshToken` almacenado, **una sola vez** aunque haya varias peticiones fallidas: como el refresh token se usa una vez, dos renovaciones en paralelo cierran todas las sesiones.
      3. Si la renovación es exitosa, guardar **los dos** tokens nuevos y reintentar la petición original.
      4. Si la renovación falla (`403`), redirigir a la pantalla de Login.
-   - Tras cambiar o recuperar la contraseña, los tokens anteriores dejan de servir: ir al Login.
+   - Tras **cambiar** la contraseña desde la app, guardar los tokens nuevos de la respuesta y seguir en la app. Tras **recuperarla** con el enlace, ir al Login.
 
 4. **Tratamiento de Errores Normalizados (RFC 7807 ProblemDetail):**
    - El backend responderá todos los errores en formato estándar `application/problem+json`:

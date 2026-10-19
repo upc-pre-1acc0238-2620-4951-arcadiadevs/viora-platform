@@ -15,8 +15,10 @@ import java.util.Optional;
  * <p>When demo mode is enabled ({@code viora.security.demo.enabled=true}, set by the {@code demo} profile) and no
  * user is authenticated, it falls back to the seeded demo producer so the demo data stays reachable without
  * signing in. An authenticated user always takes precedence over the fallback.</p>
+ *
+ * <p>It is registered as {@code currentUserProvider} so method security expressions can call it.</p>
  */
-@Component
+@Component("currentUserProvider")
 public class SpringSecurityCurrentUserProvider implements CurrentUserProvider {
 
     private final boolean demoModeEnabled;
@@ -60,5 +62,11 @@ public class SpringSecurityCurrentUserProvider implements CurrentUserProvider {
         return currentUserId()
                 .or(() -> demoModeEnabled ? Optional.of(demoUserId) : Optional.empty())
                 .orElseThrow(AuthenticationRequiredException::new);
+    }
+
+    @Override
+    public boolean isCurrentUser(String userId) {
+        var currentUserId = requireCurrentUserId();
+        return userId != null && userId.trim().equalsIgnoreCase(currentUserId);
     }
 }

@@ -85,6 +85,26 @@ class SpringSecurityCurrentUserProviderTest {
     }
 
     @Test
+    @DisplayName("isCurrentUser compares with the authenticated user, ignoring case and surrounding spaces")
+    void isCurrentUserComparesWithAuthenticatedUser() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("user-1", null, List.of()));
+
+        assertThat(provider.isCurrentUser(" USER-1 ")).isTrue();
+        assertThat(provider.isCurrentUser("user-2")).isFalse();
+        assertThat(provider.isCurrentUser(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("isCurrentUser uses the demo user in demo mode, and requires a user otherwise")
+    void isCurrentUserWithoutAuthentication() {
+        assertThat(demoProvider.isCurrentUser(DEMO_USER_ID)).isTrue();
+        assertThat(demoProvider.isCurrentUser("user-2")).isFalse();
+        assertThatThrownBy(() -> provider.isCurrentUser("user-1"))
+                .isInstanceOf(AuthenticationRequiredException.class);
+    }
+
+    @Test
     @DisplayName("Rejects demo mode without a demo user id")
     void rejectsDemoModeWithoutUserId() {
         assertThatThrownBy(() -> new SpringSecurityCurrentUserProvider(true, " "))

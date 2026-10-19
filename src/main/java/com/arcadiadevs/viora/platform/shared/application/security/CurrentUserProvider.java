@@ -24,4 +24,14 @@ public interface CurrentUserProvider {
      * @throws AuthenticationRequiredException if no user is authenticated and no demo fallback applies
      */
     String requireCurrentUserId();
+
+    /**
+     * Checks whether the given user identifier is the current user, so a request can only reach the user's own
+     * resources. Meant for method security, as in {@code @PreAuthorize("@currentUserProvider.isCurrentUser(#userId)")}.
+     *
+     * @param userId the user identifier the request is about
+     * @return true if it is the current user; false otherwise
+     * @throws AuthenticationRequiredException if no user is authenticated and no demo fallback applies
+     */
+    boolean isCurrentUser(String userId);
 }
