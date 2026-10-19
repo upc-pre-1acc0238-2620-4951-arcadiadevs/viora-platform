@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUser
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.PurgeEndedUserSessionsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 
@@ -46,4 +47,13 @@ public interface UserSessionCommandService {
      * @return how many sessions were removed
      */
     Result<Integer, ApplicationError> handle(PurgeEndedUserSessionsCommand command);
+
+    /**
+     * Signs out: closes the session held by the refresh token. Signing out twice, or with an unknown token, is
+     * not an error.
+     *
+     * @param command sign-out command
+     * @return empty success
+     */
+    Result<Void, ApplicationError> handle(SignOutUserSessionCommand command);
 }
