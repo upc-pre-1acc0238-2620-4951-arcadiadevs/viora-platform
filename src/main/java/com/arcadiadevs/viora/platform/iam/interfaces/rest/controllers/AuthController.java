@@ -11,6 +11,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessi
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResendEmailVerificationCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ResetUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.VerifyEmailCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.queries.CheckPasswordResetTokenQuery;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
@@ -139,17 +140,28 @@ public class AuthController {
                 new RefreshUserSessionCommand(resource.refreshToken())));
     }
 
+    @PostMapping("/sign-out")
+    @Operation(summary = "Sign out",
+            description = "Closes the session held by the refresh token, so it can no longer be renewed. Always answers 204, even for an unknown or already closed session. The app must also discard its tokens.",
+            security = {})
+    public ResponseEntity<Void> signOut(@Valid @RequestBody RefreshTokenResource resource) {
+        userSessionCommandService.handle(new SignOutUserSessionCommand(resource.refreshToken()));
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/passwords")
     @Operation(summary = "Change account password",
-            description = "Updates the password of the authenticated user after checking the current one. The new password follows the password rules and cannot repeat the last 5; every other session is closed.",
+            description = "Updates the password of the authenticated user after checking the current one. The new password follows the password rules and cannot repeat the last 5. Every other session is closed and this device receives a new session, so it stays signed in.",
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordResource resource) {
-        var command = new ChangeUserPasswordCommand(currentUserProvider.requireCurrentUserId(),
-                resource.currentPassword(), resource.newPassword());
+        var userId = currentUserProvider.requireCurrentUserId();
+        var command = new ChangeUserPasswordCommand(userId, resource.currentPassword(), resource.newPassword());
         var result = userAccountCommandService.handle(command);
 
         return switch (result) {
-            case Result.Success<String, ApplicationError> ignored -> ResponseEntity.noContent().build();
+            // The change revoked every session, this one included; a new one keeps this device signed in
+            case Result.Success<String, ApplicationError> ignored ->
+                    toSessionResponse(userSessionCommandService.handle(new OpenUserSessionCommand(userId)));
             case Result.Failure<String, ApplicationError> failure ->
                     ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
