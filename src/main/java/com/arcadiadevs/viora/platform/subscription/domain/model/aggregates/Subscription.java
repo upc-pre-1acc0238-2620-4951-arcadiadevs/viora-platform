@@ -14,6 +14,10 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Sub
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionStatus;
 
 import java.time.Instant;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.IndividualHectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPrice;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Money;
+import com.arcadiadevs.viora.platform.subscription.domain.model.events.SubscriptionActivated;
 
 /**
  * Aggregate root of a producer's right to use Viora, for a surface in hectares and a window of time.
@@ -27,11 +31,15 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
     private final PlanMode mode;
     private SubscriptionStatus status;
     private final HectaresQuota quota;
-    private final SubscriptionPeriod period;
+    private SubscriptionPeriod period;
     private final CooperativeId cooperativeId;
     private final CooperativeLicenseId licenseId;
     private final InvitationCodeId redeemedCodeId;
     private final Long revision;
+    private final String planCode;
+    private final SubscriptionPrice price;
+    private String paymentId;
+    private final Instant createdAt;
 
     private Subscription(SubscriptionSnapshot snapshot) {
         this.id = snapshot.id();
@@ -44,6 +52,10 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
         this.licenseId = snapshot.licenseId();
         this.redeemedCodeId = snapshot.redeemedCodeId();
         this.revision = snapshot.revision();
+        this.planCode = snapshot.planCode();
+        this.price = snapshot.price();
+        this.paymentId = snapshot.paymentId();
+        this.createdAt = snapshot.createdAt();
     }
 
     /**
@@ -84,10 +96,91 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
             throw new IllegalArgumentException("subscription.snapshot.null");
         }
         if (snapshot.id() == null || snapshot.producerId() == null || snapshot.mode() == null
-                || snapshot.status() == null || snapshot.quota() == null || snapshot.period() == null) {
+                || snapshot.status() == null || snapshot.quota() == null) {
             throw new IllegalArgumentException("subscription.snapshot.incomplete");
         }
+        validateModeState(snapshot);
         return new Subscription(snapshot);
+    }
+
+    private static void validateModeState(SubscriptionSnapshot snapshot) {
+        if (snapshot.mode() == PlanMode.PLAN_COOPERATIVO_PATROCINADO) {
+            if (snapshot.period() == null || snapshot.cooperativeId() == null || snapshot.licenseId() == null
+                    || snapshot.redeemedCodeId() == null || snapshot.price() != null
+                    || snapshot.planCode() != null || snapshot.paymentId() != null) {
+                throw new IllegalArgumentException("subscription.snapshot.incomplete");
+            }
+            return;
+        }
+        if (snapshot.planCode() == null || snapshot.planCode().isBlank() || snapshot.price() == null
+                || snapshot.createdAt() == null || snapshot.cooperativeId() != null
+                || snapshot.licenseId() != null || snapshot.redeemedCodeId() != null) {
+            throw new IllegalArgumentException("subscription.snapshot.incomplete");
+        }
+        new IndividualHectaresQuota(snapshot.quota().hectares());
+        if (snapshot.status() == SubscriptionStatus.PENDING_PAYMENT) {
+            if (snapshot.period() != null || snapshot.paymentId() != null) {
+                throw new IllegalArgumentException("subscription.snapshot.incomplete");
+            }
+        } else if (snapshot.status() == SubscriptionStatus.ACTIVE || snapshot.status() == SubscriptionStatus.EXPIRED) {
+            if (snapshot.period() == null || snapshot.paymentId() == null || snapshot.paymentId().isBlank()
+                    || snapshot.period().startsAt().isBefore(snapshot.createdAt())
+                    || !SubscriptionPeriod.annual(snapshot.period().startsAt()).equals(snapshot.period())) {
+                throw new IllegalArgumentException("subscription.snapshot.incomplete");
+            }
+        }
+    }
+
+    /**
+     * Creates an individual contract without granting access or contacting a payment provider.
+     * @param producerId verified producer identity
+     * @param planCode selected offer
+     * @param quota validated individual capacity
+     * @param price server-owned immutable terms
+     * @param at creation instant
+     * @return pending individual contract
+     * @throws IllegalArgumentException if the creation state is incomplete
+     */
+    public static Subscription createIndividual(ProducerId producerId, String planCode,
+            IndividualHectaresQuota quota, SubscriptionPrice price, Instant at) {
+        if (producerId == null || quota == null) {
+            throw new IllegalArgumentException("subscription.snapshot.incomplete");
+        }
+        var snapshot = new SubscriptionSnapshot(new SubscriptionId(), producerId,
+                PlanMode.PLAN_PRODUCTOR_INDIVIDUAL, SubscriptionStatus.PENDING_PAYMENT,
+                new HectaresQuota(quota.value()), null, null, null, null, 0L, planCode, price, null, at);
+        validateModeState(snapshot);
+        return new Subscription(snapshot);
+    }
+
+    /**
+     * Activates only an individual contract using verified payment evidence.
+     * @param paymentId provider payment identity
+     * @param amount verified total
+     * @param currency verified settlement currency
+     * @param approvedAt verified approval time
+     * @throws IllegalArgumentException if evidence does not match the contract
+     * @throws IllegalStateException if the transition is invalid
+     */
+    public void activateIndividual(String paymentId, Money amount, String currency, Instant approvedAt) {
+        if (mode != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || paymentId == null || paymentId.isBlank()
+                || amount == null || !"PEN".equals(currency) || !price.total().equals(amount)) {
+            throw new IllegalArgumentException("subscription.payment.mismatch");
+        }
+        if (this.paymentId != null) {
+            if (!this.paymentId.equals(paymentId)) {
+                throw new IllegalStateException("subscription.payment.already_approved");
+            }
+            return;
+        }
+        if (status != SubscriptionStatus.PENDING_PAYMENT || approvedAt == null || approvedAt.isBefore(createdAt)) {
+            throw new IllegalStateException("subscription.activation.invalid");
+        }
+        period = SubscriptionPeriod.annual(approvedAt);
+        status = SubscriptionStatus.ACTIVE;
+        this.paymentId = paymentId;
+        registerDomainEvent(new SubscriptionActivated(id.subscriptionId(), producerId.producerId(),
+                period.startsAt(), period.endsAt()));
     }
 
     /**
@@ -97,7 +190,7 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
      * @return true if the subscription is active and {@code at} falls inside its window
      */
     public boolean hasActiveEntitlement(Instant at) {
-        return status == SubscriptionStatus.ACTIVE && period.contains(at);
+        return status == SubscriptionStatus.ACTIVE && period != null && period.contains(at);
     }
 
     /**
@@ -107,6 +200,6 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
      */
     public SubscriptionSnapshot snapshot() {
         return new SubscriptionSnapshot(id, producerId, mode, status, quota, period, cooperativeId, licenseId,
-                redeemedCodeId, revision);
+                redeemedCodeId, revision, planCode, price, paymentId, createdAt);
     }
 }
