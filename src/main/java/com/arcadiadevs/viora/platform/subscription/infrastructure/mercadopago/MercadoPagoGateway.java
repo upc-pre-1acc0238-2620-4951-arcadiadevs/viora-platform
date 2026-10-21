@@ -21,16 +21,22 @@ public class MercadoPagoGateway implements PaymentGateway {
     private final String notificationUrl;
     private final String returnUrl;
     private volatile String collectorId;
+    @org.springframework.beans.factory.annotation.Autowired
     public MercadoPagoGateway(@Value("${viora.payments.enabled:false}") boolean enabled,
             @Value("${viora.payments.sandbox:true}") boolean sandbox,
             @Value("${viora.payments.access-token:}") String token,
             @Value("${viora.payments.notification-url:}") String notificationUrl,
             @Value("${viora.payments.return-url:}") String returnUrl) {
+        this(enabled, sandbox, token, notificationUrl, returnUrl, defaultClient(token));
+    }
+    MercadoPagoGateway(boolean enabled, boolean sandbox, String token, String notificationUrl, String returnUrl, RestClient client) {
         this.enabled = enabled; this.sandbox = sandbox; this.token = token;
-        this.notificationUrl = notificationUrl; this.returnUrl = returnUrl;
+        this.notificationUrl = notificationUrl; this.returnUrl = returnUrl; this.client = client;
+    }
+    private static RestClient defaultClient(String token) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
         factory.setReadTimeout(Duration.ofSeconds(20));
-        client = RestClient.builder().baseUrl("https://api.mercadopago.com").requestFactory(factory)
+        return RestClient.builder().baseUrl("https://api.mercadopago.com").requestFactory(factory)
                 .defaultHeader("Authorization", "Bearer " + token).build();
     }
     @Override public boolean configured() {
