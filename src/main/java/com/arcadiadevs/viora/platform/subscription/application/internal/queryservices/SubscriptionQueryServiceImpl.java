@@ -2,6 +2,8 @@ package com.arcadiadevs.viora.platform.subscription.application.internal.queryse
 
 import java.time.Clock;
 import java.util.Optional;
+import java.util.UUID;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionQueryService;
@@ -35,4 +37,16 @@ public class SubscriptionQueryServiceImpl implements SubscriptionQueryService {
     public Optional<Subscription> current(String owner) {
         return subscriptions.findCurrent(new ProducerId(owner), clock.instant());
     }
+    /**
+     * Finds a contract only when the authenticated identity owns it.
+     * @param owner verified actor
+     * @param id requested identity
+     * @return owned contract or an empty result
+     */
+    @Override
+    public Optional<Subscription> find(String owner, UUID id) {
+        var actor = new ProducerId(owner);
+        return subscriptions.findByIdAndProducerId(new SubscriptionId(id.toString()), actor);
+    }
+
 }

@@ -57,4 +57,12 @@ public interface SubscriptionPersistenceRepository extends JpaRepository<Subscri
     @Query("select s from SubscriptionPersistenceEntity s where s.producerId = :producerId order by s.createdAt desc, s.id desc")
     List<SubscriptionPersistenceEntity> findRecent(UUID producerId, Pageable page);
 
+
+    /**
+     * Selects a row only when the requested identifier belongs to the authenticated producer.
+     * @param id requested contract identifier
+     * @param producerId authenticated owner
+     * @return owned persistence row
+     */
+    Optional<SubscriptionPersistenceEntity> findByIdAndProducerId(UUID id, UUID producerId);
 }
