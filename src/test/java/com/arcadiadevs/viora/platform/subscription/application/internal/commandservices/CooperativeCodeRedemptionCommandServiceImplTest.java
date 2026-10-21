@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,8 +38,7 @@ class CooperativeCodeRedemptionCommandServiceImplTest {
     void onlyProducersRedeem() {
         when(iam.mayRedeemCooperativeCodes(any())).thenReturn(false);
 
-        var result = service.handle(new RedeemCooperativeCodeCommand(UUID.randomUUID().toString(), "COOP-7K2Q",
-                BigDecimal.TEN));
+        var result = service.handle(new RedeemCooperativeCodeCommand(UUID.randomUUID().toString(), "COOP-7K2Q"));
 
         assertThat(result.failure()).hasValueSatisfying(error ->
                 assertThat(error.code()).isEqualTo("COOPERATIVE_CODE_REDEMPTION_FORBIDDEN"));

@@ -20,6 +20,6 @@ public final class RedeemCooperativeCodeCommandFromResourceAssembler {
      */
     public static RedeemCooperativeCodeCommand toCommandFromResource(String producerId,
                                                                      RedeemCooperativeCodeResource resource) {
-        return new RedeemCooperativeCodeCommand(producerId, resource.code(), resource.quotaHa());
+        return new RedeemCooperativeCodeCommand(producerId, resource.code());
     }
 }

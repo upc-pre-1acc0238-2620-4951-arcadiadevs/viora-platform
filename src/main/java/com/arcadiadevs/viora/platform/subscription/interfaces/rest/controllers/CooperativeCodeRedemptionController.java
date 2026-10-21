@@ -78,14 +78,14 @@ public class CooperativeCodeRedemptionController {
     /**
      * Redeems a cooperative invitation code for the authenticated producer.
      *
-     * @param resource the code and the hectares declared by the producer
+     * @param resource the code the cooperative gave the producer
      * @return 201 with the sponsored subscription, or a problem detail explaining why the code was not redeemed
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Redeem a cooperative invitation code",
-            description = "Consumes the code, commits the producer's hectares on the cooperative license and activates "
-                    + "a subscription sponsored by the cooperative until the license ends.",
+            description = "Consumes the code and activates a subscription sponsored by the cooperative until the "
+                    + "license ends, covering the hectares the code was issued for.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Code redeemed and sponsored subscription activated",
@@ -95,7 +95,6 @@ public class CooperativeCodeRedemptionController {
             @ApiResponse(responseCode = "401", description = "No authenticated user"),
             @ApiResponse(responseCode = "403", description = "The user is not a producer"),
             @ApiResponse(responseCode = "409", description = "The producer already has an active subscription"),
-            @ApiResponse(responseCode = "422", description = "The cooperative license has not enough hectares left"),
             @ApiResponse(responseCode = "429", description = "Too many failed attempts; see Retry-After")
     })
     public ResponseEntity<?> redeem(@Valid @RequestBody RedeemCooperativeCodeResource resource) {

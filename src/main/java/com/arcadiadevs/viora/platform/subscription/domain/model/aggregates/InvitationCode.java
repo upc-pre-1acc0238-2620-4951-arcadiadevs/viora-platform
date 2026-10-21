@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDom
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeStatus;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
@@ -11,7 +12,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Pro
 import java.time.Instant;
 
 /**
- * Aggregate root of a cooperative invitation code: one seat of a cooperative license that a producer redeems once.
+ * Aggregate root of a cooperative invitation code: one seat of a cooperative license, with the hectares it
+ * covers, that a producer redeems once.
  * <p>It is its own root because, when it is issued, there is no subscription to hold it. Only its fingerprint is
  * kept. A code moves from {@code AVAILABLE} to {@code REDEEMED}, {@code EXPIRED} or {@code REVOKED}, and never
  * back.</p>
@@ -22,6 +24,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
     private final CooperativeLicenseId licenseId;
     private final String batchId;
     private final CodeFingerprint fingerprint;
+    private final HectaresQuota quota;
     private InvitationCodeStatus status;
     private final Instant expiresAt;
     private ProducerId redeemedBy;
@@ -33,6 +36,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
         this.licenseId = snapshot.licenseId();
         this.batchId = snapshot.batchId();
         this.fingerprint = snapshot.fingerprint();
+        this.quota = snapshot.quota();
         this.status = snapshot.status();
         this.expiresAt = snapshot.expiresAt();
         this.redeemedBy = snapshot.redeemedBy();
@@ -41,26 +45,32 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
     }
 
     /**
-     * Issues a new available code for a license seat.
+     * Issues a new available code for a license seat. Only {@link CooperativeLicense#issueCode} calls it, so the
+     * hectares are always committed on the license.
      *
      * @param licenseId   the license whose seat the code holds
      * @param fingerprint the fingerprint of the code
+     * @param quota       the hectares the code covers
      * @param expiresAt   the last instant the code can be redeemed, exclusive
      * @return the available code
      * @throws IllegalArgumentException if any argument is null
      */
-    public static InvitationCode issue(CooperativeLicenseId licenseId, CodeFingerprint fingerprint, Instant expiresAt) {
+    static InvitationCode issue(CooperativeLicenseId licenseId, CodeFingerprint fingerprint, HectaresQuota quota,
+                                Instant expiresAt) {
         if (licenseId == null) {
             throw new IllegalArgumentException("subscription.license.id.null_or_empty");
         }
         if (fingerprint == null) {
             throw new IllegalArgumentException("subscription.invitation_code.fingerprint.invalid");
         }
+        if (quota == null) {
+            throw new IllegalArgumentException("subscription.quota.null");
+        }
         if (expiresAt == null) {
             throw new IllegalArgumentException("subscription.invitation_code.expires_at.null");
         }
         return new InvitationCode(new InvitationCodeSnapshot(new InvitationCodeId(), licenseId, null, fingerprint,
-                InvitationCodeStatus.AVAILABLE, expiresAt, null, null, 0L));
+                quota, InvitationCodeStatus.AVAILABLE, expiresAt, null, null, 0L));
     }
 
     /**
@@ -75,6 +85,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
             throw new IllegalArgumentException("subscription.invitation_code.snapshot.null");
         }
         if (snapshot.id() == null || snapshot.licenseId() == null || snapshot.fingerprint() == null
+                || snapshot.quota() == null
                 || snapshot.status() == null || snapshot.expiresAt() == null) {
             throw new IllegalArgumentException("subscription.invitation_code.snapshot.incomplete");
         }
@@ -117,7 +128,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
      * @return the snapshot
      */
     public InvitationCodeSnapshot snapshot() {
-        return new InvitationCodeSnapshot(id, licenseId, batchId, fingerprint, status, expiresAt, redeemedBy,
+        return new InvitationCodeSnapshot(id, licenseId, batchId, fingerprint, quota, status, expiresAt, redeemedBy,
                 redeemedAt, revision);
     }
 }

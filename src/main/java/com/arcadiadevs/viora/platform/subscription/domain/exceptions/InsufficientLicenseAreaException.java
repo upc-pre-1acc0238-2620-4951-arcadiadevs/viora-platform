@@ -3,7 +3,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.exceptions;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
 
 /**
- * Thrown when a cooperative license has fewer hectares left than the producer asks to cover.
+ * Thrown when a cooperative license has fewer hectares left than a new code would cover.
  */
 public class InsufficientLicenseAreaException extends BusinessRuleException {
 

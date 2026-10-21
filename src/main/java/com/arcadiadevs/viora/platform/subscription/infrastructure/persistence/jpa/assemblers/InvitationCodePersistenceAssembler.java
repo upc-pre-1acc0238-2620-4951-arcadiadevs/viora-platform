@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Invit
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.InvitationCodeSnapshot;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.entities.InvitationCodePersistenceEntity;
@@ -35,6 +36,7 @@ public final class InvitationCodePersistenceAssembler {
         entity.setLicenseId(UUID.fromString(snapshot.licenseId().cooperativeLicenseId()));
         entity.setBatchId(snapshot.batchId() == null ? null : UUID.fromString(snapshot.batchId()));
         entity.setCodeHash(snapshot.fingerprint().value());
+        entity.setQuotaHa(snapshot.quota().hectares());
         entity.setExpiresAt(snapshot.expiresAt());
         return updateEntityFromDomain(entity, domain);
     }
@@ -75,6 +77,7 @@ public final class InvitationCodePersistenceAssembler {
                 new CooperativeLicenseId(entity.getLicenseId().toString()),
                 entity.getBatchId() == null ? null : entity.getBatchId().toString(),
                 new CodeFingerprint(entity.getCodeHash()),
+                new HectaresQuota(entity.getQuotaHa()),
                 entity.getStatus(),
                 entity.getExpiresAt(),
                 entity.getRedeemedBy() == null ? null : new ProducerId(entity.getRedeemedBy().toString()),

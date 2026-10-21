@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeStatus;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
@@ -15,6 +16,7 @@ import java.time.Instant;
  * @param licenseId   the license whose seat the code holds
  * @param batchId     the batch the code was issued in; null until batches exist
  * @param fingerprint the SHA-256 fingerprint of the code
+ * @param quota       the hectares the code covers, committed on the license when it was issued
  * @param status      the lifecycle status
  * @param expiresAt   the last instant the code can be redeemed, exclusive
  * @param redeemedBy  the producer who redeemed it; null unless redeemed
@@ -26,6 +28,7 @@ public record InvitationCodeSnapshot(
         CooperativeLicenseId licenseId,
         String batchId,
         CodeFingerprint fingerprint,
+        HectaresQuota quota,
         InvitationCodeStatus status,
         Instant expiresAt,
         ProducerId redeemedBy,

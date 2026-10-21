@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
@@ -16,8 +17,8 @@ import java.time.Instant;
 
 /**
  * Aggregate root of the collective license a cooperative contracts for its producers.
- * <p>Each invitation code holds one of its seats from the moment it is issued. The hectares are committed when a
- * producer redeems a code, for the surface that producer declared, and can never exceed the contracted area.</p>
+ * <p>Each invitation code holds one of its seats and its hectares from the moment it is issued; the committed
+ * hectares can never exceed the contracted area. Redeeming a code does not change the area.</p>
  */
 public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeLicense> {
 
@@ -87,20 +88,41 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     }
 
     /**
-     * Redeems one of the license's codes for a producer: the code is consumed and the producer's hectares are
-     * committed, or nothing changes.
+     * Issues a code of this license that covers {@code quota} hectares, committing them, or changes nothing.
+     *
+     * @param fingerprint the fingerprint of the code
+     * @param quota       the hectares the code covers
+     * @param expiresAt   the last instant the code can be redeemed, exclusive
+     * @return the available code
+     * @throws IllegalArgumentException         if an argument is null
+     * @throws InsufficientLicenseAreaException if the license has fewer hectares left than {@code quota}
+     */
+    public InvitationCode issueCode(CodeFingerprint fingerprint, HectaresQuota quota, Instant expiresAt) {
+        if (quota == null) {
+            throw new IllegalArgumentException("subscription.quota.null");
+        }
+        var committed = committedAreaHa.add(quota.hectares());
+        if (committed.compareTo(contractedArea.hectares()) > 0) {
+            throw new InsufficientLicenseAreaException();
+        }
+        var code = InvitationCode.issue(id, fingerprint, quota, expiresAt);
+        this.committedAreaHa = committed;
+        return code;
+    }
+
+    /**
+     * Redeems one of the license's codes for a producer: the code is consumed, or nothing changes. The hectares were
+     * committed when the code was issued.
      *
      * @param code       the code being redeemed; it must belong to this license
      * @param producerId the producer redeeming it
-     * @param quota      the hectares the producer wants covered
      * @param at         the instant of the redemption
-     * @return the evidence of the redemption, used to activate the sponsored subscription
+     * @return the evidence of the redemption, with the code's hectares, used to activate the sponsored subscription
      * @throws IllegalArgumentException             if an argument is null or the code belongs to another license
      * @throws InvitationCodeNotRedeemableException if the license is not in force or the code cannot be redeemed
-     * @throws InsufficientLicenseAreaException     if the license has fewer hectares left than {@code quota}
      */
-    public RedeemedCode redeem(InvitationCode code, ProducerId producerId, HectaresQuota quota, Instant at) {
-        if (code == null || producerId == null || quota == null || at == null) {
+    public RedeemedCode redeem(InvitationCode code, ProducerId producerId, Instant at) {
+        if (code == null || producerId == null || at == null) {
             throw new IllegalArgumentException("subscription.license.redemption.incomplete");
         }
         if (!id.equals(code.snapshot().licenseId())) {
@@ -109,13 +131,8 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
         if (!period.contains(at) || !code.isRedeemable(at)) {
             throw new InvitationCodeNotRedeemableException();
         }
-        var committed = committedAreaHa.add(quota.hectares());
-        if (committed.compareTo(contractedArea.hectares()) > 0) {
-            throw new InsufficientLicenseAreaException();
-        }
         code.redeem(producerId, at);
-        this.committedAreaHa = committed;
-        return new RedeemedCode(code.snapshot().id(), id, cooperativeId, producerId, quota, period);
+        return new RedeemedCode(code.snapshot().id(), id, cooperativeId, producerId, code.snapshot().quota(), period);
     }
 
     /**

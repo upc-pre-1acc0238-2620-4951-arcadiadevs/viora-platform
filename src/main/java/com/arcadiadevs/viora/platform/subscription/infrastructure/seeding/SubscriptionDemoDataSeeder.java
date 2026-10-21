@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Coo
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeStatus;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPeriod;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
@@ -23,20 +24,23 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.SequencedMap;
 
 /**
  * Demo data seeder for the Subscription context.
  * <p>There is no screen to issue codes yet, so it grants one cooperative license and issues known codes the
- * mobile app can redeem: three available ones, one expired and one revoked. It runs only while no license exists,
+ * mobile app can redeem: three available ones, each with the hectares it covers, one expired and one revoked. It runs only while no license exists,
  * and can be turned off with {@code viora.subscription.seed.enabled=false}.</p>
  */
 @Component
 @Order(3)
 public class SubscriptionDemoDataSeeder implements ApplicationRunner {
 
-    /** Codes that can be redeemed once each. */
-    public static final List<String> AVAILABLE_CODES = List.of("COOP-7K2Q", "COOP-4F9T", "COOP-9HX3");
+    /** Codes that can be redeemed once each, with the hectares each one covers. */
+    public static final SequencedMap<String, BigDecimal> AVAILABLE_CODES = availableCodes();
     /** A code whose redemption deadline has passed. */
     public static final String EXPIRED_CODE = "COOP-2MKD";
     /** A code the cooperative revoked. */
@@ -80,16 +84,17 @@ public class SubscriptionDemoDataSeeder implements ApplicationRunner {
                 return;
             }
             var now = clock.instant();
-            var license = licenseRepository.save(CooperativeLicense.grant(new CooperativeId(),
+            var license = CooperativeLicense.grant(new CooperativeId(),
                     "Coop. Olivarera La Yarada", 60, new HectaresQuota(new BigDecimal("200")),
-                    new SubscriptionPeriod(now.minus(Duration.ofDays(30)), now.plus(Duration.ofDays(365)))));
+                    new SubscriptionPeriod(now.minus(Duration.ofDays(30)), now.plus(Duration.ofDays(365))));
             var licenseId = license.snapshot().id();
             var codesExpireAt = now.plus(Duration.ofDays(30));
+            var codes = new ArrayList<InvitationCode>();
 
-            for (var code : AVAILABLE_CODES) {
-                invitationCodeRepository.save(
-                        InvitationCode.issue(licenseId, new CooperativeCode(code).fingerprint(), codesExpireAt));
-            }
+            AVAILABLE_CODES.forEach((code, hectares) -> codes.add(license.issueCode(
+                    new CooperativeCode(code).fingerprint(), new HectaresQuota(hectares), codesExpireAt)));
+            licenseRepository.save(license);
+            codes.forEach(invitationCodeRepository::save);
             invitationCodeRepository.save(closedCode(licenseId, EXPIRED_CODE, InvitationCodeStatus.EXPIRED,
                     now.minus(Duration.ofDays(1))));
             invitationCodeRepository.save(closedCode(licenseId, REVOKED_CODE, InvitationCodeStatus.REVOKED,
@@ -101,10 +106,18 @@ public class SubscriptionDemoDataSeeder implements ApplicationRunner {
         }
     }
 
+    private static SequencedMap<String, BigDecimal> availableCodes() {
+        var codes = new LinkedHashMap<String, BigDecimal>();
+        codes.put("COOP-7K2Q", new BigDecimal("12"));
+        codes.put("COOP-4F9T", new BigDecimal("8"));
+        codes.put("COOP-9HX3", new BigDecimal("20"));
+        return Collections.unmodifiableSequencedMap(codes);
+    }
+
     private static InvitationCode closedCode(
             CooperativeLicenseId licenseId, String code, InvitationCodeStatus status, Instant expiresAt) {
-        var issued = InvitationCode.issue(licenseId, new CooperativeCode(code).fingerprint(), expiresAt).snapshot();
-        return InvitationCode.reconstitute(new InvitationCodeSnapshot(issued.id(), issued.licenseId(), null,
-                issued.fingerprint(), status, issued.expiresAt(), null, null, issued.revision()));
+        return InvitationCode.reconstitute(new InvitationCodeSnapshot(new InvitationCodeId(), licenseId, null,
+                new CooperativeCode(code).fingerprint(), new HectaresQuota(BigDecimal.ONE), status, expiresAt, null, null,
+                0L));
     }
 }

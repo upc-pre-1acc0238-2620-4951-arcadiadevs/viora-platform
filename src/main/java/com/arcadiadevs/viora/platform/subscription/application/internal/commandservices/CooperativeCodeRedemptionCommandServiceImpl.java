@@ -5,12 +5,10 @@ import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CooperativeCodeRedemptionCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
-import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemCooperativeCodeCommand;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeCode;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.InvitationCodeRepository;
@@ -24,8 +22,8 @@ import java.time.Instant;
 
 /**
  * Application service redeeming cooperative invitation codes.
- * <p>The code and its license are locked while the code is consumed, the hectares are committed and the sponsored
- * subscription is created, and all of them are stored in one transaction. A code that does not exist, expired, was
+ * <p>The code and its license are locked while the code is consumed and the sponsored subscription, covering the
+ * code's hectares, is created, and all of them are stored in one transaction. A code that does not exist, expired, was
  * already redeemed or was revoked answers the same validation error, and counts as a failed attempt. The attempt is
  * reserved before the code is looked up and given back for any other outcome.</p>
  */
@@ -129,7 +127,6 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
     private Result<Subscription, ApplicationError> redeem(RedeemCooperativeCodeCommand command, ProducerId producerId,
                                                           Instant now) {
         try {
-            var quota = new HectaresQuota(command.quotaHa());
             var code = new CooperativeCode(command.code());
             if (subscriptionRepository.existsActiveByProducerId(producerId, now)) {
                 return Result.failure(ApplicationError.conflict("subscription", "subscription.producer.already_active"));
@@ -144,7 +141,7 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
                 return notRedeemable();
             }
 
-            var redeemedCode = license.get().redeem(invitationCode.get(), producerId, quota, now);
+            var redeemedCode = license.get().redeem(invitationCode.get(), producerId, now);
             var subscription = Subscription.activateFromCode(redeemedCode, now);
             invitationCodeRepository.save(invitationCode.get());
             cooperativeLicenseRepository.save(license.get());
@@ -158,8 +155,6 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             return Result.success(savedSubscription);
         } catch (InvitationCodeNotRedeemableException ex) {
             return notRedeemable();
-        } catch (InsufficientLicenseAreaException ex) {
-            return Result.failure(ApplicationError.businessRuleViolation("license area", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }

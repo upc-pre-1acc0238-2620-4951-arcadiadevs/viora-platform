@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -33,6 +35,9 @@ public class InvitationCodePersistenceEntity extends AuditableAbstractPersistenc
 
     @Column(name = "code_hash", nullable = false, unique = true, length = 64)
     private String codeHash;
+
+    @Column(name = "quota_ha", nullable = false, precision = 8, scale = 2)
+    private BigDecimal quotaHa;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)

@@ -103,9 +103,10 @@ class CooperativeCodeRedemptionIntegrationTest {
     @Test
     @DisplayName("A producer redeems an available code: 201 with the sponsored subscription, and everything is stored")
     void redeemsAnAvailableCode() throws Exception {
-        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)), new BigDecimal("12"));
+        assertThat(committedArea(license)).isEqualByComparingTo("12");
 
-        redeem(code, "12")
+        redeem(code)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.mode").value("PLAN_COOPERATIVO_PATROCINADO"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
@@ -129,7 +130,7 @@ class CooperativeCodeRedemptionIntegrationTest {
     void codeIsNormalized() throws Exception {
         var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));
 
-        redeem("  " + code.toLowerCase() + " ", "3.5").andExpect(status().isCreated());
+        redeem("  " + code.toLowerCase() + " ").andExpect(status().isCreated());
 
         assertThat(storedCode(code).getStatus()).isEqualTo(InvitationCodeStatus.REDEEMED);
     }
@@ -142,11 +143,12 @@ class CooperativeCodeRedemptionIntegrationTest {
         var taken = newCode(license, Instant.now().plus(Duration.ofDays(7)));
         var otherProducer = signUp();
         authenticateAs(otherProducer);
-        redeem(taken, "1").andExpect(status().isCreated());
+        redeem(taken).andExpect(status().isCreated());
         authenticateAs(producer);
+        var areaBefore = committedArea(license);
 
         for (var code : List.of("COOP-ZZZZ", expired, revoked, taken)) {
-            redeem(code, "12")
+            redeem(code)
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.detail").value(NOT_REDEEMABLE_EN));
@@ -154,7 +156,7 @@ class CooperativeCodeRedemptionIntegrationTest {
         assertThat(storedCode(expired).getStatus()).isEqualTo(InvitationCodeStatus.AVAILABLE);
         assertThat(storedCode(revoked).getStatus()).isEqualTo(InvitationCodeStatus.REVOKED);
         assertThat(storedCode(taken).getRedeemedBy()).hasToString(otherProducer);
-        assertThat(committedArea(license)).isEqualByComparingTo("1");
+        assertThat(committedArea(license)).isEqualByComparingTo(areaBefore);
         assertThat(subscriptionsOf(producer)).isEmpty();
     }
 
@@ -163,7 +165,7 @@ class CooperativeCodeRedemptionIntegrationTest {
     void refusalIsLocalized() throws Exception {
         mvc.perform(post(URL).header(HttpHeaders.ACCEPT_LANGUAGE, "es")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body("COOP-ZZZZ", "12")))
+                        .content(body("COOP-ZZZZ")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(NOT_REDEEMABLE_ES));
     }
@@ -171,13 +173,14 @@ class CooperativeCodeRedemptionIntegrationTest {
     @Test
     @DisplayName("The demo seed grants a license whose available code is redeemable and whose closed codes are not")
     void seededCodes() throws Exception {
-        redeem(SubscriptionDemoDataSeeder.AVAILABLE_CODES.getFirst(), "12")
+        redeem(SubscriptionDemoDataSeeder.AVAILABLE_CODES.firstEntry().getKey())
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.cooperativeName").value("Coop. Olivarera La Yarada"));
+                .andExpect(jsonPath("$.cooperativeName").value("Coop. Olivarera La Yarada"))
+                .andExpect(jsonPath("$.quotaHa").value(12.0));
 
         authenticateAs(signUp());
-        redeem(SubscriptionDemoDataSeeder.EXPIRED_CODE, "12").andExpect(status().isBadRequest());
-        redeem(SubscriptionDemoDataSeeder.REVOKED_CODE, "12").andExpect(status().isBadRequest());
+        redeem(SubscriptionDemoDataSeeder.EXPIRED_CODE).andExpect(status().isBadRequest());
+        redeem(SubscriptionDemoDataSeeder.REVOKED_CODE).andExpect(status().isBadRequest());
     }
 
     @Test
@@ -185,9 +188,9 @@ class CooperativeCodeRedemptionIntegrationTest {
     void producerAlreadySubscribed() throws Exception {
         var first = newCode(license, Instant.now().plus(Duration.ofDays(7)));
         var second = newCode(license, Instant.now().plus(Duration.ofDays(7)));
-        redeem(first, "12").andExpect(status().isCreated());
+        redeem(first).andExpect(status().isCreated());
 
-        redeem(second, "12")
+        redeem(second)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SUBSCRIPTION_CONFLICT"))
                 .andExpect(jsonPath("$.detail").value("You already have an active subscription"));
@@ -197,31 +200,27 @@ class CooperativeCodeRedemptionIntegrationTest {
     }
 
     @Test
-    @DisplayName("A license with fewer hectares left than the producer's answers 422 and nothing changes")
-    void licenseWithoutEnoughArea() throws Exception {
-        var smallLicense = newLicense(BigDecimal.TEN);
-        var code = newCode(smallLicense, Instant.now().plus(Duration.ofDays(7)));
+    @DisplayName("Hectares sent by the client are ignored: the subscription covers the code's quota")
+    void clientHectaresAreIgnored() throws Exception {
+        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)), new BigDecimal("8"));
 
-        redeem(code, "12")
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\": \"" + code + "\", \"quotaHa\": 150}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.quotaHa").value(8.0));
 
-        assertThat(storedCode(code).getStatus()).isEqualTo(InvitationCodeStatus.AVAILABLE);
-        assertThat(committedArea(smallLicense)).isEqualByComparingTo("0");
-        assertThat(subscriptionsOf(producer)).isEmpty();
+        assertThat(committedArea(license)).isEqualByComparingTo("8");
     }
 
     @Test
-    @DisplayName("A payload without hectares, with too few hectares or with a malformed code answers 400")
+    @DisplayName("A payload without a code, with a blank code or with a malformed code answers 400")
     void invalidPayload() throws Exception {
         var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));
 
-        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{\"code\": \"" + code + "\"}"))
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
-        redeem(code, "0.05")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("The hectares must be at least 0.1"));
-        redeem("OLIV-4F9T", "12")
+        redeem(" ").andExpect(status().isBadRequest());
+        redeem("OLIV-4F9T")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail")
                         .value("The code must be COOP- followed by four letters or digits, for example COOP-7K2Q"));
@@ -234,18 +233,18 @@ class CooperativeCodeRedemptionIntegrationTest {
     void noSession() throws Exception {
         SecurityContextHolder.clearContext();
 
-        redeem(newCode(license, Instant.now().plus(Duration.ofDays(7))), "12").andExpect(status().isUnauthorized());
+        redeem(newCode(license, Instant.now().plus(Duration.ofDays(7)))).andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("After five codes that cannot be redeemed the producer waits, even for a valid code")
     void tooManyFailedAttempts() throws Exception {
         for (var attempt = 0; attempt < 5; attempt++) {
-            redeem(randomCode(), "12").andExpect(status().isBadRequest());
+            redeem(randomCode()).andExpect(status().isBadRequest());
         }
         var valid = newCode(license, Instant.now().plus(Duration.ofDays(7)));
 
-        redeem(valid, "12")
+        redeem(valid)
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
                 .andExpect(jsonPath("$.code").value("COOPERATIVE_CODE_REDEMPTION_TOO_MANY_REQUESTS"));
@@ -265,7 +264,7 @@ class CooperativeCodeRedemptionIntegrationTest {
                 Callable<Result<Subscription, ApplicationError>> task = () -> {
                     start.await();
                     return redemptionCommandService.handle(
-                            new RedeemCooperativeCodeCommand(producer, guess, BigDecimal.ONE));
+                            new RedeemCooperativeCodeCommand(producer, guess));
                 };
                 futures.add(executor.submit(task));
             }
@@ -286,18 +285,18 @@ class CooperativeCodeRedemptionIntegrationTest {
     @DisplayName("Refusals that are not a wrong code, such as a malformed code or a 409, do not use up attempts")
     void otherRefusalsDoNotCount() throws Exception {
         for (var attempt = 0; attempt < 6; attempt++) {
-            redeem("OLIV-4F9T", "12").andExpect(status().isBadRequest());
+            redeem("OLIV-4F9T").andExpect(status().isBadRequest());
         }
-        redeem(newCode(license, Instant.now().plus(Duration.ofDays(7))), "12").andExpect(status().isCreated());
+        redeem(newCode(license, Instant.now().plus(Duration.ofDays(7)))).andExpect(status().isCreated());
         for (var attempt = 0; attempt < 6; attempt++) {
-            redeem(newCode(license, Instant.now().plus(Duration.ofDays(7))), "12").andExpect(status().isConflict());
+            redeem(newCode(license, Instant.now().plus(Duration.ofDays(7)))).andExpect(status().isConflict());
         }
     }
 
     @Test
     @DisplayName("Two producers redeeming the same code at the same time: one gets it, the other gets the 400")
     void concurrentRedemptionsOfTheSameCode() throws Exception {
-        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)), new BigDecimal("5"));
         var producers = List.of(signUp(), signUp());
         var start = new CountDownLatch(1);
         var executor = Executors.newFixedThreadPool(2);
@@ -307,7 +306,7 @@ class CooperativeCodeRedemptionIntegrationTest {
                 Callable<Result<Subscription, ApplicationError>> task = () -> {
                     start.await();
                     return redemptionCommandService.handle(
-                            new RedeemCooperativeCodeCommand(each, code, new BigDecimal("5")));
+                            new RedeemCooperativeCodeCommand(each, code));
                 };
                 futures.add(executor.submit(task));
             }
@@ -333,12 +332,12 @@ class CooperativeCodeRedemptionIntegrationTest {
                 .hasSize(1);
     }
 
-    private ResultActions redeem(String code, String quotaHa) throws Exception {
-        return mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body(code, quotaHa)));
+    private ResultActions redeem(String code) throws Exception {
+        return mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body(code)));
     }
 
-    private static String body(String code, String quotaHa) {
-        return "{\"code\": \"" + code + "\", \"quotaHa\": " + quotaHa + "}";
+    private static String body(String code) {
+        return "{\"code\": \"" + code + "\"}";
     }
 
     private CooperativeLicense newLicense(BigDecimal areaHa) {
@@ -347,15 +346,26 @@ class CooperativeCodeRedemptionIntegrationTest {
     }
 
     private String newCode(CooperativeLicense owner, Instant expiresAt) {
-        return newCode(owner, expiresAt, InvitationCodeStatus.AVAILABLE);
+        return newCode(owner, expiresAt, InvitationCodeStatus.AVAILABLE, BigDecimal.ONE);
+    }
+
+    private String newCode(CooperativeLicense owner, Instant expiresAt, BigDecimal quotaHa) {
+        return newCode(owner, expiresAt, InvitationCodeStatus.AVAILABLE, quotaHa);
     }
 
     private String newCode(CooperativeLicense owner, Instant expiresAt, InvitationCodeStatus status) {
+        return newCode(owner, expiresAt, status, BigDecimal.ONE);
+    }
+
+    private String newCode(CooperativeLicense owner, Instant expiresAt, InvitationCodeStatus status,
+                           BigDecimal quotaHa) {
         var code = randomCode();
-        var issued = InvitationCode.issue(owner.snapshot().id(), new CooperativeCode(code).fingerprint(), expiresAt)
+        var stored = licenseRepository.findById(owner.snapshot().id()).orElseThrow();
+        var issued = stored.issueCode(new CooperativeCode(code).fingerprint(), new HectaresQuota(quotaHa), expiresAt)
                 .snapshot();
+        licenseRepository.save(stored);
         invitationCodeRepository.save(InvitationCode.reconstitute(new InvitationCodeSnapshot(issued.id(),
-                issued.licenseId(), null, issued.fingerprint(), status, expiresAt, null, null, 0L)));
+                issued.licenseId(), null, issued.fingerprint(), issued.quota(), status, expiresAt, null, null, 0L)));
         return code;
     }
 
