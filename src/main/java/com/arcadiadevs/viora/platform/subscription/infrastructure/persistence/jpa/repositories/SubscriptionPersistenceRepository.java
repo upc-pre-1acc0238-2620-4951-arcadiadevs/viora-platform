@@ -25,4 +25,12 @@ public interface SubscriptionPersistenceRepository extends JpaRepository<Subscri
      */
     boolean existsByProducerIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThan(
             UUID producerId, SubscriptionStatus status, Instant startsAt, Instant endsAt);
+    /**
+     * Checks for an open individual purchase.
+     * @param producerId owner identity
+     * @param status expected state
+     * @return whether a matching row exists
+     */
+    boolean existsByProducerIdAndStatus(UUID producerId, SubscriptionStatus status);
+
 }

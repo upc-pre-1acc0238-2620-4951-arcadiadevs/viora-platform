@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Optional;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
 /**
  * Repository adapter bridging {@link SubscriptionRepository} with Spring Data JPA.
@@ -42,4 +44,26 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
                 .orElseGet(() -> SubscriptionPersistenceAssembler.toPersistenceFromDomain(subscription));
         return SubscriptionPersistenceAssembler.toDomainFromPersistence(persistenceRepository.saveAndFlush(entity));
     }
+    /**
+     * Finds a domain contract without exposing a persistence entity.
+     * @param id domain identity
+     * @return matching contract
+     */
+    @Override
+    public Optional<Subscription> findById(SubscriptionId id) {
+        return persistenceRepository.findById(UUID.fromString(id.subscriptionId()))
+                .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    /**
+     * Checks pending purchases independently of the latest row ordering.
+     * @param producerId producer identity
+     * @return whether a pending contract exists
+     */
+    @Override
+    public boolean existsPendingByProducerId(ProducerId producerId) {
+        return persistenceRepository.existsByProducerIdAndStatus(
+                UUID.fromString(producerId.producerId()), SubscriptionStatus.PENDING_PAYMENT);
+    }
+
 }
