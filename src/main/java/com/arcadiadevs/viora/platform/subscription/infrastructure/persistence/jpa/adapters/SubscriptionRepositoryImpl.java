@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
 /**
@@ -64,6 +65,21 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
     public boolean existsPendingByProducerId(ProducerId producerId) {
         return persistenceRepository.existsByProducerIdAndStatus(
                 UUID.fromString(producerId.producerId()), SubscriptionStatus.PENDING_PAYMENT);
+    }
+
+    /**
+     * Prefers existing active access so a pending row cannot hide it.
+     * @param producerId owner identity
+     * @param at evaluation time
+     * @return current domain contract
+     */
+    @Override
+    public Optional<Subscription> findCurrent(ProducerId producerId, Instant at) {
+        var owner = UUID.fromString(producerId.producerId());
+        var active = persistenceRepository.findFirstByProducerIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
+                owner, SubscriptionStatus.ACTIVE, at, at);
+        return active.or(() -> persistenceRepository.findRecent(owner, PageRequest.of(0, 1)).stream().findFirst())
+                .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
     }
 
 }
