@@ -42,4 +42,12 @@ public interface SubscriptionRepository {
      */
     boolean existsPendingByProducerId(ProducerId producerId);
 
+    /**
+     * Resolves active access first, otherwise the latest owned contract.
+     * @param producerId owner identity
+     * @param at current instant
+     * @return current contract when any exists
+     */
+    Optional<Subscription> findCurrent(ProducerId producerId, Instant at);
+
 }
