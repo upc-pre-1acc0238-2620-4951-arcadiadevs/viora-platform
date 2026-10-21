@@ -7,6 +7,10 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 
 /**
  * Spring Data JPA repository for {@link SubscriptionPersistenceEntity}.
@@ -32,5 +36,25 @@ public interface SubscriptionPersistenceRepository extends JpaRepository<Subscri
      * @return whether a matching row exists
      */
     boolean existsByProducerIdAndStatus(UUID producerId, SubscriptionStatus status);
+
+    /**
+     * Finds currently effective access independently of newer pending rows.
+     * @param producerId owner
+     * @param status active state
+     * @param start instant compared with the inclusive start
+     * @param end instant compared with the exclusive end
+     * @return active contract when present
+     */
+    Optional<SubscriptionPersistenceEntity> findFirstByProducerIdAndStatusAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
+            UUID producerId, SubscriptionStatus status, Instant start, Instant end);
+
+    /**
+     * Reads only the requested page of most recently registered owned contracts.
+     * @param producerId owner
+     * @param page bounded page request
+     * @return recent contracts
+     */
+    @Query("select s from SubscriptionPersistenceEntity s where s.producerId = :producerId order by s.createdAt desc, s.id desc")
+    List<SubscriptionPersistenceEntity> findRecent(UUID producerId, Pageable page);
 
 }
