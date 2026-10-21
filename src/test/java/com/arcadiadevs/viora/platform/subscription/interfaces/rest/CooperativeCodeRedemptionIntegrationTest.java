@@ -62,7 +62,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:cooperativecoderedemption;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "viora.subscription.seed.enabled=true",
+        "viora.security.demo.enabled=true"
 })
 @DisplayName("Cooperative code redemption integration")
 class CooperativeCodeRedemptionIntegrationTest {
@@ -158,6 +160,17 @@ class CooperativeCodeRedemptionIntegrationTest {
         assertThat(storedCode(taken).getRedeemedBy()).hasToString(otherProducer);
         assertThat(committedArea(license)).isEqualByComparingTo(areaBefore);
         assertThat(subscriptionsOf(producer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Without a session the code is not redeemed, even with the demo producer fallback on")
+    void anonymousRequestIsRejected() throws Exception {
+        var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        SecurityContextHolder.clearContext();
+
+        redeem(code).andExpect(status().isUnauthorized());
+
+        assertThat(storedCode(code).getStatus()).isEqualTo(InvitationCodeStatus.AVAILABLE);
     }
 
     @Test

@@ -28,11 +28,10 @@ public class ExternalIamService {
     }
 
     /**
-     * Checks whether a user may redeem cooperative codes: only producers do. A user IAM does not know, which only
-     * happens with the demo fallback user, is let through.
+     * Checks whether a user may redeem cooperative codes: only producers IAM knows do.
      *
      * @param producerId the user asking to redeem a code
-     * @return false if IAM knows the user with a role other than producer; true otherwise
+     * @return true if IAM knows the user as a producer; false otherwise
      */
     public boolean mayRedeemCooperativeCodes(ProducerId producerId) {
         if (producerId == null) {
@@ -40,6 +39,6 @@ public class ExternalIamService {
         }
         return iamContextFacade.findUserRole(producerId.producerId())
                 .map(PRODUCER_ROLE::equals)
-                .orElse(true);
+                .orElse(false);
     }
 }
