@@ -1,6 +1,6 @@
 # Brechas del backend para las historias de la app Android (Productor)
 
-- **Última actualización:** 2026-10-05
+- **Última actualización:** 2026-10-20
 - **Backend revisado:** `develop` en la etiqueta **0.33.0** (cambios desde la 0.21.0 en la sección 4)
 - **Fuentes:** reporte (US y escenarios BDD), mockups de Figma (`Viora202602_Mobile_App`, sección App Productor · Kotlin) y el código del backend
 - **Para qué sirve:** que cada desarrollador sepa qué le falta al backend para completar las historias que tiene asignadas en la app, antes de empezar la pantalla, y dar seguimiento a los endpoints que requiere la app (sección 3).
@@ -11,6 +11,7 @@
 
 | US | Dueño en la app | Pantallas | Backend hoy | Qué falta | Tamaño | Quién |
 |---|---|---|---|---|---|---|
+| **US07** Canje de código de cooperativa | Jahat | T02c, T02f, P05, P06 | ✅ `POST /cooperative-code-redemptions` con `{ code, quotaHa }` (rama `feature/cooperative-code-redemption`): 201 con la suscripción patrocinada (`cooperativeName`, `quotaHa`, `startsAt`, `endsAt`, `entitlementActive`); 400 con un único mensaje para un código inexistente, vencido, canjeado o revocado; 409 si ya tiene suscripción activa; 422 si a la licencia no le quedan hectáreas; 429 con `Retry-After` después de 5 intentos fallidos en 15 min. Códigos demo: `COOP-7K2Q`, `COOP-4F9T`, `COOP-9HX3` (vencido `COOP-2MKD`, revocado `COOP-7PZA`) | Pantallas del gestor (G40–G44: generar, listar y revocar códigos) y consultar la suscripción vigente (`GET /subscriptions`, del compañero de suscripción) | — | Jahat |
 | **US09** Delimitar lote | Victor | P20–P26 | ✅ `POST /plots`, `GET /plots`, `GET /plots/{id}` | Opcional: fecha de registro y método de marcado (el diseño dice "registrado hoy con GPS"). El cupo del plan (P25) depende de suscripción (US06–US08, Sprint 3) | S | Victor |
 | **US10** Editar lote | Victor | P27–P29 | ✅ `PUT /plots/{id}` con `If-Match` (nombre, marco, poda, polígono) | ✅ `PUT /plots/{id}` acepta `variety` opcional (si se omite, se conserva). Sin restricción por muestreos o cosechas: el modelo de calibre se autocalibra con los datos del productor | — | Resuelto en `feature/plot-variety-edit` |
 | **US11** Baja de lote | Victor | P28, archivados | ✅ `DELETE /plots/{id}` (baja suave). ✅ **Listar archivados** (0.22.0): `GET /plots?status=REMOVED_SOFT_DELETE` | Un lote archivado no se puede abrir por id (404), alcanza con los datos de la lista. ✅ **Restaurar** (`POST /plots/{id}/restore`, rama `feature/plot-restore`): vuelve a ACTIVE con su historial; 409 si el lote no está archivado | — | — |
@@ -109,6 +110,8 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | 0.33.0 | `feature/settlement-settle-contract-us29` | `POST /plots/{plotId}/harvest-settlements` acepta `weighedOn` y `millTicketNumber`, y la cabecera `Idempotency-Key` | US29 |
 | 0.33.0 | igual | Las liquidaciones devuelven `receiptNumber`, `weighedOn`, `millTicketNumber` y `commercialSizeGrade` | US29 |
 | 0.33.0 | igual | El 409 de una campaña ya liquidada agrega `existingSettlement`, y una clave de idempotencia reutilizada da 422 | US29 |
+| pendiente | `feature/cooperative-code-redemption` | `POST /cooperative-code-redemptions` con `{ code, quotaHa }` y la respuesta `SubscriptionResource` con `cooperativeName` | US07, TS10 |
+| pendiente | igual | Contexto `subscription` mínimo: `Subscription` (solo modo patrocinado), `CooperativeLicense`, `InvitationCode` y seed de códigos demo | US07 |
 
 **0.22.0**
 1. **`DELETE /api/v1/plots/{plotId}/harvest-records/{recordId}`** (US21, escenario 2): quita el registro, recalcula el BBI y la clasificación sobre las campañas válidas que quedan, y deja volver a registrar esa campaña. `If-Match` opcional. Respuesta 200 con `MessageResource` (no 204); también 400 (UUID o `If-Match` inválido), 404 y 412.
@@ -141,6 +144,9 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 18. **Mensajes de error nuevos** (US29), todos como `detail` ya traducido: `settlement.weighed_on.null` y `settlement.weighed_on.future` (400), `settlement.mill_ticket.too_long` y `settlement.idempotency_key.too_long` (400), `settlement.idempotency_key.reused` (422) y `settlement.receipt_number.invalid` / `settlement.receipt_number.sequence.invalid` (400, solo por datos ya persistidos que no se pueden leer).
 
 **Para el reporte**
+- Canje de código (US07, TS10), siguiendo a Figma cuando el reporte lo contradice: el body es `{ code, quotaHa }` (no `invitationCode`) y la respuesta es la suscripción con `cooperativeName` (no `CooperativeMembershipResource`); se quita "pertenece al socio autenticado", porque el código es anónimo hasta que se canjea.
+- US07 esc. 3: un solo mensaje para un código vencido o ya canjeado; se quita "ya no cuenta con cupos disponibles".
+- Diseño táctico de Subscription (`docs/tactical-ddd/subscription.md` y cap. 26): el código ocupa una plaza y no trae hectáreas (se quita `hectaresCapPerCode` / `InvitationCode.quota`); las hectáreas son las que declara el productor y se comprometen al canjear. `InvitationCodeStatus` suma `REVOKED`. El formato del código es `COOP-XXXX`.
 - Baja de lote: `DELETE /plots/{id}?reason=` da 200 con `MessageResource`; la restauración es un `POST .../restore` aparte.
 - Agregar `variety` al contrato `UpdatePlot` y los estados `ACTIVE | REMOVED_SOFT_DELETE` a `PlotResource`.
 - Las cosechas históricas ya tienen CRUD completo (POST, GET, PUT, DELETE).
