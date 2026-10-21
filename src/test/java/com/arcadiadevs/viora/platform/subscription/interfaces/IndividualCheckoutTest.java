@@ -37,7 +37,7 @@ class IndividualCheckoutTest {
         var contract = subscriptions.save(Subscription.createIndividual(owner, "PRODUCER_ANNUAL", quota,
                 new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18")).quote(quota), Instant.now()));
         when(gateway.configured()).thenReturn(true);
-        when(gateway.create(any(), any())).thenReturn(new PaymentGateway.Checkout("fixture", "https://www.mercadopago.com.pe/checkout/test"));
+        when(gateway.create(any(), any())).thenReturn(new PaymentGateway.Checkout("fixture-" + UUID.randomUUID(), "https://www.mercadopago.com.pe/checkout/test"));
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
         var path = "/api/v1/subscriptions/" + contract.snapshot().id().subscriptionId() + "/checkouts";
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(owner.producerId(), null, List.of()));
