@@ -44,7 +44,7 @@ public class CheckoutService {
                     return conflict("subscription.payment.unresolved");
                 }
                 var old = latest.get();
-                work.exclusive(owner, () -> { attempts.save(attempts.find(old.id()).orElseThrow().withStatus("EXPIRED")); return true; });
+                work.exclusive(owner, () -> { var stored = attempts.find(old.id()).orElseThrow(); if (!"APPROVED".equals(stored.status())) { attempts.save(stored.withStatus("EXPIRED")); } return true; });
             } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
         }
         Result<Reservation, ApplicationError> reserved = work.exclusive(owner, () -> {
@@ -126,7 +126,7 @@ public class CheckoutService {
                 // An earlier failed transaction must not hide a newer transaction still being processed.
                 if (Set.of("pending", "in_process", "authorized", "in_mediation").contains(payment.status())) {
                     attempts.save(current.withStatus("PENDING"));
-                } else if (Set.of("rejected", "cancelled").contains(payment.status())) {
+                } else if (!"PENDING".equals(current.status()) && Set.of("rejected", "cancelled").contains(payment.status())) {
                     attempts.save(current.withStatus("REJECTED"));
                 }
             }

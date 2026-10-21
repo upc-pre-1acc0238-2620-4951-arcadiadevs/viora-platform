@@ -103,4 +103,13 @@ class CheckoutServiceTest {
         var attempt = new PaymentAttempt(UUID.randomUUID(), sub.snapshot().id(), "owner", "APPROVED", null, null, now, now.plusSeconds(3600));
         assertEquals("APPROVED", attempt.withCheckout("p", "https://www.mercadopago.com.pe/").status());
     }
+    @Test void earlierRejectionCannotHidePendingTransaction() {
+        var checkout = service.create("owner", sub.snapshot().id(), "k").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "pending", price.total(), "PEN", now.plusSeconds(21), null);
+        service.confirm("123");
+        gateway.payment = new PaymentGateway.VerifiedPayment("122", checkout.intentId(), "rejected", price.total(), "PEN", now.plusSeconds(21), null);
+        service.confirm("122");
+        assertEquals("PENDING", service.latest(sub.snapshot().id()).orElseThrow().status());
+        assertFalse(sub.hasActiveEntitlement(now.plusSeconds(22)));
+    }
 }
