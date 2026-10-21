@@ -214,7 +214,9 @@ Retorna el perfil actualizado.
 
 ### 2.6. Recuperación de Contraseña por Enlace (T06–T09)
 
-La recuperación usa un **enlace de un solo uso** que abre la app directamente (Android App Links). No hay página web: el enlace solo funciona desde el celular con la app instalada.
+La recuperación usa un **enlace de un solo uso** que abre la app directamente (Android App Links).
+
+Si el teléfono abre el enlace en el navegador (el APK instalado está firmado con una huella que no figura en `assetlinks.json`, la verificación del dominio no corrió o la app de correo usa su propio navegador), `GET /password-resets/{token}` responde una **página de Viora** que abre la app con un `intent://…#Intent;scheme=https;package=pe.edu.upc.viora;end`. Ese intent nombra el paquete, así que no depende de la verificación. La página no valida el token: lo hace la app con `GET /api/v1/auth/password-reset-tokens/{token}`.
 
 #### Paso 1: Pedir el enlace (`POST /api/v1/auth/password-reset-tokens`) — T06/T07
 - **Payload:** `{"email": "productor.demo@viora.ag"}`
@@ -265,6 +267,14 @@ Ya viene configurada por defecto en `application.properties`; las variables de e
 - **Brevo:** debe estar desactivado el **seguimiento de clics** de los correos transaccionales; si no, el botón apunta a Brevo y Android no abre la app.
 
 ---
+
+### 2.6.1. Token vencido o inválido → `401`
+
+Si una petición trae `Authorization: Bearer` y el token no autentica (venció, fue alterado o es anterior al último cambio de contraseña), el backend responde **`401`** en cualquier ruta que no sea pública (`/api/v1/auth/**`, `/.well-known/**`, `/password-resets/**`). La app renueva la sesión (sección 2.3) y repite la petición. Sin cabecera `Authorization` la petición sigue siendo anónima, como antes.
+
+### 2.6.2. Cuenta demo
+
+Con `VIORA_DEMO_ACCOUNT_EMAIL` y `VIORA_DEMO_ACCOUNT_PASSWORD` configuradas, el arranque crea una cuenta **verificada** de productor cuyo `userId` es el productor demo (`DEFAULT_PRODUCER_ID`, dueño de los datos sembrados) y su perfil (`VIORA_DEMO_ACCOUNT_FULL_NAME`, `VIORA_DEMO_ACCOUNT_COUNTRY`, `VIORA_DEMO_ACCOUNT_PHONE`). Así los datos de demostración se ven iniciando sesión. Las credenciales nunca van al repositorio; una cuenta existente no se modifica (para cambiarlas, borrar la cuenta y reiniciar).
 
 ### 2.7. Reglas de Contraseña (registro, cambio y recuperación)
 
