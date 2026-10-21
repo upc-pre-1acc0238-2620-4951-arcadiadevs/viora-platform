@@ -105,6 +105,17 @@ class SpringSecurityCurrentUserProviderTest {
     }
 
     @Test
+    @DisplayName("requireAuthenticatedUserId never falls back to the demo user")
+    void requireAuthenticatedUserIdIgnoresDemoFallback() {
+        assertThatThrownBy(demoProvider::requireAuthenticatedUserId)
+                .isInstanceOf(AuthenticationRequiredException.class);
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("user-1", null, List.of()));
+        assertThat(demoProvider.requireAuthenticatedUserId()).isEqualTo("user-1");
+    }
+
+    @Test
     @DisplayName("Rejects demo mode without a demo user id")
     void rejectsDemoModeWithoutUserId() {
         assertThatThrownBy(() -> new SpringSecurityCurrentUserProvider(true, " "))

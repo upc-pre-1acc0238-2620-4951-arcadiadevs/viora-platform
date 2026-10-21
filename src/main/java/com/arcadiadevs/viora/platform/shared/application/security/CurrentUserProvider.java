@@ -26,6 +26,17 @@ public interface CurrentUserProvider {
     String requireCurrentUserId();
 
     /**
+     * Resolves the user who really signed in, never the demo fallback. For operations that change what belongs to a
+     * person, such as redeeming a cooperative code, which must not happen on the demo producer's behalf.
+     *
+     * @return the authenticated user identifier
+     * @throws AuthenticationRequiredException if no user is authenticated
+     */
+    default String requireAuthenticatedUserId() {
+        return currentUserId().orElseThrow(AuthenticationRequiredException::new);
+    }
+
+    /**
      * Checks whether the given user identifier is the current user, so a request can only reach the user's own
      * resources. Meant for method security, as in {@code @PreAuthorize("@currentUserProvider.isCurrentUser(#userId)")}.
      *

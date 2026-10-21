@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.conf
 import com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.pipeline.BearerAuthorizationRequestFilter;
 import com.arcadiadevs.viora.platform.iam.infrastructure.hashing.argon2.Argon2HashingService;
 import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
+import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,22 +39,26 @@ public class WebSecurityConfiguration {
     private final BearerTokenService tokenService;
     private final Argon2HashingService hashingService;
     private final AuthenticationEntryPoint unauthorizedRequestHandler;
+    private final DeepLinkProperties deepLinkProperties;
 
     public WebSecurityConfiguration(
             @Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService,
             BearerTokenService tokenService,
             Argon2HashingService hashingService,
-            AuthenticationEntryPoint unauthorizedRequestHandler
+            AuthenticationEntryPoint unauthorizedRequestHandler,
+            DeepLinkProperties deepLinkProperties
     ) {
         this.userDetailsService = userDetailsService;
         this.tokenService = tokenService;
         this.hashingService = hashingService;
         this.unauthorizedRequestHandler = unauthorizedRequestHandler;
+        this.deepLinkProperties = deepLinkProperties;
     }
 
     @Bean
     public BearerAuthorizationRequestFilter authorizationRequestFilter() {
-        return new BearerAuthorizationRequestFilter(tokenService, userDetailsService);
+        return new BearerAuthorizationRequestFilter(tokenService, userDetailsService, unauthorizedRequestHandler,
+                deepLinkProperties.passwordResetPath());
     }
 
     @Bean

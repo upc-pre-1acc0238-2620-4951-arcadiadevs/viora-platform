@@ -98,7 +98,8 @@ public class CooperativeCodeRedemptionController {
             @ApiResponse(responseCode = "429", description = "Too many failed attempts; see Retry-After")
     })
     public ResponseEntity<?> redeem(@Valid @RequestBody RedeemCooperativeCodeResource resource) {
-        var producerId = currentUserProvider.requireCurrentUserId();
+        // A real session only: an anonymous request must not spend a code on the demo producer.
+        var producerId = currentUserProvider.requireAuthenticatedUserId();
         var command = RedeemCooperativeCodeCommandFromResourceAssembler.toCommandFromResource(producerId, resource);
         var result = redemptionCommandService.handle(command);
         return ResponseEntityAssembler.toResponseEntityFromResult(result, this::toResource, HttpStatus.CREATED);
