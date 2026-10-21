@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subsc
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 
 import java.time.Instant;
+import java.util.Optional;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
 /**
  * Repository port of the subscriptions.
@@ -26,4 +28,18 @@ public interface SubscriptionRepository {
      * @return the stored subscription
      */
     Subscription save(Subscription subscription);
+    /**
+     * Finds a contract using its domain identity.
+     * @param id contract identity
+     * @return stored contract when present
+     */
+    Optional<Subscription> findById(SubscriptionId id);
+
+    /**
+     * Checks whether another individual purchase remains open.
+     * @param producerId producer identity
+     * @return whether a pending contract exists
+     */
+    boolean existsPendingByProducerId(ProducerId producerId);
+
 }

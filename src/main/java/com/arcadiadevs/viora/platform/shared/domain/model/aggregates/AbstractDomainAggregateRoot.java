@@ -1,44 +1,36 @@
 package com.arcadiadevs.viora.platform.shared.domain.model.aggregates;
 
-import org.springframework.data.domain.AbstractAggregateRoot;
-
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
- * Base class for aggregate roots supporting domain event publication and lifecycle.
- *
- * @param <T> the concrete aggregate root type
+ * Framework-free event collection for aggregate roots.
+ * Application services publish and clear events after coordinating persistence.
+ * @param <T> concrete aggregate root type
  */
-public abstract class AbstractDomainAggregateRoot<T extends AbstractDomainAggregateRoot<T>>
-        extends AbstractAggregateRoot<T> {
+public abstract class AbstractDomainAggregateRoot<T extends AbstractDomainAggregateRoot<T>> {
+    private final List<Object> events = new ArrayList<>();
 
     /**
-     * Registers a domain event to be published after this aggregate is saved.
-     *
-     * @param event the domain event to register
+     * Records a domain fact without publishing it or depending on a framework.
+     * @param event domain event
+     * @throws IllegalArgumentException if the event is missing
      */
     protected void registerDomainEvent(Object event) {
-        super.registerEvent(event);
+        if (event == null) {
+            throw new IllegalArgumentException("shared.domain.event.null");
+        }
+        events.add(event);
     }
 
-    /**
-     * Returns all domain events registered on this aggregate since the last publication.
-     * Exposed as {@code public} so repository adapters can retrieve and publish them
-     * after the aggregate has been persisted.
-     *
-     * @return the registered domain events
-     */
-    @Override
+    /** @return immutable snapshot of events awaiting publication */
     public Collection<Object> domainEvents() {
-        return super.domainEvents();
+        return List.copyOf(events);
     }
 
-    /**
-     * Clears all registered domain events.
-     * Exposed as {@code public} so repository adapters can clear events after publishing.
-     */
-    @Override
+    /** Clears already processed events; publication remains an application responsibility. */
     public void clearDomainEvents() {
-        super.clearDomainEvents();
+        events.clear();
     }
 }
