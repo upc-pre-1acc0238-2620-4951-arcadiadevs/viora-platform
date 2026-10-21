@@ -56,4 +56,20 @@ class MercadoPagoGatewayTest {
         var payment = gateway.verify("123");
         assertEquals(intent, payment.intentId()); assertEquals(new Money(new BigDecimal("389.40")), payment.amount());
     }
+    @Test void verifiedTestSellerCanReportLiveModeInSandbox() {
+        var body = "{\"id\":123,\"collector_id\":42,\"live_mode\":true,\"external_reference\":\"" + intent + "\",\"status\":\"approved\",\"currency_id\":\"PEN\",\"transaction_amount\":389.40,\"date_created\":\"2026-10-21T12:00:00Z\",\"date_approved\":\"2026-10-21T12:01:00Z\"}";
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/123")).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.mercadopago.com/users/me")).andRespond(withSuccess("{\"id\":42,\"tags\":[\"test_user\"]}", MediaType.APPLICATION_JSON));
+        assertEquals("approved", gateway.verify("123").status());
+    }
+    @Test void testSellerCannotEnterProductionEvenWhenLiveModeIsTrue() {
+        var builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        server = MockRestServiceServer.bindTo(builder).build();
+        gateway = new MercadoPagoGateway(true, false, "fixture-token", "https://example.test/notify", "https://example.test/return", builder.build());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/123"))
+            .andRespond(withSuccess("{\"id\":123,\"collector_id\":42,\"live_mode\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.mercadopago.com/users/me")).andRespond(withSuccess("{\"id\":42,\"tags\":[\"test_user\"]}", MediaType.APPLICATION_JSON));
+        assertThrows(PaymentGateway.Unavailable.class, () -> gateway.verify("123"));
+    }
+
 }

@@ -20,7 +20,8 @@ public class MercadoPagoGateway implements PaymentGateway {
     private final String token;
     private final String notificationUrl;
     private final String returnUrl;
-    private volatile String collectorId;
+    private record Merchant(String id, boolean testAccount) { }
+    private volatile Merchant merchantIdentity;
     @org.springframework.beans.factory.annotation.Autowired
     public MercadoPagoGateway(@Value("${viora.payments.enabled:false}") boolean enabled,
             @Value("${viora.payments.sandbox:true}") boolean sandbox,
@@ -90,7 +91,7 @@ public class MercadoPagoGateway implements PaymentGateway {
         try {
             var map = get("/v1/payments/" + id);
             if (!id.equals(required(map, "id")) || !collector().equals(required(map, "collector_id"))
-                    || !(map.get("live_mode") instanceof Boolean live) || live == sandbox) { throw new Unavailable(); }
+                    || !(map.get("live_mode") instanceof Boolean live) || !validEnvironment(live)) { throw new Unavailable(); }
             return new VerifiedPayment(id, UUID.fromString(required(map, "external_reference")), required(map, "status"),
                     new Money(new BigDecimal(required(map, "transaction_amount"))), required(map, "currency_id"),
                     Instant.parse(required(map, "date_created")), map.get("date_approved") == null ? null : Instant.parse(required(map, "date_approved")));
@@ -113,8 +114,19 @@ public class MercadoPagoGateway implements PaymentGateway {
         } catch (RuntimeException ex) { throw new Unavailable(); }
     }
     private String collector() {
-        if (collectorId == null) { collectorId = required(get("/users/me"), "id"); }
-        return collectorId;
+        return merchant().id();
+    }
+    private Merchant merchant() {
+        if (merchantIdentity == null) {
+            var account = get("/users/me");
+            var testAccount = account.get("tags") instanceof List<?> tags && tags.contains("test_user");
+            merchantIdentity = new Merchant(required(account, "id"), testAccount);
+        }
+        return merchantIdentity;
+    }
+    private boolean validEnvironment(boolean live) {
+        // Test sellers can report live_mode=true; only the authenticated account can establish this exception.
+        return sandbox ? !live || merchant().testAccount() : live && !merchant().testAccount();
     }
     private Map<?, ?> get(String path) {
         var response = client.get().uri(path).retrieve().body(Map.class);
