@@ -254,6 +254,47 @@ class CooperativeCodeRedemptionIntegrationTest {
     }
 
     @Test
+    @DisplayName("Forty wrong codes sent at the same time: only five are tried, the rest wait")
+    void burstOfWrongCodesIsCappedAtFive() throws Exception {
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(40);
+        try {
+            var futures = new ArrayList<Future<Result<Subscription, ApplicationError>>>();
+            for (var attempt = 0; attempt < 40; attempt++) {
+                var guess = randomCode();
+                Callable<Result<Subscription, ApplicationError>> task = () -> {
+                    start.await();
+                    return redemptionCommandService.handle(
+                            new RedeemCooperativeCodeCommand(producer, guess, BigDecimal.ONE));
+                };
+                futures.add(executor.submit(task));
+            }
+            start.countDown();
+            var codes = new ArrayList<String>();
+            for (var future : futures) {
+                codes.add(future.get().failure().orElseThrow().code());
+            }
+
+            assertThat(codes).filteredOn("VALIDATION_ERROR"::equals).hasSize(5);
+            assertThat(codes).filteredOn("COOPERATIVE_CODE_REDEMPTION_TOO_MANY_REQUESTS"::equals).hasSize(35);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("Refusals that are not a wrong code, such as a malformed code or a 409, do not use up attempts")
+    void otherRefusalsDoNotCount() throws Exception {
+        for (var attempt = 0; attempt < 6; attempt++) {
+            redeem("OLIV-4F9T", "12").andExpect(status().isBadRequest());
+        }
+        redeem(newCode(license, Instant.now().plus(Duration.ofDays(7))), "12").andExpect(status().isCreated());
+        for (var attempt = 0; attempt < 6; attempt++) {
+            redeem(newCode(license, Instant.now().plus(Duration.ofDays(7))), "12").andExpect(status().isConflict());
+        }
+    }
+
+    @Test
     @DisplayName("Two producers redeeming the same code at the same time: one gets it, the other gets the 400")
     void concurrentRedemptionsOfTheSameCode() throws Exception {
         var code = newCode(license, Instant.now().plus(Duration.ofDays(7)));

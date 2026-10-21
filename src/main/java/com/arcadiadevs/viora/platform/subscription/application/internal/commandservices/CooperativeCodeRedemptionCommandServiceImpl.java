@@ -26,7 +26,8 @@ import java.time.Instant;
  * Application service redeeming cooperative invitation codes.
  * <p>The code and its license are locked while the code is consumed, the hectares are committed and the sponsored
  * subscription is created, and all of them are stored in one transaction. A code that does not exist, expired, was
- * already redeemed or was revoked answers the same validation error, and counts as a failed attempt.</p>
+ * already redeemed or was revoked answers the same validation error, and counts as a failed attempt. The attempt is
+ * reserved before the code is looked up and given back for any other outcome.</p>
  */
 @Service
 @Transactional
@@ -104,11 +105,30 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
                 return Result.failure(ApplicationError.forbidden(RESOURCE, "subscription.redemption.producer_only"));
             }
             var now = clock.instant();
-            var retryAfter = attemptLimiter.retryAfterSeconds(producerId, now);
+            var retryAfter = attemptLimiter.tryAcquire(producerId, now);
             if (retryAfter.isPresent()) {
                 return Result.failure(ApplicationError.tooManyRequests(RESOURCE,
                         "subscription.redemption.too_many_attempts", retryAfter.getAsLong()));
             }
+            var result = redeem(command, producerId, now);
+            if (result.isSuccess()) {
+                attemptLimiter.reset(producerId);
+            } else if (!isNotRedeemable(result)) {
+                attemptLimiter.release(producerId, now);
+            }
+            return result;
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        }
+    }
+
+    /**
+     * Runs the redemption once the attempt is reserved. Every failure is returned, never thrown, so the caller can
+     * tell which attempts count as failed.
+     */
+    private Result<Subscription, ApplicationError> redeem(RedeemCooperativeCodeCommand command, ProducerId producerId,
+                                                          Instant now) {
+        try {
             var quota = new HectaresQuota(command.quotaHa());
             var code = new CooperativeCode(command.code());
             if (subscriptionRepository.existsActiveByProducerId(producerId, now)) {
@@ -117,11 +137,11 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
 
             var invitationCode = invitationCodeRepository.findByFingerprintForRedemption(code.fingerprint());
             if (invitationCode.isEmpty()) {
-                return notRedeemable(producerId, now);
+                return notRedeemable();
             }
             var license = cooperativeLicenseRepository.findByIdForRedemption(invitationCode.get().snapshot().licenseId());
             if (license.isEmpty()) {
-                return notRedeemable(producerId, now);
+                return notRedeemable();
             }
 
             var redeemedCode = license.get().redeem(invitationCode.get(), producerId, quota, now);
@@ -134,11 +154,10 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
                 eventPublisher.publishEvent(event);
             }
             subscription.clearDomainEvents();
-            attemptLimiter.reset(producerId);
 
             return Result.success(savedSubscription);
         } catch (InvitationCodeNotRedeemableException ex) {
-            return notRedeemable(new ProducerId(command.producerId()), clock.instant());
+            return notRedeemable();
         } catch (InsufficientLicenseAreaException ex) {
             return Result.failure(ApplicationError.businessRuleViolation("license area", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
@@ -146,8 +165,13 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
         }
     }
 
-    private Result<Subscription, ApplicationError> notRedeemable(ProducerId producerId, Instant at) {
-        attemptLimiter.recordFailure(producerId, at);
+    private static boolean isNotRedeemable(Result<Subscription, ApplicationError> result) {
+        return result.failure()
+                .map(error -> InvitationCodeNotRedeemableException.MESSAGE_KEY.equals(error.details()))
+                .orElse(false);
+    }
+
+    private static Result<Subscription, ApplicationError> notRedeemable() {
         return Result.failure(ApplicationError.validationError("code", InvitationCodeNotRedeemableException.MESSAGE_KEY));
     }
 }

@@ -11,24 +11,26 @@ import java.util.OptionalLong;
 public interface RedemptionAttemptLimiter {
 
     /**
-     * Tells whether the producer must wait before trying another code.
+     * Reserves an attempt for the producer, unless the producer already used up the attempts of the window. The
+     * check and the reservation happen together, so attempts sent at the same time cannot get past the limit.
      *
      * @param producerId the producer
      * @param at         the instant of the attempt
-     * @return the seconds to wait, or empty if the producer can try now
+     * @return empty if the attempt was reserved, or the seconds to wait before trying again
      */
-    OptionalLong retryAfterSeconds(ProducerId producerId, Instant at);
+    OptionalLong tryAcquire(ProducerId producerId, Instant at);
 
     /**
-     * Counts a code the producer tried and could not redeem.
+     * Gives back an attempt reserved with {@link #tryAcquire}, when the attempt did not try a code that could not be
+     * redeemed (for example the producer was already subscribed or sent a malformed code).
      *
      * @param producerId the producer
-     * @param at         the instant of the attempt
+     * @param at         the instant the attempt was reserved with
      */
-    void recordFailure(ProducerId producerId, Instant at);
+    void release(ProducerId producerId, Instant at);
 
     /**
-     * Forgets the failed attempts of the producer, after a code is redeemed.
+     * Forgets the attempts of the producer, after a code is redeemed.
      *
      * @param producerId the producer
      */

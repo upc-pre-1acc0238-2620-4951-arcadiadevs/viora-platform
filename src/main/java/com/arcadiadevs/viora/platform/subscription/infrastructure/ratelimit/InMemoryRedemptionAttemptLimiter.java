@@ -15,8 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link RedemptionAttemptLimiter} keeping the failed attempts of each producer in memory, in a sliding window.
- * <p>Once a producer reaches the maximum of failed attempts inside the window, the next attempt waits until the
- * oldest one leaves the window. The counts live in this instance only and are lost on restart, which is enough to
+ * <p>Every attempt is reserved before the code is looked up and given back when it did not fail, so once a producer
+ * reaches the maximum of failed attempts inside the window, the next attempt waits until the oldest one leaves the
+ * window, however many attempts arrive at the same time. The counts live in this instance only and are lost on restart, which is enough to
  * stop a code from being guessed by trying them all.</p>
  */
 @Component
@@ -45,27 +46,27 @@ public class InMemoryRedemptionAttemptLimiter implements RedemptionAttemptLimite
     }
 
     @Override
-    public OptionalLong retryAfterSeconds(ProducerId producerId, Instant at) {
-        var attempts = failures.get(producerId.producerId());
-        if (attempts == null) {
-            return OptionalLong.empty();
-        }
+    public OptionalLong tryAcquire(ProducerId producerId, Instant at) {
+        var attempts = failures.computeIfAbsent(producerId.producerId(), key -> new ArrayDeque<>());
         synchronized (attempts) {
             prune(attempts, at);
-            if (attempts.size() < maxFailedAttempts) {
-                return OptionalLong.empty();
+            if (attempts.size() >= maxFailedAttempts) {
+                var waitUntil = attempts.peekFirst().plus(window);
+                return OptionalLong.of(Math.max(1L, Duration.between(at, waitUntil).toSeconds()));
             }
-            var waitUntil = attempts.peekFirst().plus(window);
-            return OptionalLong.of(Math.max(1L, Duration.between(at, waitUntil).toSeconds()));
+            attempts.addLast(at);
+            return OptionalLong.empty();
         }
     }
 
     @Override
-    public void recordFailure(ProducerId producerId, Instant at) {
-        var attempts = failures.computeIfAbsent(producerId.producerId(), key -> new ArrayDeque<>());
+    public void release(ProducerId producerId, Instant at) {
+        var attempts = failures.get(producerId.producerId());
+        if (attempts == null) {
+            return;
+        }
         synchronized (attempts) {
-            prune(attempts, at);
-            attempts.addLast(at);
+            attempts.removeLastOccurrence(at);
         }
     }
 
