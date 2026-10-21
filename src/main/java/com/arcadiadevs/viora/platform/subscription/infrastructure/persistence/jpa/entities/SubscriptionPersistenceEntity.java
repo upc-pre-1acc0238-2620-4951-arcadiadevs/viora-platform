@@ -41,10 +41,10 @@ public class SubscriptionPersistenceEntity extends AuditableAbstractPersistenceE
     @Column(name = "quota_ha", nullable = false, precision = 8, scale = 2)
     private BigDecimal quotaHa;
 
-    @Column(name = "starts_at", nullable = false)
+    @Column(name = "starts_at")
     private Instant startsAt;
 
-    @Column(name = "ends_at", nullable = false)
+    @Column(name = "ends_at")
     private Instant endsAt;
 
     @Column(name = "cooperative_id")
@@ -55,6 +55,24 @@ public class SubscriptionPersistenceEntity extends AuditableAbstractPersistenceE
 
     @Column(name = "redeemed_code_id", unique = true)
     private UUID redeemedCodeId;
+
+    @Column(name = "plan_code")
+    private String planCode;
+
+    @Column(name = "base_amount", precision = 19, scale = 2)
+    private BigDecimal baseAmount;
+
+    @Column(name = "tax_amount", precision = 19, scale = 2)
+    private BigDecimal taxAmount;
+
+    @Column(name = "total_amount", precision = 19, scale = 2)
+    private BigDecimal totalAmount;
+
+    @Column(name = "payment_id", unique = true)
+    private String paymentId;
+
+    @Column(name = "requested_at")
+    private Instant requestedAt;
 
     @Version
     @Column(name = "revision", nullable = false)
