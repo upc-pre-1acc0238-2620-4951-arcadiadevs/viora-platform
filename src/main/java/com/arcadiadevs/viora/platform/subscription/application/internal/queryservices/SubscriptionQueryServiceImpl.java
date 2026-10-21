@@ -3,13 +3,16 @@ package com.arcadiadevs.viora.platform.subscription.application.internal.queryse
 import java.time.Clock;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionQueryService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 
 /** Resolves owned contracts without provider calls or client-supplied ownership. */
 @Service
-public class SubscriptionQueryService {
+@Transactional(readOnly = true)
+public class SubscriptionQueryServiceImpl implements SubscriptionQueryService {
     private final SubscriptionRepository subscriptions;
     private final Clock clock;
 
@@ -18,7 +21,7 @@ public class SubscriptionQueryService {
      * @param subscriptions shared persistence port
      * @param clock application time
      */
-    public SubscriptionQueryService(SubscriptionRepository subscriptions, Clock clock) {
+    public SubscriptionQueryServiceImpl(SubscriptionRepository subscriptions, Clock clock) {
         this.subscriptions = subscriptions;
         this.clock = clock;
     }
@@ -28,6 +31,7 @@ public class SubscriptionQueryService {
      * @param owner verified identity
      * @return current contract when present
      */
+    @Override
     public Optional<Subscription> current(String owner) {
         return subscriptions.findCurrent(new ProducerId(owner), clock.instant());
     }

@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
-import com.arcadiadevs.viora.platform.subscription.application.internal.queryservices.SubscriptionQueryService;
+import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionQueryService;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.SubscriptionDetailsAssembler;
 
 /** Read boundary for the signed-in producer's current contract. */
@@ -28,7 +28,12 @@ public class CurrentSubscriptionController {
         this.clock = clock;
     }
 
-    /** @return current owned contract, or 204 when none exists */
+    /**
+     * Reads only the signed-in producer's contract without granting or changing access.
+     * @return current owned contract, or 204 when none exists
+     * @throws com.arcadiadevs.viora.platform.shared.application.security.AuthenticationRequiredException
+     *         if no real authenticated identity is available, including in demo mode
+     */
     @GetMapping
     @Operation(summary = "Get the signed-in producer's current subscription")
     public ResponseEntity<?> current() {
