@@ -65,7 +65,7 @@ class IndividualSubscriptionDomainTest {
     }
 
     @Test
-    void rejectsMissingOwnerAndMixedModeReferences() {
+    void rejectsMissingOwnerAndPlanCode() {
         var s = pending().snapshot();
         var invalid = new SubscriptionSnapshot(s.id(), null, s.mode(), s.status(), s.quota(), null,
                 null, null, null, s.revision(), s.planCode(), s.price(), null, s.createdAt());

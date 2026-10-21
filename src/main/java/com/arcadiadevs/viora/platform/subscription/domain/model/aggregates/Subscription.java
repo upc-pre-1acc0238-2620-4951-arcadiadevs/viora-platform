@@ -21,8 +21,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.events.Subscript
 
 /**
  * Aggregate root of a producer's right to use Viora, for a surface in hectares and a window of time.
- * <p>This first version only knows the mode sponsored by a cooperative: it is born active from a redeemed
- * invitation code. The individual paid mode is added on top of it.</p>
+ * <p>Sponsored subscriptions retain their invitation-code activation and license term. Individual subscriptions
+ * begin pending and receive a calendar-year term only after verified payment approval.</p>
  */
 public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
 
