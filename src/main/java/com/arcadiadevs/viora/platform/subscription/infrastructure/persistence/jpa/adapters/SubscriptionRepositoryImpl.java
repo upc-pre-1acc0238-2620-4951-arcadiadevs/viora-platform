@@ -82,4 +82,17 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
                 .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
     }
 
+
+    /**
+     * Restricts ownership in the database before reconstructing the domain contract.
+     * @param id requested domain identifier
+     * @param producerId authenticated owner
+     * @return owned domain contract, or empty when missing or foreign
+     */
+    @Override
+    public Optional<Subscription> findByIdAndProducerId(SubscriptionId id, ProducerId producerId) {
+        return persistenceRepository.findByIdAndProducerId(UUID.fromString(id.subscriptionId()),
+                UUID.fromString(producerId.producerId()))
+                .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
+    }
 }

@@ -50,4 +50,12 @@ public interface SubscriptionRepository {
      */
     Optional<Subscription> findCurrent(ProducerId producerId, Instant at);
 
+
+    /**
+     * Looks up a contract without reading another producer's persistence row.
+     * @param id contract identifier
+     * @param producerId authenticated owner
+     * @return owned contract, or empty if the identifier is missing or foreign
+     */
+    Optional<Subscription> findByIdAndProducerId(SubscriptionId id, ProducerId producerId);
 }
