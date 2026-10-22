@@ -31,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -41,6 +42,7 @@ import java.util.List;
 @RequestMapping(value = "/api/v1/plots/{plotId}/iot-devices", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "IoT Devices", description = "Endpoints for virtual IoT sensor nodes and edaphic probe management")
 @NullMarked
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class IoTDeviceController {
 
     private final IoTDeviceCommandService ioTDeviceCommandService;

@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.Incide
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.IncidentType;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.PlotId;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +60,16 @@ public interface AgroclimaticIncidentRepository {
      * @return list of matching incidents
      */
     List<AgroclimaticIncident> findAll(PlotId plotId, IncidentStatus status, IncidentSeverity severity);
+
+    /**
+     * Searches the incidents of a set of plots matching optional filters, newest first.
+     *
+     * @param plotIds  the plots to search; an empty collection finds nothing
+     * @param status   optional status filter
+     * @param severity optional severity filter
+     * @return list of matching incidents
+     */
+    List<AgroclimaticIncident> findAllByPlotIds(Collection<PlotId> plotIds, IncidentStatus status, IncidentSeverity severity);
 
     /**
      * Checks if an active incident of the given type already exists for a plot.

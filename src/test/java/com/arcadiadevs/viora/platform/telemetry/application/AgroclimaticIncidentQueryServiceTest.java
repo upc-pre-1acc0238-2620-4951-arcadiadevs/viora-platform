@@ -28,6 +28,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +51,7 @@ class AgroclimaticIncidentQueryServiceTest {
     private AgroclimaticIncidentQueryServiceImpl queryService;
 
     private final PlotId plotId = new PlotId(UUID.randomUUID().toString());
+    private final String producerId = UUID.randomUUID().toString();
 
     @BeforeEach
     void setUp() {
@@ -60,6 +63,7 @@ class AgroclimaticIncidentQueryServiceTest {
     @DisplayName("Should retrieve summarized incidents successfully")
     void shouldRetrieveSummarizedIncidentsSuccessfully() {
         when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(externalOrchardService.findPlotProducerId(plotId)).thenReturn(Optional.of(producerId));
         when(externalOrchardService.findPlotName(plotId)).thenReturn(Optional.of("Lote Norte"));
         when(externalOrchardService.findPlotVariety(plotId)).thenReturn(Optional.of("ARBEQUINA"));
 
@@ -75,7 +79,7 @@ class AgroclimaticIncidentQueryServiceTest {
         when(incidentRepository.findAll(plotId, IncidentStatus.ACTIVE, null)).thenReturn(List.of(incident));
         when(incidentRepository.findAll(plotId, null, null)).thenReturn(List.of(incident));
 
-        var query = new GetAgroclimaticIncidentsQuery(plotId.plotId(), "ACTIVE", null);
+        var query = new GetAgroclimaticIncidentsQuery(producerId, plotId.plotId(), "ACTIVE", null);
         var result = queryService.handle(query);
 
         assertThat(result).isInstanceOf(Result.Success.class);
@@ -86,6 +90,32 @@ class AgroclimaticIncidentQueryServiceTest {
         assertThat(summary.incidents()).hasSize(1);
         assertThat(summary.incidents().get(0).plotName()).isEqualTo("Lote Norte");
         assertThat(summary.incidents().get(0).plotVariety()).isEqualTo("ARBEQUINA");
+    }
+
+    @Test
+    @DisplayName("A plot of another producer answers forbidden and reads no incident")
+    void anotherProducersPlotIsForbidden() {
+        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(externalOrchardService.findPlotProducerId(plotId)).thenReturn(Optional.of(UUID.randomUUID().toString()));
+
+        var result = queryService.handle(new GetAgroclimaticIncidentsQuery(producerId, plotId.plotId(), null, null));
+
+        assertThat(result).isInstanceOf(Result.Failure.class);
+        verify(incidentRepository, never()).findAll(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Without a plot, only the incidents of the producer's active plots are read")
+    void everyPlotMeansTheProducersPlots() {
+        var otherPlot = new PlotId(UUID.randomUUID().toString());
+        when(externalOrchardService.findActivePlotIdsByProducerId(producerId)).thenReturn(List.of(plotId, otherPlot));
+        when(incidentRepository.findAllByPlotIds(List.of(plotId, otherPlot), null, null)).thenReturn(List.of());
+
+        var result = queryService.handle(new GetAgroclimaticIncidentsQuery(producerId, (PlotId) null, null, null));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
+        assertThat(((Result.Success<AgroclimaticIncidentsSummary, ?>) result).value().incidents()).isEmpty();
+        verify(incidentRepository, never()).findAll(any(), any(), any());
     }
 
     @Test

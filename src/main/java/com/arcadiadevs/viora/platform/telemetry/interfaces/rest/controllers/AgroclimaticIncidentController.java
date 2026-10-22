@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.telemetry.application.commandservices.AgroclimaticIncidentCommandService;
@@ -25,6 +26,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -38,19 +40,22 @@ public class AgroclimaticIncidentController {
 
     private final AgroclimaticIncidentQueryService queryService;
     private final AgroclimaticIncidentCommandService commandService;
+    private final CurrentUserProvider currentUserProvider;
     private final @Nullable MessageSource messageSource;
 
     /**
      * Constructs the controller injecting query, command services, and message source.
      *
-     * @param queryService   the incident query service
-     * @param commandService the incident command service
-     * @param messageSource  the i18n message source for localized mitigations
+     * @param queryService        the incident query service
+     * @param commandService      the incident command service
+     * @param currentUserProvider resolves the producer asking, whose plots bound the incidents
+     * @param messageSource       the i18n message source for localized mitigations
      */
     @Autowired
     public AgroclimaticIncidentController(
             AgroclimaticIncidentQueryService queryService,
             AgroclimaticIncidentCommandService commandService,
+            CurrentUserProvider currentUserProvider,
             @Nullable MessageSource messageSource
     ) {
         if (queryService == null) {
@@ -59,22 +64,28 @@ public class AgroclimaticIncidentController {
         if (commandService == null) {
             throw new IllegalArgumentException("incident.command_service.null");
         }
+        if (currentUserProvider == null) {
+            throw new IllegalArgumentException("incident.current_user_provider.null");
+        }
         this.queryService = queryService;
         this.commandService = commandService;
+        this.currentUserProvider = currentUserProvider;
         this.messageSource = messageSource;
     }
 
     /**
      * Overload for testing without an explicit MessageSource.
      *
-     * @param queryService   the incident query service
-     * @param commandService the incident command service
+     * @param queryService        the incident query service
+     * @param commandService      the incident command service
+     * @param currentUserProvider resolves the producer asking, whose plots bound the incidents
      */
     public AgroclimaticIncidentController(
             AgroclimaticIncidentQueryService queryService,
-            AgroclimaticIncidentCommandService commandService
+            AgroclimaticIncidentCommandService commandService,
+            CurrentUserProvider currentUserProvider
     ) {
-        this(queryService, commandService, null);
+        this(queryService, commandService, currentUserProvider, null);
     }
 
     /**
@@ -86,7 +97,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK with summary and incident list
      */
     @GetMapping("/api/v1/agroclimatic-incidents")
-    @Operation(summary = "List all agroclimatic incidents", description = "Retrieves summarized incidents with counter metrics, filterable by plot, status, and severity.")
+    @Operation(summary = "List all agroclimatic incidents", description = "Retrieves the summarized incidents of the authenticated producer's active plots with counter metrics, filterable by plot, status, and severity. A plot of another producer answers 403.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Incidents summary successfully retrieved",
                     content = @Content(schema = @Schema(implementation = AgroclimaticIncidentsSummaryResource.class)))
@@ -96,7 +107,7 @@ public class AgroclimaticIncidentController {
             @Parameter(description = "Optional status filter (ACTIVE, SNOOZED, NORMALIZED)") @RequestParam(required = false) @Nullable String status,
             @Parameter(description = "Optional severity filter (WARNING, CRITICAL)") @RequestParam(required = false) @Nullable String severity
     ) {
-        var query = new GetAgroclimaticIncidentsQuery(plotId, status, severity);
+        var query = new GetAgroclimaticIncidentsQuery(currentUserProvider.requireCurrentUserId(), plotId, status, severity);
         var result = queryService.handle(query);
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 result,
@@ -114,6 +125,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK with summary and incident list
      */
     @GetMapping("/api/v1/plots/{plotId}/agroclimatic-incidents")
+    @PreAuthorize("@plotAccess.isAccessible(#plotId)")
     @Operation(summary = "List agroclimatic incidents for a specific plot", description = "Retrieves incidents scoped to the given plot.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Plot incidents successfully retrieved",
@@ -125,7 +137,7 @@ public class AgroclimaticIncidentController {
             @Parameter(description = "Optional status filter (ACTIVE, SNOOZED, NORMALIZED)") @RequestParam(required = false) @Nullable String status,
             @Parameter(description = "Optional severity filter (WARNING, CRITICAL)") @RequestParam(required = false) @Nullable String severity
     ) {
-        var query = new GetAgroclimaticIncidentsQuery(plotId, status, severity);
+        var query = new GetAgroclimaticIncidentsQuery(currentUserProvider.requireCurrentUserId(), plotId, status, severity);
         var result = queryService.handle(query);
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 result,
@@ -141,6 +153,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK with detail representation
      */
     @GetMapping("/api/v1/agroclimatic-incidents/{incidentId}")
+    @PreAuthorize("@incidentAccess.isAccessible(#incidentId)")
     @Operation(summary = "Get detailed agroclimatic incident information", description = "Retrieves full details for an incident including action steps and weekly trend data.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Incident details successfully retrieved",
@@ -168,6 +181,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK on success
      */
     @PostMapping("/api/v1/agroclimatic-incidents/{incidentId}/postponements")
+    @PreAuthorize("@incidentAccess.isAccessible(#incidentId)")
     @Operation(summary = "Postpone (snooze) an active incident", description = "Creates a postponement sub-resource to snooze notifications for an incident.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Incident successfully snoozed",
@@ -197,6 +211,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK on success
      */
     @PutMapping("/api/v1/agroclimatic-incidents/{incidentId}/mitigation-steps/{stepId}")
+    @PreAuthorize("@incidentAccess.isAccessible(#incidentId)")
     @Operation(summary = "Complete an actionable mitigation step", description = "Marks a specific mitigation task step within an incident as completed.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Mitigation step successfully completed",

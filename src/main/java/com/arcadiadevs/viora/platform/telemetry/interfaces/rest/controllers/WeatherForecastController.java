@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * REST controller exposing endpoints for 7-day agroclimatic weather forecast projections.
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(value = "/api/v1/plots/{plotId}/forecasts", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Weather Forecasts", description = "Endpoints for 7-day agroclimatic and frost risk weather forecasts")
 @NullMarked
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class WeatherForecastController {
 
     private final WeatherForecastQueryService weatherForecastQueryService;
