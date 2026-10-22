@@ -39,6 +39,7 @@ class IndividualPaymentNotificationTest {
 
     @Test
     void signedApprovalActivatesOnceAndInvalidSignatureCannotQueryProvider() throws Exception {
+        var paymentId = Long.toString(UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE);
         var owner = new ProducerId(UUID.randomUUID().toString());
         var quota = new IndividualHectaresQuota(new BigDecimal("0.5"));
         var price = new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18")).quote(quota);
@@ -47,22 +48,22 @@ class IndividualPaymentNotificationTest {
         when(gateway.create(any(), any())).thenReturn(new PaymentGateway.Checkout("fixture-" + UUID.randomUUID(), "https://www.mercadopago.com.pe/checkout/test"));
         var checkout = payments.create(owner.producerId(), UUID.fromString(contract.snapshot().id().subscriptionId()), "notify").success().orElseThrow();
         var at = Instant.now();
-        when(gateway.verify("123")).thenReturn(new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "approved", price.total(), "PEN", at, at));
+        when(gateway.verify(paymentId)).thenReturn(new PaymentGateway.VerifiedPayment(paymentId, checkout.intentId(), "approved", price.total(), "PEN", at, at));
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-        var body = "{\"type\":\"payment\",\"data\":{\"id\":\"123\"}}";
-        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", "123")
+        var body = "{\"type\":\"payment\",\"data\":{\"id\":\"" + paymentId + "\"}}";
+        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", paymentId)
                 .header("x-request-id", "fixture-request").header("x-signature", "invalid")
                 .contentType("application/json").content(body)).andExpect(status().isUnauthorized());
         verify(gateway, never()).verify(anyString());
-        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", "123")
-                .header("x-request-id", "fixture-request").header("x-signature", signature("123"))
+        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", paymentId)
+                .header("x-request-id", "fixture-request").header("x-signature", signature(paymentId))
                 .contentType("application/json").content(body)).andExpect(status().isOk());
         var active = subscriptions.findById(contract.snapshot().id()).orElseThrow();
         assertEquals(SubscriptionStatus.ACTIVE, active.snapshot().status());
         assertTrue(active.hasActiveEntitlement(Instant.now()));
         var end = active.snapshot().period().endsAt();
-        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", "123")
-                .header("x-request-id", "fixture-request").header("x-signature", signature("123"))
+        mvc.perform(post("/api/v1/payment-notifications/mercado-pago").param("data.id", paymentId)
+                .header("x-request-id", "fixture-request").header("x-signature", signature(paymentId))
                 .contentType("application/json").content(body)).andExpect(status().isOk());
         assertEquals(end, subscriptions.findById(contract.snapshot().id()).orElseThrow().snapshot().period().endsAt());
     }
