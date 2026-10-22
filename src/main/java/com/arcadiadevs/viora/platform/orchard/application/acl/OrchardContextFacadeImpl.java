@@ -110,6 +110,20 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
     }
 
     @Override
+    public Optional<String> findPlotOwnerId(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return plotRepository.findById(new PlotId(plotId))
+                    .map(plot -> plot.snapshot().producerId().producerId());
+        } catch (IllegalArgumentException ex) {
+            // Malformed UUID or VO validation failure means plot does not exist
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public Optional<String> findPlotName(String plotId) {
         if (plotId == null || plotId.isBlank()) {
             return Optional.empty();
