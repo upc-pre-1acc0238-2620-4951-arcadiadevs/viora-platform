@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,17 @@ public interface AgroclimaticIncidentPersistenceRepository extends JpaRepository
            "ORDER BY i.triggeredAt DESC")
     List<AgroclimaticIncidentPersistenceEntity> findByCriteria(
             @Param("plotId") PlotId plotId,
+            @Param("status") IncidentStatus status,
+            @Param("severity") IncidentSeverity severity
+    );
+
+    @Query("SELECT i FROM AgroclimaticIncidentPersistenceEntity i WHERE " +
+           "i.plotId IN :plotIds AND " +
+           "(:status IS NULL OR i.status = :status) AND " +
+           "(:severity IS NULL OR i.severity = :severity) " +
+           "ORDER BY i.triggeredAt DESC")
+    List<AgroclimaticIncidentPersistenceEntity> findByPlotIdsAndCriteria(
+            @Param("plotIds") Collection<PlotId> plotIds,
             @Param("status") IncidentStatus status,
             @Param("severity") IncidentSeverity severity
     );

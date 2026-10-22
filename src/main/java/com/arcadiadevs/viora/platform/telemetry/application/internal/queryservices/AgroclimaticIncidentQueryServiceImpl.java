@@ -80,12 +80,26 @@ public class AgroclimaticIncidentQueryServiceImpl implements AgroclimaticInciden
             throw new IllegalArgumentException("query.null");
         }
 
-        if (query.plotId() != null && !externalOrchardService.existsActivePlot(query.plotId())) {
-            return Result.failure(ApplicationError.notFound("Plot", query.plotId().plotId()));
+        final List<AgroclimaticIncident> matchingIncidents;
+        final List<AgroclimaticIncident> allForPlotOrGlobal;
+        if (query.plotId() != null) {
+            if (!externalOrchardService.existsActivePlot(query.plotId())) {
+                return Result.failure(ApplicationError.notFound("Plot", query.plotId().plotId()));
+            }
+            var ownedByProducer = externalOrchardService.findPlotProducerId(query.plotId())
+                    .map(ownerId -> ownerId.trim().equalsIgnoreCase(query.producerId().trim()))
+                    .orElse(false);
+            if (!ownedByProducer) {
+                return Result.failure(ApplicationError.forbidden("Plot", "telemetry.plot.not_owner"));
+            }
+            matchingIncidents = incidentRepository.findAll(query.plotId(), query.status(), query.severity());
+            allForPlotOrGlobal = incidentRepository.findAll(query.plotId(), null, null);
+        } else {
+            // Every plot means every active plot of the producer, never the incidents of other producers
+            var producerPlots = externalOrchardService.findActivePlotIdsByProducerId(query.producerId());
+            matchingIncidents = incidentRepository.findAllByPlotIds(producerPlots, query.status(), query.severity());
+            allForPlotOrGlobal = incidentRepository.findAllByPlotIds(producerPlots, null, null);
         }
-
-        var matchingIncidents = incidentRepository.findAll(query.plotId(), query.status(), query.severity());
-        var allForPlotOrGlobal = incidentRepository.findAll(query.plotId(), null, null);
 
         long activeCount = allForPlotOrGlobal.stream()
                 .filter(i -> i.snapshot().status() == IncidentStatus.ACTIVE || i.snapshot().status() == IncidentStatus.SNOOZED)

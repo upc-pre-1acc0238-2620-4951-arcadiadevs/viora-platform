@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHandler;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -46,6 +48,9 @@ class AgroclimaticIncidentControllerIntegrationTest {
     @Mock
     private AgroclimaticIncidentCommandService commandService;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
     private final UUID incidentUuid = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private final UUID plotUuid = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private final UUID stepUuid = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -56,7 +61,8 @@ class AgroclimaticIncidentControllerIntegrationTest {
         messageSource.setBasenames("messages");
         messageSource.setDefaultEncoding("UTF-8");
 
-        var controller = new AgroclimaticIncidentController(queryService, commandService, messageSource);
+        var controller = new AgroclimaticIncidentController(queryService, commandService, currentUserProvider, messageSource);
+        lenient().when(currentUserProvider.requireCurrentUserId()).thenReturn("44444444-4444-4444-4444-444444444444");
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

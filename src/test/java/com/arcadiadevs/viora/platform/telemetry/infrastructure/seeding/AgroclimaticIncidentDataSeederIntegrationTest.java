@@ -3,15 +3,21 @@ package com.arcadiadevs.viora.platform.telemetry.infrastructure.seeding;
 import com.arcadiadevs.viora.platform.orchard.infrastructure.seeding.OrchardDemoDataSeeder;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.IncidentType;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.AgroclimaticIncidentRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -37,9 +43,20 @@ class AgroclimaticIncidentDataSeederIntegrationTest {
     @Autowired
     private AgroclimaticIncidentRepository incidentRepository;
 
+    /** The demo producer, who owns the seeded plots and therefore their incidents. */
+    @Value("${viora.security.mock.default-producer-id}")
+    private String demoProducerId;
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(demoProducerId, null, List.of()));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
