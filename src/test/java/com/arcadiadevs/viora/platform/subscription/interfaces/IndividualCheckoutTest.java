@@ -30,12 +30,16 @@ class IndividualCheckoutTest {
     @AfterEach
     void clearActor() { SecurityContextHolder.clearContext(); }
 
-    @Test
-    void recoversOneHostedPreferenceAndNeverGrantsAccessFromTheLink() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void recoversOneHostedPreferenceAndNeverGrantsAccessFromTheLink(boolean legacy) throws Exception {
         var owner = new ProducerId(UUID.randomUUID().toString());
         var quota = new IndividualHectaresQuota(new BigDecimal("0.5"));
+        var originalPrice = legacy ? new SubscriptionPrice(new Money(new BigDecimal("330.00")),
+                new Money(new BigDecimal("59.40")), new Money(new BigDecimal("389.40")))
+                : new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18")).quote(quota);
         var contract = subscriptions.save(Subscription.createIndividual(owner, "PRODUCER_ANNUAL", quota,
-                new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18")).quote(quota), Instant.now()));
+                originalPrice, Instant.now()));
         when(gateway.configured()).thenReturn(true);
         when(gateway.create(any(), any())).thenReturn(new PaymentGateway.Checkout("fixture-" + UUID.randomUUID(), "https://www.mercadopago.com.pe/checkout/test"));
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
@@ -44,7 +48,10 @@ class IndividualCheckoutTest {
         mvc.perform(post(path).header("Idempotency-Key", "one")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.checkoutUrl").value("https://www.mercadopago.com.pe/checkout/test"));
         mvc.perform(post(path).header("Idempotency-Key", "two")).andExpect(status().isCreated());
-        verify(gateway, times(1)).create(any(), any());
+        var sentPrice = org.mockito.ArgumentCaptor.forClass(SubscriptionPrice.class);
+        verify(gateway, times(1)).create(any(), sentPrice.capture());
+        assertEquals(originalPrice, sentPrice.getValue());
+        assertEquals(originalPrice, subscriptions.findById(contract.snapshot().id()).orElseThrow().snapshot().price());
         assertFalse(subscriptions.findById(contract.snapshot().id()).orElseThrow().hasActiveEntitlement(Instant.now()));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null, List.of()));
         mvc.perform(post(path).header("Idempotency-Key", "foreign")).andExpect(status().isNotFound());

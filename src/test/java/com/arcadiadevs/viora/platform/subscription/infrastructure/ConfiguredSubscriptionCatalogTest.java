@@ -13,7 +13,7 @@ class ConfiguredSubscriptionCatalogTest {
         var offer = catalog.plans().getFirst();
         assertEquals("fixture-2", offer.tariffVersion());
         assertEquals(new BigDecimal("10"), offer.monthlyRatePerHa());
-        assertEquals(new BigDecimal("66.00"), catalog.quote(offer.code(),
+        assertEquals(new BigDecimal("60.00"), catalog.quote(offer.code(),
                 new IndividualHectaresQuota(new BigDecimal("0.5"))).total().amount());
     }
 
@@ -28,3 +28,4 @@ class ConfiguredSubscriptionCatalogTest {
                 () -> catalog.quote("UNKNOWN", new IndividualHectaresQuota(new BigDecimal("0.5"))));
     }
 }
+

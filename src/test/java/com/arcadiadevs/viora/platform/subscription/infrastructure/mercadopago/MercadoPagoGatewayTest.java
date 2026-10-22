@@ -25,16 +25,22 @@ class MercadoPagoGatewayTest {
         gateway = new MercadoPagoGateway(true, true, "fixture-token", "https://example.test/notify", "https://example.test/payments/return", "fixture-plan", builder.build());
     }
     @AfterEach void verify() { server.verify(); }
-    @Test void preferenceContainsExactTotalAndConfiguredLifetime() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void preferenceContainsExactTotalAndConfiguredLifetime(boolean legacy) {
         var now = Instant.parse("2026-10-21T12:00:00Z");
         var attempt = new PaymentAttempt(intent, UUID.randomUUID(), "owner", "CREATING", null, null, now, now.plusSeconds(86400));
         server.expect(requestTo("https://api.mercadopago.com/checkout/preferences")).andExpect(method(HttpMethod.POST))
             .andExpect(jsonPath("$.external_reference").value(intent.toString()))
-            .andExpect(jsonPath("$.items[0].unit_price").value(389.4))
+            .andExpect(jsonPath("$.items[0].unit_price").value(legacy ? 389.4 : 330.0))
             .andExpect(jsonPath("$.expiration_date_to").value("2026-10-22T12:00:00Z"))
             .andRespond(withSuccess("{\"id\":\"pref-1\",\"collector_id\":42,\"sandbox_init_point\":\"https://sandbox.mercadopago.com.pe/checkout/test\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://api.mercadopago.com/users/me")).andRespond(withSuccess("{\"id\":42}", MediaType.APPLICATION_JSON));
         var price = new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18")).quote(new IndividualHectaresQuota(new BigDecimal("0.5")));
+        if (legacy) {
+            price = new SubscriptionPrice(new Money(new BigDecimal("330.00")), new Money(new BigDecimal("59.40")),
+                    new Money(new BigDecimal("389.40")));
+        }
         assertEquals("pref-1", gateway.create(attempt, price).preferenceId());
     }
     @Test void realPaymentCannotEnterSandboxEvenWithApprovedStatus() {
