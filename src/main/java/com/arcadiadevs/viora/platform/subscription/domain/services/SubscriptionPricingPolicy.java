@@ -14,7 +14,7 @@ public final class SubscriptionPricingPolicy {
 
     /**
      * Creates the pricing policy without deployment-specific defaults.
-     * @param monthlyRate net PEN per hectare per month
+     * @param monthlyRate tax-inclusive PEN per hectare per month
      * @param taxRate fractional tax rate
      * @throws IllegalArgumentException if either rate is invalid
      */
@@ -28,7 +28,7 @@ public final class SubscriptionPricingPolicy {
     }
 
     /**
-     * Calculates base and tax with exact cents, rejecting storage overflow.
+     * Extracts included tax from the annual total with exact cents, rejecting storage overflow.
      * @param quota validated individual purchase capacity
      * @return the annual quote
      * @throws IllegalArgumentException if capacity is missing or amounts exceed precision
@@ -37,9 +37,10 @@ public final class SubscriptionPricingPolicy {
         if (quota == null) {
             throw new IllegalArgumentException("subscription.quota.invalid");
         }
-        var base = quota.value().multiply(monthlyRate).multiply(MONTHS_PER_YEAR)
+        var total = quota.value().multiply(monthlyRate).multiply(MONTHS_PER_YEAR)
                 .setScale(2, RoundingMode.HALF_UP);
-        var tax = base.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);
-        return new SubscriptionPrice(new Money(base), new Money(tax), new Money(base.add(tax)));
+        var base = total.divide(BigDecimal.ONE.add(taxRate), 2, RoundingMode.HALF_UP);
+        var tax = total.subtract(base);
+        return new SubscriptionPrice(new Money(base), new Money(tax), new Money(total));
     }
 }

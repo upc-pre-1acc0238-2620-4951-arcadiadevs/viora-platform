@@ -34,7 +34,7 @@ class SubscriptionByIdTest {
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
         var path = "/api/v1/subscriptions/" + contract.snapshot().id().subscriptionId();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(owner.producerId(), null, List.of()));
-        mvc.perform(get(path)).andExpect(status().isOk()).andExpect(jsonPath("$.totalAmount").value(389.4));
+        mvc.perform(get(path)).andExpect(status().isOk()).andExpect(jsonPath("$.totalAmount").value(330.0));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null, List.of()));
         mvc.perform(get(path)).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/subscriptions/" + UUID.randomUUID())).andExpect(status().isNotFound());

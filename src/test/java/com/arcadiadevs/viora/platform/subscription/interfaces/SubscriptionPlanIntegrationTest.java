@@ -31,6 +31,7 @@ class SubscriptionPlanIntegrationTest {
                 .andExpect(jsonPath("$[0].code").value("PRODUCER_ANNUAL"))
                 .andExpect(jsonPath("$[0].monthlyRatePerHa").value(10))
                 .andExpect(jsonPath("$[0].taxRate").value(0.1))
+                .andExpect(jsonPath("$[0].taxIncluded").value(true))
                 .andExpect(jsonPath("$[0].minimumQuotaHa").value(0.5))
                 .andExpect(jsonPath("$[0].quotaIncrementHa").value(0.5))
                 .andExpect(jsonPath("$[0].billingMonths").value(12))

@@ -76,7 +76,7 @@ class SubscriptionByIdHttpTest {
         var response = get(id(requested), token);
         assertContract(response, requested, false);
         assertEquals("PENDING_PAYMENT", JsonPath.read(response.body(), "$.status"));
-        assertEquals(389.4, JsonPath.<Double>read(response.body(), "$.totalAmount"));
+        assertEquals(330.0, JsonPath.<Double>read(response.body(), "$.totalAmount"));
         assertNull(JsonPath.read(response.body(), "$.startsAt"));
         assertNull(JsonPath.read(response.body(), "$.endsAt"));
     }

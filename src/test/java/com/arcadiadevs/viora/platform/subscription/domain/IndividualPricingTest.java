@@ -13,12 +13,13 @@ class IndividualPricingTest {
             new BigDecimal("55"), new BigDecimal("0.18"));
 
     @ParameterizedTest
-    @CsvSource({"0.5,330.00,59.40,389.40", "5,3300.00,594.00,3894.00", "12,7920.00,1425.60,9345.60"})
+    @CsvSource({"0.5,279.66,50.34,330.00", "1,559.32,100.68,660.00", "10,5593.22,1006.78,6600.00", "12,6711.86,1208.14,7920.00"})
     void calculatesAnnualBaseTaxAndTotal(String hectares, String base, String tax, String total) {
         var price = pricing.quote(new IndividualHectaresQuota(new BigDecimal(hectares)));
         assertEquals(new BigDecimal(base), price.base().amount());
         assertEquals(new BigDecimal(tax), price.tax().amount());
         assertEquals(new BigDecimal(total), price.total().amount());
+        assertEquals(price.total().amount(), price.base().amount().add(price.tax().amount()));
     }
 
     @ParameterizedTest
@@ -41,10 +42,19 @@ class IndividualPricingTest {
 
     @Test
     void usesSuppliedRatesAndHalfUpRounding() {
-        var custom = new SubscriptionPricingPolicy(new BigDecimal("0.055"), new BigDecimal("0.5"));
+        var custom = new SubscriptionPricingPolicy(new BigDecimal("0.055"), BigDecimal.ONE);
         var price = custom.quote(new IndividualHectaresQuota(new BigDecimal("0.5")));
-        assertEquals(new BigDecimal("0.33"), price.base().amount());
-        assertEquals(new BigDecimal("0.17"), price.tax().amount());
-        assertEquals(new BigDecimal("0.50"), price.total().amount());
+        assertEquals(new BigDecimal("0.17"), price.base().amount());
+        assertEquals(new BigDecimal("0.16"), price.tax().amount());
+        assertEquals(new BigDecimal("0.33"), price.total().amount());
+    }
+
+    @Test
+    void zeroTaxKeepsTheGrossAmountAsBase() {
+        var price = new SubscriptionPricingPolicy(new BigDecimal("55"), BigDecimal.ZERO)
+                .quote(new IndividualHectaresQuota(new BigDecimal("10")));
+        assertEquals(new BigDecimal("6600.00"), price.base().amount());
+        assertEquals(new BigDecimal("0.00"), price.tax().amount());
+        assertEquals(price.base(), price.total());
     }
 }
