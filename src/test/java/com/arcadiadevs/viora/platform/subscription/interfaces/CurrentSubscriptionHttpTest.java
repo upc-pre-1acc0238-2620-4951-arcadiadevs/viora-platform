@@ -86,7 +86,7 @@ class CurrentSubscriptionHttpTest {
         assertContract(response, own, false);
         assertEquals("PENDING_PAYMENT", JsonPath.read(response.body(), "$.status"));
         assertEquals("PEN", JsonPath.read(response.body(), "$.currency"));
-        assertEquals(389.4, JsonPath.<Double>read(response.body(), "$.totalAmount"));
+        assertEquals(330.0, JsonPath.<Double>read(response.body(), "$.totalAmount"));
         assertNull(JsonPath.read(response.body(), "$.startsAt"));
         assertNull(JsonPath.read(response.body(), "$.endsAt"));
     }

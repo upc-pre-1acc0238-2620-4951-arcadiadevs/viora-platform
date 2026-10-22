@@ -177,4 +177,23 @@ class CheckoutServiceTest {
         assertNotEquals(first.intentId(), next.intentId());
         assertEquals(2, gateway.creates);
     }
+
+    @Test void legacyApprovalAndReplayPreserveStoredAmountAndPeriod() {
+        var legacyOwner = UUID.randomUUID().toString();
+        var legacyPrice = new SubscriptionPrice(new Money(new BigDecimal("330.00")),
+                new Money(new BigDecimal("59.40")), new Money(new BigDecimal("389.40")));
+        var legacy = Subscription.createIndividual(new ProducerId(legacyOwner), "PRODUCER_ANNUAL",
+                new IndividualHectaresQuota(new BigDecimal("0.5")), legacyPrice, now.minusSeconds(10));
+        store.save(legacy);
+        var legacyId = UUID.fromString(legacy.snapshot().id().subscriptionId());
+        var checkout = service.create(legacyOwner, legacyId, "legacy-price").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "approved", legacyPrice.total(),
+                "PEN", now.plusSeconds(21), now.plusSeconds(22));
+        assertTrue(service.confirm("123").isSuccess());
+        var approved = legacy.snapshot();
+        assertEquals(legacyPrice, approved.price());
+        assertEquals(SubscriptionStatus.ACTIVE, approved.status());
+        assertTrue(service.confirm("123").isSuccess());
+        assertEquals(approved, legacy.snapshot());
+    }
 }

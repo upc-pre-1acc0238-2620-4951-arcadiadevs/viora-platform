@@ -22,7 +22,7 @@ public class ConfiguredSubscriptionCatalog implements SubscriptionCatalog {
 
     /**
      * Builds the offer from application configuration, never from client totals.
-     * @param monthlyRate net rate per hectare per month
+     * @param monthlyRate tax-inclusive rate per hectare per month
      * @param taxRate fractional tax rate
      * @param version nonblank tariff identifier
      * @throws IllegalArgumentException if commercial configuration is invalid
@@ -36,7 +36,7 @@ public class ConfiguredSubscriptionCatalog implements SubscriptionCatalog {
         }
         pricing = new SubscriptionPricingPolicy(monthlyRate, taxRate);
         offer = new PlanOffer(PLAN_CODE, CURRENCY, monthlyRate, taxRate,
-                MINIMUM_QUOTA, QUOTA_INCREMENT, BILLING_MONTHS, version);
+                MINIMUM_QUOTA, QUOTA_INCREMENT, BILLING_MONTHS, version, true);
     }
 
     /** @return the available annual offer */
