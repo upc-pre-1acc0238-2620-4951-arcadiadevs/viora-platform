@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * REST controller exposing endpoints for querying biological phenological metrics and bearing indexes.
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(value = "/api/v1/plots/{plotId}/metrics", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Phenology Metrics", description = "Endpoints for biological phenological metrics, Hoblyn BBI, and Erez chilling portions")
 @NullMarked
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class PhenologyMetricController {
 
     private final PhenologyMetricQueryService metricQueryService;

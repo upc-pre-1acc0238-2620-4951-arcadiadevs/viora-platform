@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.Year;
 import java.time.ZoneOffset;
@@ -51,6 +52,7 @@ import java.util.Locale;
 @RequestMapping(value = "/api/v1/plots/{plotId}/thinning-prescriptions", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Thinning Prescriptions", description = "Endpoints for retrieving technical fruit-thinning prescriptions")
 @NullMarked
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class ThinningPrescriptionController {
 
     private static final Logger LOG = LoggerFactory.getLogger(ThinningPrescriptionController.class);
