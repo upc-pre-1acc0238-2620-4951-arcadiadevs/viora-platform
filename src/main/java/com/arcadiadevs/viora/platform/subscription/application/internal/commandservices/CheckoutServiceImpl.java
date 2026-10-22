@@ -20,7 +20,17 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final Duration ttl;
-    /** @param subscriptions contracts @param attempts payment attempts @param work owner serialization @param gateway provider @param events domain events @param clock time @param ttl link lifetime */
+    /**
+     * Creates the durable individual checkout use case.
+     * @param subscriptions shared contract repository port
+     * @param attempts durable attempt repository port
+     * @param work transactional producer serialization
+     * @param gateway hosted payment provider port
+     * @param events application domain-event publisher
+     * @param clock application time source
+     * @param ttl configured hosted-link lifetime
+     * @throws IllegalArgumentException if the lifetime is not positive
+     */
     public CheckoutServiceImpl(SubscriptionRepository subscriptions, PaymentAttemptRepository attempts,
             SubscriptionUnitOfWork work, PaymentGateway gateway, ApplicationEventPublisher events, Clock clock, @org.springframework.beans.factory.annotation.Value("${viora.payments.checkout-ttl}") Duration ttl) {
         this.subscriptions = subscriptions; this.attempts = attempts; this.work = work;
@@ -28,12 +38,28 @@ public class CheckoutServiceImpl implements CheckoutService {
         if (ttl.isNegative() || ttl.isZero()) { throw new IllegalArgumentException("subscription.checkout.ttl.invalid"); }
     }
     private record Reservation(PaymentAttempt attempt, SubscriptionPrice price, boolean created) { }
-    /** @param owner verified actor @param subscriptionId owned contract @param key operation id @return checkout, never an active entitlement */
+    /**
+     * Reserves or recovers a hosted checkout after checking ownership and unresolved payments.
+     * @param owner authenticated producer identifier
+     * @param subscriptionId requested contract identifier
+     * @param key durable client operation identifier
+     * @return hosted navigation data or a consistent application failure
+     */
+    @Override
     public Result<CheckoutResult, ApplicationError> create(String owner, UUID subscriptionId, String key) {
         if (key == null || key.isBlank() || key.length() > 128) { return invalid("subscription.operation.invalid"); }
-        var contract = subscriptions.findById(new SubscriptionId(subscriptionId.toString()));
-        if (contract.isEmpty() || !contract.get().snapshot().producerId().producerId().equals(owner)) {
+        final ProducerId producer;
+        try { producer = new ProducerId(owner); }
+        catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
+        }
+        var contract = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer);
+        if (contract.isEmpty()) {
+            return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
+        }
+        if (contract.get().snapshot().status() != SubscriptionStatus.PENDING_PAYMENT
+                || contract.get().snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) {
+            return conflict("subscription.checkout.state");
         }
         if (!gateway.configured()) { return unavailable(); }
         // Expired links are reconciled before another attempt can be reserved.
@@ -47,11 +73,18 @@ public class CheckoutServiceImpl implements CheckoutService {
                     return conflict("subscription.payment.unresolved");
                 }
                 var old = latest.get();
-                work.exclusive(owner, () -> { var stored = attempts.find(old.id()).orElseThrow(); if (!"APPROVED".equals(stored.status())) { attempts.save(stored.withStatus("EXPIRED")); } return true; });
+                Result<Boolean, ApplicationError> expiration = work.exclusive(owner, () -> {
+                    var stored = attempts.find(old.id()).orElseThrow();
+                    if ("PENDING".equals(stored.status())) { return conflict("subscription.payment.unresolved"); }
+                    if ("APPROVED".equals(stored.status())) { return conflict("subscription.checkout.state"); }
+                    attempts.save(stored.withStatus("EXPIRED"));
+                    return Result.success(true);
+                });
+                if (expiration.isFailure()) { return Result.failure(expiration.failure().orElseThrow()); }
             } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
         }
         Result<Reservation, ApplicationError> reserved = work.exclusive(owner, () -> {
-            var sub = subscriptions.findById(new SubscriptionId(subscriptionId.toString())).orElseThrow();
+            var sub = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer).orElseThrow();
             if (sub.snapshot().status() != SubscriptionStatus.PENDING_PAYMENT || sub.snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) { return conflict("subscription.checkout.state"); }
             var operation = work.findOperation(owner, key);
             if (operation.isPresent()) {
@@ -100,7 +133,12 @@ public class CheckoutServiceImpl implements CheckoutService {
             });
         } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
     }
-    /** @param paymentId provider identifier from an authenticated webhook @return acknowledgement only after durable processing */
+    /**
+     * Applies authoritative provider evidence rather than browser-return claims.
+     * @param paymentId provider transaction identifier received through a trusted integration
+     * @return acknowledgement after durable processing, or a consistent failure
+     */
+    @Override
     public Result<Boolean, ApplicationError> confirm(String paymentId) {
         try { return apply(gateway.verify(paymentId)); }
         catch (PaymentGateway.Unavailable ex) { return unavailable(); }
@@ -134,7 +172,12 @@ public class CheckoutServiceImpl implements CheckoutService {
             return Result.success(true);
         });
     }
-    /** @param subscriptionId owned contract @return last stored attempt without a provider query */
+    /**
+     * Reads locally persisted attempt state without contacting the provider.
+     * @param subscriptionId contract identifier already authorized by the caller
+     * @return latest durable attempt when present
+     */
+    @Override
     public Optional<PaymentAttempt> latest(UUID subscriptionId) { return attempts.latest(subscriptionId); }
     private static <T> Result<T, ApplicationError> conflict(String key) {
         return Result.failure(ApplicationError.conflict("subscription", key));

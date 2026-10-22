@@ -36,6 +36,8 @@ class CheckoutServiceTest {
     static class Gateway implements PaymentGateway {
         int creates;
         boolean loseResponse;
+        boolean omitSearchResults;
+        boolean failSearch;
         boolean configured = true;
         VerifiedPayment payment;
         Checkout existing;
@@ -47,7 +49,10 @@ class CheckoutServiceTest {
         }
         public Optional<Checkout> recover(UUID id) { return Optional.ofNullable(existing); }
         public VerifiedPayment verify(String id) { return payment; }
-        public List<VerifiedPayment> findPayments(UUID id) { return payment == null ? List.of() : List.of(payment); }
+        public List<VerifiedPayment> findPayments(UUID id) {
+            if (failSearch) { throw new Unavailable(); }
+            return payment == null || omitSearchResults ? List.of() : List.of(payment);
+        }
     }
     final Instant now = Instant.parse("2026-10-21T12:00:00Z");
     final Store store = new Store();
@@ -130,5 +135,46 @@ class CheckoutServiceTest {
         assertEquals("REJECTED", service.latest(contractId).orElseThrow().status());
         assertTrue(service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "retry").isSuccess());
         assertEquals(1, gateway.creates);
+    }
+
+    private CheckoutService afterExpiry() {
+        return new CheckoutServiceImpl(store, store, store, gateway, events::add,
+                Clock.fixed(now.plus(Duration.ofHours(25)), ZoneOffset.UTC), Duration.ofHours(24));
+    }
+    @Test void expiredPendingObservationSurvivesAnEmptyProviderSearch() {
+        var checkout = service.create(sub.snapshot().producerId().producerId(), contractId, "initial").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "pending", price.total(), "PEN", now.plusSeconds(21), null);
+        service.confirm("123");
+        gateway.omitSearchResults = true;
+        assertTrue(afterExpiry().create(sub.snapshot().producerId().producerId(), contractId, "retry").isFailure());
+        assertEquals("PENDING", store.find(checkout.intentId()).orElseThrow().status());
+        assertEquals(1, gateway.creates);
+    }
+    @Test void expiredOpenCheckoutCanBeReplacedAfterAuthoritativeEmptySearch() {
+        var first = service.create(sub.snapshot().producerId().producerId(), contractId, "initial").success().orElseThrow();
+        var next = afterExpiry().create(sub.snapshot().producerId().producerId(), contractId, "retry").success().orElseThrow();
+        assertNotEquals(first.intentId(), next.intentId());
+        assertEquals("EXPIRED", store.find(first.intentId()).orElseThrow().status());
+        assertEquals(2, gateway.creates);
+    }
+    @Test void expiredOperationKeyCannotBeReusedForANewAttempt() {
+        service.create(sub.snapshot().producerId().producerId(), contractId, "initial");
+        assertTrue(afterExpiry().create(sub.snapshot().producerId().producerId(), contractId, "initial").isFailure());
+        assertEquals(1, gateway.creates);
+    }
+    @Test void providerFailureDuringExpiryReconciliationDoesNotCreateAgain() {
+        service.create(sub.snapshot().producerId().producerId(), contractId, "initial");
+        gateway.failSearch = true;
+        assertTrue(afterExpiry().create(sub.snapshot().producerId().producerId(), contractId, "retry").isFailure());
+        assertEquals(1, gateway.creates);
+    }
+    @Test void confirmedRejectionOfExpiredPendingPaymentAllowsANewAttempt() {
+        var first = service.create(sub.snapshot().producerId().producerId(), contractId, "initial").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", first.intentId(), "pending", price.total(), "PEN", now.plusSeconds(21), null);
+        service.confirm("123");
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", first.intentId(), "rejected", price.total(), "PEN", now.plusSeconds(21), null);
+        var next = afterExpiry().create(sub.snapshot().producerId().producerId(), contractId, "retry").success().orElseThrow();
+        assertNotEquals(first.intentId(), next.intentId());
+        assertEquals(2, gateway.creates);
     }
 }

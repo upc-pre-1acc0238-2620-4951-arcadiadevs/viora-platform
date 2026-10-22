@@ -31,7 +31,16 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
         return new PaymentAttempt(id, subscriptionId, producerId, "CREATING".equals(status) ? "OPEN" : status,
                 preference, url, createdAt, expiresAt, paymentStates);
     }
+    /**
+     * Updates attempt lifecycle without expiring an unresolved or approved payment.
+     * @param next requested lifecycle state
+     * @return immutable updated attempt
+     * @throws IllegalStateException if expiration would discard pending or approved evidence
+     */
     public PaymentAttempt withStatus(String next) {
+        if ("EXPIRED".equals(next) && Set.of("PENDING", "APPROVED").contains(status)) {
+            throw new IllegalStateException("subscription.payment.unresolved");
+        }
         return new PaymentAttempt(id, subscriptionId, producerId, next, preferenceId, checkoutUrl, createdAt, expiresAt, paymentStates);
     }
     /**

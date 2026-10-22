@@ -40,4 +40,13 @@ class PaymentAttemptDomainTest {
                 "fixture", "OPEN", null, null, now, now));
         assertThrows(IllegalArgumentException.class, () -> attempt().withStatus("UNKNOWN"));
     }
+
+    @Test
+    void linkExpirationCannotDiscardPendingOrApprovedPaymentEvidence() {
+        var pending = attempt().withPaymentState("123", "pending");
+        assertThrows(IllegalStateException.class, () -> pending.withStatus("EXPIRED"));
+        var approved = pending.withPaymentState("123", "approved");
+        assertThrows(IllegalStateException.class, () -> approved.withStatus("EXPIRED"));
+        assertEquals("EXPIRED", attempt().withStatus("EXPIRED").status());
+    }
 }
