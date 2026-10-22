@@ -44,6 +44,14 @@ public interface OrchardContextFacade {
     Optional<String> findPlotProducerId(String plotId);
 
     /**
+     * Retrieves the owner producer identifier of a plot in any status, archived plots included.
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @return Optional containing the producer identifier, or empty if the plot does not exist
+     */
+    Optional<String> findPlotOwnerId(String plotId);
+
+    /**
      * Retrieves the name of an active plot.
      *
      * @param plotId the plot identifier string (UUID)

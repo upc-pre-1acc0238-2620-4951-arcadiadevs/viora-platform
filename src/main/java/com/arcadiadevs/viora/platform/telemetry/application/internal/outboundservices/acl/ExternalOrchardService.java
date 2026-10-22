@@ -93,6 +93,19 @@ public class ExternalOrchardService {
     }
 
     /**
+     * Retrieves the owner producer identifier of a plot in any status, archived plots included.
+     *
+     * @param plotId the Telemetry PlotId value object
+     * @return Optional containing the producer identifier, or empty if the plot does not exist
+     */
+    public Optional<String> findPlotOwnerId(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotOwnerId(plotId.plotId());
+    }
+
+    /**
      * Retrieves all active plot identifiers associated with a given producer.
      *
      * @param producerId the producer identifier string (UUID)

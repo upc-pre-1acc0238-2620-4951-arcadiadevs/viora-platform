@@ -12,6 +12,7 @@ import com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.e
 import com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.repositories.AgroclimaticIncidentPersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +88,16 @@ public class AgroclimaticIncidentRepositoryImpl implements AgroclimaticIncidentR
     @Override
     public List<AgroclimaticIncident> findAll(PlotId plotId, IncidentStatus status, IncidentSeverity severity) {
         return persistenceRepository.findByCriteria(plotId, status, severity).stream()
+                .map(AgroclimaticIncidentPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
+    public List<AgroclimaticIncident> findAllByPlotIds(Collection<PlotId> plotIds, IncidentStatus status, IncidentSeverity severity) {
+        if (plotIds == null || plotIds.isEmpty()) {
+            return List.of();
+        }
+        return persistenceRepository.findByPlotIdsAndCriteria(plotIds, status, severity).stream()
                 .map(AgroclimaticIncidentPersistenceAssembler::toDomainFromPersistence)
                 .toList();
     }
