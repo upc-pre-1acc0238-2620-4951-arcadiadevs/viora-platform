@@ -55,6 +55,7 @@ class CheckoutHttpTest {
     @Autowired private TokenService tokens;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PaymentAttemptRepository attempts;
+    @Autowired private com.arcadiadevs.viora.platform.subscription.application.ports.SubscriptionUnitOfWork work;
     @MockitoBean private PaymentGateway gateway;
     private ProducerId owner;
     private String token;
@@ -209,6 +210,25 @@ class CheckoutHttpTest {
         verify(gateway, never()).create(any(), any());
     }
 
+    @Test
+    void expiredCheckoutReceiptHasAStableRecoveryReasonAndReplacementRemainsServerControlled() throws Exception {
+        var contract = pending(owner);
+        var attempt = attempts.save(new PaymentAttempt(UUID.randomUUID(), UUID.fromString(id(contract)), owner.producerId(),
+                "EXPIRED", "expired-preference", "https://sandbox.mercadopago.com.pe/checkout/test",
+                NOW.minus(Duration.ofHours(25)), NOW.minus(Duration.ofHours(1))));
+        work.exclusive(owner.producerId(), () -> {
+            work.recordOperation(owner.producerId(), "expired-receipt", "CREATE_CHECKOUT", id(contract), attempt.id());
+            return com.arcadiadevs.viora.platform.shared.application.result.Result.success(true);
+        });
+        var expired = post(id(contract), token, "expired-receipt");
+        assertEquals(409, expired.statusCode(), expired.body());
+        assertEquals("SUBSCRIPTION_CONFLICT", JsonPath.read(expired.body(), "$.code"));
+        assertEquals("subscription.checkout.expired", JsonPath.read(expired.body(), "$.reason"));
+        verify(gateway, never()).create(any(), any());
+        assertEquals(201, post(id(contract), token, "replacement-receipt").statusCode());
+        verify(gateway, times(1)).create(any(), any());
+        assertFalse(subscriptions.findById(contract.snapshot().id()).orElseThrow().hasActiveEntitlement(NOW));
+    }
     private String id(Subscription subscription) {
         return subscription.snapshot().id().subscriptionId();
     }
