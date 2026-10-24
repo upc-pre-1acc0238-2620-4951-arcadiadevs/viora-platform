@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.iam.application.commandservices.UserSessio
 import com.arcadiadevs.viora.platform.iam.application.queryservices.UserAccountQueryService;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.AuthenticateUserCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.DeleteUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.OpenUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
@@ -163,6 +164,21 @@ public class AuthController {
             case Result.Success<String, ApplicationError> ignored ->
                     toSessionResponse(userSessionCommandService.handle(new OpenUserSessionCommand(userId)));
             case Result.Failure<String, ApplicationError> failure ->
+                    ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
+        };
+    }
+
+    @PostMapping("/account-deletions")
+    @Operation(summary = "Delete own account",
+            description = "Deletes the authenticated account for good after checking its password: profile, plots and everything recorded on them, settlements, dossiers, subscriptions and sessions. Answers 204. A wrong password answers 422 with reason user.password.current_invalid and deletes nothing; the shared demo account answers 403.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<?> deleteAccount(@Valid @RequestBody DeleteAccountResource resource) {
+        // A real session only: an anonymous request must never reach the demo producer fallback.
+        var userId = currentUserProvider.requireAuthenticatedUserId();
+        var result = userAccountCommandService.handle(new DeleteUserAccountCommand(userId, resource.password()));
+        return switch (result) {
+            case Result.Success<Void, ApplicationError> ignored -> ResponseEntity.noContent().build();
+            case Result.Failure<Void, ApplicationError> failure ->
                     ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error());
         };
     }

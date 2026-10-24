@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.iam.domain.exceptions.EmailVerificationCoo
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerificationCodeException;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.EmailVerificationRequestedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordChangedEvent;
+import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountDeletedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetCompletedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.PasswordResetRequestedEvent;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UnverifiedUserAccountDiscardedEvent;
@@ -296,6 +297,35 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
             throw new BusinessRuleException("user.account.not_discardable");
         }
         registerDomainEvent(new UnverifiedUserAccountDiscardedEvent(this.id.userId(), this.email.value(), now));
+    }
+
+    /**
+     * Confirms that the owner wants to delete this account for good and registers {@link UserAccountDeletedEvent}, so
+     * every context removes the data it keeps for the account. The repository deletes it afterwards.
+     *
+     * @param password the current plain password, typed again to confirm
+     * @param hasher   the port checking passwords
+     * @param now      the instant of the deletion
+     * @throws IllegalArgumentException if an argument is missing
+     * @throws BusinessRuleException    if the account is not active or the password is wrong
+     */
+    public void delete(String password, PasswordHasher hasher, Instant now) {
+        if (password == null) {
+            throw new IllegalArgumentException("user.password.current.null");
+        }
+        if (hasher == null) {
+            throw new IllegalArgumentException("user.password_hasher.null");
+        }
+        if (now == null) {
+            throw new IllegalArgumentException("user.clock.now.null");
+        }
+        if (this.status != UserAccountStatus.ACTIVE) {
+            throw new BusinessRuleException("user.email.not_verified");
+        }
+        if (!hasher.matches(password, this.passwordHash)) {
+            throw new BusinessRuleException("user.password.current_invalid");
+        }
+        registerDomainEvent(new UserAccountDeletedEvent(this.id.userId(), this.email.value(), now));
     }
 
     /**

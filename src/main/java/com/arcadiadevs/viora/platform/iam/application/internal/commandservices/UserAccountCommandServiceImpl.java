@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerifica
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.WeakPasswordException;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.ChangeUserPasswordCommand;
+import com.arcadiadevs.viora.platform.iam.domain.model.commands.DeleteUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.DiscardUnverifiedUserAccountsCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAccountCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.RequestPasswordResetCommand;
@@ -29,6 +30,7 @@ import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountReposit
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.domain.model.exceptions.BusinessRuleException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
     private final SecureTokenGenerator tokenGenerator;
     private final TransactionalEmailService emailService;
     private final String termsVersion;
+    private final String protectedEmail;
 
     /**
      * Creates the command service.
@@ -77,7 +80,37 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             PasswordHasher passwordHasher,
             SecureTokenGenerator tokenGenerator,
             TransactionalEmailService emailService,
-            @Value("${viora.iam.terms-version}") String termsVersion
+            String termsVersion
+    ) {
+        this(userAccountRepository, eventPublisher, codeGenerator, codeHasher, passwordHasher, tokenGenerator,
+                emailService, termsVersion, "");
+    }
+
+    /**
+     * Creates the command service with the shared demo account, which nobody can delete.
+     *
+     * @param userAccountRepository the user account repository port
+     * @param eventPublisher        publisher of the domain events raised by the aggregate
+     * @param codeGenerator         generator of email verification codes
+     * @param codeHasher            hasher of those codes
+     * @param passwordHasher        hasher of passwords
+     * @param tokenGenerator        generator and hasher of the tokens carried by password reset links
+     * @param emailService          transactional email port delivering the codes
+     * @param termsVersion          version of the terms that sign-up records as accepted
+     * @param protectedEmail        email of the shared demo account; blank when there is none
+     * @throws IllegalArgumentException if any dependency is null or the terms version is blank
+     */
+    @Autowired
+    public UserAccountCommandServiceImpl(
+            UserAccountRepository userAccountRepository,
+            ApplicationEventPublisher eventPublisher,
+            VerificationCodeGenerator codeGenerator,
+            VerificationCodeHasher codeHasher,
+            PasswordHasher passwordHasher,
+            SecureTokenGenerator tokenGenerator,
+            TransactionalEmailService emailService,
+            @Value("${viora.iam.terms-version}") String termsVersion,
+            @Value("${viora.demo-account.email:}") String protectedEmail
     ) {
         if (userAccountRepository == null) {
             throw new IllegalArgumentException("user.repository.null");
@@ -111,6 +144,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         this.tokenGenerator = tokenGenerator;
         this.emailService = emailService;
         this.termsVersion = termsVersion.trim();
+        this.protectedEmail = protectedEmail == null ? "" : protectedEmail.trim();
     }
 
     /**
@@ -275,6 +309,35 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             return Result.success(savedAccount.snapshot().id().userId());
         } catch (WeakPasswordException ex) {
             return Result.failure(weakPasswordError(ex));
+        } catch (IllegalArgumentException ex) {
+            return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
+        }
+    }
+
+    @Override
+    public Result<Void, ApplicationError> handle(DeleteUserAccountCommand command) {
+        if (command == null) {
+            return Result.failure(ApplicationError.validationError("command", "user.command.null"));
+        }
+        try {
+            var userId = new UserId(command.userId());
+            var optionalAccount = userAccountRepository.findById(userId);
+            if (optionalAccount.isEmpty()) {
+                return Result.failure(ApplicationError.notFound("user", command.userId()));
+            }
+            var account = optionalAccount.get();
+            if (!protectedEmail.isEmpty() && protectedEmail.equalsIgnoreCase(account.snapshot().email().value())) {
+                return Result.failure(ApplicationError.forbidden("user", "user.account.demo_protected"));
+            }
+            try {
+                account.delete(command.rawPassword(), passwordHasher, Instant.now());
+            } catch (BusinessRuleException ex) {
+                return Result.failure(passwordRuleError(ex.getMessage()));
+            }
+            // Every context removes its data while the account still exists, all in this transaction.
+            publishDomainEvents(account);
+            userAccountRepository.delete(account);
+            return Result.success(null);
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         }
