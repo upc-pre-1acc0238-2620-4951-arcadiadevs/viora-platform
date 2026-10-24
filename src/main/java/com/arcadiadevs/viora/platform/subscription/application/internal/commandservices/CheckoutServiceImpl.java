@@ -180,7 +180,8 @@ public class CheckoutServiceImpl implements CheckoutService {
     @Override
     public Optional<PaymentAttempt> latest(UUID subscriptionId) { return attempts.latest(subscriptionId); }
     private static <T> Result<T, ApplicationError> conflict(String key) {
-        return Result.failure(ApplicationError.conflict("subscription", key));
+        var error = ApplicationError.conflict("subscription", key);
+        return Result.failure(new ApplicationError(error.code(), error.message(), error.details(), Map.of("reason", key)));
     }
     private static <T> Result<T, ApplicationError> invalid(String key) {
         return Result.failure(ApplicationError.businessRuleViolation("subscription", key));

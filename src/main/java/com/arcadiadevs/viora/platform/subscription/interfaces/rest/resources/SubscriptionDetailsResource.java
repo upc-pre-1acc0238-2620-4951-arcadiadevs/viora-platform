@@ -17,8 +17,9 @@ import java.time.Instant;
  * @param startsAt entitlement start, absent while pending
  * @param endsAt exclusive entitlement end
  * @param entitlementActive current access
+ * @param paymentStatus latest authoritative attempt state, absent when no attempt exists
  * @param cooperativeId sponsoring cooperative, when applicable
  */
 public record SubscriptionDetailsResource(String id, String mode, String planCode, String status,
         BigDecimal quotaHa, String currency, BigDecimal baseAmount, BigDecimal taxAmount,
-        BigDecimal totalAmount, Instant startsAt, Instant endsAt, boolean entitlementActive, String cooperativeId) { }
+        BigDecimal totalAmount, Instant startsAt, Instant endsAt, boolean entitlementActive, String cooperativeId, String paymentStatus) { }
