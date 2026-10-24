@@ -50,4 +50,7 @@ public interface AgroclimaticIncidentPersistenceRepository extends JpaRepository
             IncidentType type,
             IncidentStatus status
     );
+
+    /** Everything of a deleted account, for the account purge. */
+    List<AgroclimaticIncidentPersistenceEntity> findAllByPlotIdIn(Collection<PlotId> plotIds);
 }

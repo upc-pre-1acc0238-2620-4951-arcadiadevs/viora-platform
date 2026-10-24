@@ -1,5 +1,8 @@
 package com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.FruitThinningPrescriptionPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -41,4 +44,7 @@ public interface FruitThinningPrescriptionPersistenceRepository
     @Query("select p from FruitThinningPrescriptionPersistenceEntity p where p.id = :id")
     Optional<FruitThinningPrescriptionPersistenceEntity> findByIdForUpdate(
             @Param("id") UUID id);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<FruitThinningPrescriptionPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }

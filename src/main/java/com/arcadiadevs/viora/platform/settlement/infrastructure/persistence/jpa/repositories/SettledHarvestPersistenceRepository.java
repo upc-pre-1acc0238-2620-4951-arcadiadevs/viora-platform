@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+
 import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.HarvestSettlementPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -47,4 +49,7 @@ public interface SettledHarvestPersistenceRepository
             + "and s.receiptNumber is not null")
     Integer findHighestReceiptSequence(@Param("producerId") UUID producerId,
             @Param("campaignYear") Integer campaignYear);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<HarvestSettlementPersistenceEntity> findAllByProducerId(UUID producerId);
 }

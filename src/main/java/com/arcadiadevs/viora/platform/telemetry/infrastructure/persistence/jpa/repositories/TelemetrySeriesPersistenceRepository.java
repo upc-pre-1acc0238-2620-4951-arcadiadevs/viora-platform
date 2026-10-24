@@ -1,5 +1,8 @@
 package com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.entities.TelemetrySeriesPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -28,4 +31,7 @@ public interface TelemetrySeriesPersistenceRepository extends JpaRepository<Tele
      * @return true if exists; false otherwise
      */
     boolean existsByPlotId(UUID plotId);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<TelemetrySeriesPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }

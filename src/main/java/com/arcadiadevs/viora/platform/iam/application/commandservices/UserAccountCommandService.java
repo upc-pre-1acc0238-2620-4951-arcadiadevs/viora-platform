@@ -65,4 +65,13 @@ public interface UserAccountCommandService {
      * @return how many accounts were discarded
      */
     Result<Integer, ApplicationError> handle(DiscardUnverifiedUserAccountsCommand command);
+
+    /**
+     * Deletes the account for good after checking its password; every context removes its data in the same
+     * transaction. The shared demo account cannot be deleted.
+     *
+     * @param command the account and its password
+     * @return success, or an application error (wrong password, unknown or protected account)
+     */
+    Result<Void, ApplicationError> handle(DeleteUserAccountCommand command);
 }

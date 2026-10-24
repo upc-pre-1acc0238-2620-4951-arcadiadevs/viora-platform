@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.repositories;
 
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceName;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceStatus;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.PlotId;
@@ -41,4 +43,7 @@ public interface IoTDevicePersistenceRepository extends JpaRepository<IoTDeviceP
      * @return list of matching persistence entities
      */
     List<IoTDevicePersistenceEntity> findAllByPlotIdAndStatus(PlotId plotId, DeviceStatus status);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<IoTDevicePersistenceEntity> findAllByPlotIdIn(Collection<PlotId> plotIds);
 }

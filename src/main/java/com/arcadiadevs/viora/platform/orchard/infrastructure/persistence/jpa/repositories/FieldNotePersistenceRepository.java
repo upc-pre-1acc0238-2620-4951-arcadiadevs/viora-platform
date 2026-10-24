@@ -11,4 +11,7 @@ import java.util.UUID;
 public interface FieldNotePersistenceRepository extends JpaRepository<FieldNotePersistenceEntity, UUID> {
 
     List<FieldNotePersistenceEntity> findByPlotIdOrderByObservedOnDescRecordedAtDesc(String plotId);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<FieldNotePersistenceEntity> findAllByProducerId(String producerId);
 }
