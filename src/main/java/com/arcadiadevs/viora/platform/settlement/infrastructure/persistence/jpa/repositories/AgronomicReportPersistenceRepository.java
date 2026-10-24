@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+
 import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.AgronomicReportPersistenceEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,4 +23,7 @@ public interface AgronomicReportPersistenceRepository extends JpaRepository<Agro
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from AgronomicReportPersistenceEntity r where r.plotId = :plotId")
     Optional<AgronomicReportPersistenceEntity> findByPlotIdForUpdate(@Param("plotId") UUID plotId);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<AgronomicReportPersistenceEntity> findAllByProducerId(UUID producerId);
 }

@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+
 import com.arcadiadevs.viora.platform.settlement.infrastructure.persistence.jpa.entities.ReceiptCounterPersistenceEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -63,4 +65,7 @@ public interface ReceiptCounterPersistenceRepository extends JpaRepository<Recei
             + "where producer_id = :producerId and campaign_year = :campaignYear), 0))", nativeQuery = true)
     int mergeKeepingLastSequence(@Param("id") UUID id, @Param("producerId") UUID producerId,
             @Param("campaignYear") Integer campaignYear);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<ReceiptCounterPersistenceEntity> findAllByProducerId(UUID producerId);
 }

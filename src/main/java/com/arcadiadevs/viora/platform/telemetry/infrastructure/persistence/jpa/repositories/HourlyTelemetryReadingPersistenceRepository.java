@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.repositories;
 
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.entities.HourlyTelemetryReadingPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -43,4 +45,7 @@ public interface HourlyTelemetryReadingPersistenceRepository extends JpaReposito
             UUID plotId,
             Instant endDate
     );
+
+    /** Everything of a deleted account, for the account purge. */
+    List<HourlyTelemetryReadingPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }

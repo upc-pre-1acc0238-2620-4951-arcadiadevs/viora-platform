@@ -1,5 +1,8 @@
 package com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.SamplingRoundPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -22,4 +25,7 @@ public interface SamplingRoundPersistenceRepository
      * @return {@code true} if an entry exists; {@code false} otherwise
      */
     boolean existsByActorIdAndPlotIdAndClientBatchId(UUID actorId, UUID plotId, String clientBatchId);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<SamplingRoundPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }
