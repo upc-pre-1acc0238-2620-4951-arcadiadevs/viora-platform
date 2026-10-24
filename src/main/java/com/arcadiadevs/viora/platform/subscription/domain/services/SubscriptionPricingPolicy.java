@@ -37,7 +37,25 @@ public final class SubscriptionPricingPolicy {
         if (quota == null) {
             throw new IllegalArgumentException("subscription.quota.invalid");
         }
-        var total = quota.value().multiply(monthlyRate).multiply(MONTHS_PER_YEAR)
+        return price(quota, MONTHS_PER_YEAR);
+    }
+
+    /**
+     * Prices the hectares added to a plan in force for the months it has left, with the same rate as a new plan.
+     * @param addedQuota validated hectares to add
+     * @param months complete months left of the plan, from {@link PlanExtensionPolicy#billableMonths}
+     * @return the extension quote
+     * @throws IllegalArgumentException if the hectares are missing or the months are not positive
+     */
+    public SubscriptionPrice quoteExtension(IndividualHectaresQuota addedQuota, int months) {
+        if (addedQuota == null || months < 1 || months > MONTHS_PER_YEAR.intValue()) {
+            throw new IllegalArgumentException("subscription.extension.quote.invalid");
+        }
+        return price(addedQuota, BigDecimal.valueOf(months));
+    }
+
+    private SubscriptionPrice price(IndividualHectaresQuota quota, BigDecimal months) {
+        var total = quota.value().multiply(monthlyRate).multiply(months)
                 .setScale(2, RoundingMode.HALF_UP);
         var base = total.divide(BigDecimal.ONE.add(taxRate), 2, RoundingMode.HALF_UP);
         var tax = total.subtract(base);

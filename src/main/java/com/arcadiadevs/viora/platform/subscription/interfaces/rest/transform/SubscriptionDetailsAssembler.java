@@ -29,7 +29,9 @@ public final class SubscriptionDetailsAssembler {
     public static SubscriptionDetailsResource toResource(Subscription subscription, Instant at, String paymentStatus) {
         var s = subscription.snapshot();
         var active = subscription.hasActiveEntitlement(at);
-        var status = s.status() == SubscriptionStatus.ACTIVE && !active
+        // A renewal paid ahead stays ACTIVE until its year starts; only a window that already ended is EXPIRED.
+        var ended = s.period() != null && !at.isBefore(s.period().endsAt());
+        var status = s.status() == SubscriptionStatus.ACTIVE && !active && ended
                 ? SubscriptionStatus.EXPIRED : s.status();
         return new SubscriptionDetailsResource(s.id().subscriptionId(), s.mode().name(), s.planCode(), status.name(),
                 s.quota().hectares(), s.price() == null ? null : "PEN",

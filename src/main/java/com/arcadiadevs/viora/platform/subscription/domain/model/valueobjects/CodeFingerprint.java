@@ -38,8 +38,19 @@ public record CodeFingerprint(String value) {
         if (code == null) {
             throw new IllegalArgumentException("subscription.invitation_code.blank");
         }
+        return of(code.value());
+    }
+
+    /**
+     * Computes the fingerprint of an already normalized code, an invitation or an extension code.
+     *
+     * @param normalizedCode the normalized code
+     * @return the SHA-256 fingerprint of the code
+     * @throws IllegalStateException if the platform has no SHA-256 implementation
+     */
+    static CodeFingerprint of(String normalizedCode) {
         try {
-            var digest = MessageDigest.getInstance("SHA-256").digest(code.value().getBytes(StandardCharsets.UTF_8));
+            var digest = MessageDigest.getInstance("SHA-256").digest(normalizedCode.getBytes(StandardCharsets.UTF_8));
             return new CodeFingerprint(HexFormat.of().formatHex(digest));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("subscription.invitation_code.fingerprint.unavailable", exception);

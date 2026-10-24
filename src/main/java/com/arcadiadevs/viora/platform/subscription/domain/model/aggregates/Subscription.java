@@ -30,7 +30,7 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
     private final ProducerId producerId;
     private final PlanMode mode;
     private SubscriptionStatus status;
-    private final HectaresQuota quota;
+    private HectaresQuota quota;
     private SubscriptionPeriod period;
     private final CooperativeId cooperativeId;
     private final CooperativeLicenseId licenseId;
@@ -163,6 +163,22 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
      * @throws IllegalStateException if the transition is invalid
      */
     public void activateIndividual(String paymentId, Money amount, String currency, Instant approvedAt) {
+        activateIndividual(paymentId, amount, currency, approvedAt, approvedAt);
+    }
+
+    /**
+     * Activates an individual contract whose year may start later than the payment, when it renews a plan still in
+     * force: the new year then starts when the current plan ends.
+     * @param paymentId provider payment identity
+     * @param amount verified total
+     * @param currency verified settlement currency
+     * @param approvedAt verified approval time
+     * @param startsAt start of the paid year, at or after {@code approvedAt}
+     * @throws IllegalArgumentException if evidence does not match the contract
+     * @throws IllegalStateException if the transition is invalid
+     */
+    public void activateIndividual(String paymentId, Money amount, String currency, Instant approvedAt,
+            Instant startsAt) {
         if (mode != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || paymentId == null || paymentId.isBlank()
                 || amount == null || !"PEN".equals(currency) || !price.total().equals(amount)) {
             throw new IllegalArgumentException("subscription.payment.mismatch");
@@ -173,14 +189,36 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
             }
             return;
         }
-        if (status != SubscriptionStatus.PENDING_PAYMENT || approvedAt == null || approvedAt.isBefore(createdAt)) {
+        if (status != SubscriptionStatus.PENDING_PAYMENT || approvedAt == null || approvedAt.isBefore(createdAt)
+                || startsAt == null || startsAt.isBefore(approvedAt)) {
             throw new IllegalStateException("subscription.activation.invalid");
         }
-        period = SubscriptionPeriod.annual(approvedAt);
+        period = SubscriptionPeriod.annual(startsAt);
         status = SubscriptionStatus.ACTIVE;
         this.paymentId = paymentId;
         registerDomainEvent(new SubscriptionActivated(id.subscriptionId(), producerId.producerId(),
                 period.startsAt(), period.endsAt()));
+    }
+
+    /**
+     * Adds hectares to the plan without changing its window; an individual plan keeps half-hectare steps.
+     *
+     * @param added the hectares to add
+     * @throws IllegalArgumentException if {@code added} is null or breaks the half-hectare steps of an individual plan
+     * @throws IllegalStateException    if the plan was never activated
+     */
+    public void extendQuota(HectaresQuota added) {
+        if (added == null) {
+            throw new IllegalArgumentException("subscription.quota.null");
+        }
+        if (period == null || status == SubscriptionStatus.PENDING_PAYMENT) {
+            throw new IllegalStateException("subscription.extension.not_active");
+        }
+        var extended = new HectaresQuota(quota.hectares().add(added.hectares()));
+        if (mode == PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) {
+            new IndividualHectaresQuota(extended.hectares());
+        }
+        quota = extended;
     }
 
     /**

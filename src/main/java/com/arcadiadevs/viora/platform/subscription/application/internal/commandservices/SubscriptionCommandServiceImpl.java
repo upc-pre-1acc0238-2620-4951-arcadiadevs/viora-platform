@@ -11,8 +11,12 @@ import com.arcadiadevs.viora.platform.subscription.domain.repositories.Subscript
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.subscription.domain.services.PlanExtensionPolicy;
 
-/** Coordinates idempotent individual purchases without replacing sponsored access. */
+/**
+ * Coordinates idempotent individual purchases without replacing sponsored access. A producer whose plan is in its
+ * renewal window can buy the next year, which starts when the current plan ends.
+ */
 @Service
 public class SubscriptionCommandServiceImpl implements SubscriptionCommandService {
     private static final String OPERATION = "CREATE_SUBSCRIPTION";
@@ -73,8 +77,7 @@ public class SubscriptionCommandServiceImpl implements SubscriptionCommandServic
                 }
                 return Result.success(new CreatedSubscription(operation.resourceId(), true));
             }
-            if (subscriptions.existsActiveByProducerId(owner, clock.instant())
-                    || subscriptions.existsPendingByProducerId(owner)) {
+            if (holdsPlanBeyondRenewal(owner) || subscriptions.existsPendingByProducerId(owner)) {
                 return Result.failure(ApplicationError.conflict("subscription", "subscription.current.exists"));
             }
             var created = subscriptions.save(Subscription.createIndividual(owner, command.planCode(), quota,
@@ -83,5 +86,18 @@ public class SubscriptionCommandServiceImpl implements SubscriptionCommandServic
             work.recordOperation(owner.producerId(), command.operationId(), OPERATION, fingerprint, id);
             return Result.success(new CreatedSubscription(id, false));
         });
+    }
+
+    /**
+     * Tells whether the producer's access blocks a new purchase: a plan in force outside its renewal window, or a
+     * renewal already bought for after it.
+     */
+    private boolean holdsPlanBeyondRenewal(ProducerId owner) {
+        var now = clock.instant();
+        return subscriptions.findCurrent(owner, now)
+                .filter(plan -> plan.hasActiveEntitlement(now))
+                .map(plan -> !PlanExtensionPolicy.isInRenewalWindow(plan.snapshot().period(), now)
+                        || subscriptions.existsActiveByProducerId(owner, plan.snapshot().period().endsAt()))
+                .orElse(false);
     }
 }
