@@ -1,5 +1,8 @@
 package com.arcadiadevs.viora.platform.phenology.infrastructure.persistence.jpa.repositories;
 
+import java.util.List;
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.phenology.infrastructure.persistence.jpa.entities.ChillAccumulationTrackerPersistenceEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,4 +35,7 @@ public interface ChillAccumulationTrackerPersistenceRepository extends JpaReposi
     @Override
     @EntityGraph(attributePaths = {"harvestRecords"})
     Optional<ChillAccumulationTrackerPersistenceEntity> findById(UUID id);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<ChillAccumulationTrackerPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }

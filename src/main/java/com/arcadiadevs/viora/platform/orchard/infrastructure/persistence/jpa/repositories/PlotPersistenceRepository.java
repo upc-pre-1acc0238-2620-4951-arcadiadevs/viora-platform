@@ -51,4 +51,7 @@ public interface PlotPersistenceRepository extends JpaRepository<PlotPersistence
      * @return list of matching plot persistence entities
      */
     List<PlotPersistenceEntity> findAllByProducerIdAndUpdatedAtGreaterThanEqual(ProducerId producerId, Instant updatedSince);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<PlotPersistenceEntity> findAllByProducerId(ProducerId producerId);
 }

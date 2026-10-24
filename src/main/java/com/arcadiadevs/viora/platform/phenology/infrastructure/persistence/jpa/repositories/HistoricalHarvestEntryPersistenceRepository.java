@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.phenology.infrastructure.persistence.jpa.repositories;
 
+import java.util.Collection;
+
 import com.arcadiadevs.viora.platform.phenology.infrastructure.persistence.jpa.entities.HistoricalHarvestEntryPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -39,4 +41,7 @@ public interface HistoricalHarvestEntryPersistenceRepository extends JpaReposito
      * @return true if existing, false otherwise
      */
     boolean existsByPlotIdAndCampaignYear(UUID plotId, Integer campaignYear);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<HistoricalHarvestEntryPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
 }

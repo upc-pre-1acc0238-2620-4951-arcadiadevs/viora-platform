@@ -16,4 +16,7 @@ public interface SealedDossierPersistenceRepository extends JpaRepository<Sealed
     List<SealedDossierPersistenceEntity> findByPlotIdOrderByCampaignYearDesc(String plotId);
 
     Optional<SealedDossierPersistenceEntity> findByVerificationHash(String verificationHash);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<SealedDossierPersistenceEntity> findAllByProducerId(String producerId);
 }

@@ -31,4 +31,14 @@ public interface UserSessionPersistenceRepository extends JpaRepository<UserSess
     @Modifying
     @Query("delete from UserSessionPersistenceEntity s where s.expiresAt < :cutoff or s.revokedAt < :cutoff")
     int deleteEndedBefore(@Param("cutoff") Instant cutoff);
+
+    /**
+     * Deletes every session of an account, ended or not.
+     *
+     * @param userId the account
+     * @return how many rows were deleted
+     */
+    @Modifying
+    @Query("delete from UserSessionPersistenceEntity s where s.userId = :userId")
+    int deleteByUserId(@Param("userId") UUID userId);
 }

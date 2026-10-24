@@ -65,4 +65,7 @@ public interface SubscriptionPersistenceRepository extends JpaRepository<Subscri
      * @return owned persistence row
      */
     Optional<SubscriptionPersistenceEntity> findByIdAndProducerId(UUID id, UUID producerId);
+
+    /** Everything of a deleted account, for the account purge. */
+    List<SubscriptionPersistenceEntity> findAllByProducerId(UUID producerId);
 }
