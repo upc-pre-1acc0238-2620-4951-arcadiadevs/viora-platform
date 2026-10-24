@@ -21,7 +21,7 @@ public interface ProfileCommandService {
     Result<String, ApplicationError> handle(CreateProfileCommand command);
 
     /**
-     * Handles updating contact details on an existing profile.
+     * Handles updating contact details; an existing account without a profile gets one on its first save.
      *
      * @param command contact update command
      * @return updated Profile aggregate or application error
