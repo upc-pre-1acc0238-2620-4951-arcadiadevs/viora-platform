@@ -22,4 +22,13 @@ public interface SubscriptionQueryService {
      * @throws IllegalArgumentException if the producer identifier is invalid
      */
     Optional<Subscription> find(String owner, UUID id);
+
+    /**
+     * Reads the latest payment state for an owned contract.
+     * @param owner verified producer identity
+     * @param id requested contract identifier
+     * @return persisted attempt state, or null when no owned evidence exists
+     * @throws IllegalArgumentException if the producer identifier is invalid
+     */
+    String paymentStatus(String owner, UUID id);
 }
