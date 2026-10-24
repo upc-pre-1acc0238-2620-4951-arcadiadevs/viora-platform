@@ -23,6 +23,7 @@ import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jp
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.InvitationCodePersistenceRepository;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.SubscriptionPersistenceRepository;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.seeding.SubscriptionDemoDataSeeder;
+import com.arcadiadevs.viora.platform.subscription.infrastructure.seeding.SubscriptionTestCodesSeeder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -194,6 +195,20 @@ class CooperativeCodeRedemptionIntegrationTest {
         authenticateAs(signUp());
         redeem(SubscriptionDemoDataSeeder.EXPIRED_CODE).andExpect(status().isBadRequest());
         redeem(SubscriptionDemoDataSeeder.REVOKED_CODE).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("The test codes seed a license of its own whose codes activate the plan size they name")
+    void seededTestCodes() throws Exception {
+        redeem("COOP-T05A")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.cooperativeName").value(SubscriptionTestCodesSeeder.COOPERATIVE_NAME))
+                .andExpect(jsonPath("$.quotaHa").value(5.0));
+
+        authenticateAs(signUp());
+        redeem("COOP-T05A").andExpect(status().isBadRequest());
+        redeem("COOP-T20E").andExpect(status().isCreated()).andExpect(jsonPath("$.quotaHa").value(20.0));
+        assertThat(SubscriptionTestCodesSeeder.CODES).hasSize(20).containsKeys("COOP-T02A", "COOP-T12C");
     }
 
     @Test
