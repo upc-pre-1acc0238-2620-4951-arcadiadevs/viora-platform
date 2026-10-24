@@ -8,11 +8,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import com.arcadiadevs.viora.platform.shared.infrastructure.persistence.jpa.entities.AuditableAbstractPersistenceEntity;
 /** Provider attempt data; credentials are never persisted here. */
-@Entity @Table(name = "subscription_payment_attempts", indexes = @Index(columnList = "subscription_id"))
+@Entity @Table(name = "subscription_payment_attempts", indexes = {@Index(columnList = "subscription_id"), @Index(columnList = "extension_id")})
 @Getter @Setter @NoArgsConstructor
 public class PaymentAttemptPersistenceEntity extends AuditableAbstractPersistenceEntity {
     @Column(name = "subscription_id", nullable = false) private UUID subscriptionId;
     @Column(nullable = false) private String producerId;
+    /** Set when the attempt pays an extension of the plan instead of the plan itself. */
+    @Column(name = "extension_id") private UUID extensionId;
     @Column(nullable = false) private String status;
     @Column(unique = true) private String preferenceId;
     @Column(length = 4096) private String checkoutUrl;

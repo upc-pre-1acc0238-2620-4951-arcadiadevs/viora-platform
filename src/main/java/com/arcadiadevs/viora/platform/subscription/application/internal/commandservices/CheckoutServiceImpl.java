@@ -8,9 +8,13 @@ import java.util.*;
 import org.springframework.context.ApplicationEventPublisher;
 import com.arcadiadevs.viora.platform.shared.application.result.*;
 import com.arcadiadevs.viora.platform.subscription.application.ports.*;
+import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
-/** Coordinates durable attempts without holding a database transaction during provider requests. */
+/**
+ * Coordinates durable attempts without holding a database transaction during provider requests. An attempt pays a
+ * pending individual plan or a pending paid extension of a plan in force; both share the same provider flow.
+ */
 @Service
 public class CheckoutServiceImpl implements CheckoutService {
     private final SubscriptionRepository subscriptions;
@@ -20,6 +24,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final Duration ttl;
+    private final QuotaExtensionRepository extensions;
     /**
      * Creates the durable individual checkout use case.
      * @param subscriptions shared contract repository port
@@ -29,15 +34,28 @@ public class CheckoutServiceImpl implements CheckoutService {
      * @param events application domain-event publisher
      * @param clock application time source
      * @param ttl configured hosted-link lifetime
+     * @param extensions paid plan extensions
      * @throws IllegalArgumentException if the lifetime is not positive
      */
     public CheckoutServiceImpl(SubscriptionRepository subscriptions, PaymentAttemptRepository attempts,
-            SubscriptionUnitOfWork work, PaymentGateway gateway, ApplicationEventPublisher events, Clock clock, @org.springframework.beans.factory.annotation.Value("${viora.payments.checkout-ttl}") Duration ttl) {
+            SubscriptionUnitOfWork work, PaymentGateway gateway, ApplicationEventPublisher events, Clock clock,
+            @org.springframework.beans.factory.annotation.Value("${viora.payments.checkout-ttl}") Duration ttl,
+            QuotaExtensionRepository extensions) {
         this.subscriptions = subscriptions; this.attempts = attempts; this.work = work;
-        this.gateway = gateway; this.events = events; this.clock = clock; this.ttl = ttl;
+        this.gateway = gateway; this.events = events; this.clock = clock; this.ttl = ttl; this.extensions = extensions;
         if (ttl.isNegative() || ttl.isZero()) { throw new IllegalArgumentException("subscription.checkout.ttl.invalid"); }
     }
     private record Reservation(PaymentAttempt attempt, SubscriptionPrice price, boolean created) { }
+    /**
+     * What one checkout pays: the plan itself, or one of its extensions when {@code extensionId} is set.
+     * @param subscriptionId owned plan
+     * @param extensionId pending extension, or null
+     * @param price server-owned amount to collect
+     */
+    private record Target(UUID subscriptionId, UUID extensionId, SubscriptionPrice price) {
+        /** @return the identity the attempt and its operation fingerprint are keyed by */
+        UUID key() { return extensionId == null ? subscriptionId : extensionId; }
+    }
     /**
      * Reserves or recovers a hosted checkout after checking ownership and unresolved payments.
      * @param owner authenticated producer identifier
@@ -47,23 +65,37 @@ public class CheckoutServiceImpl implements CheckoutService {
      */
     @Override
     public Result<CheckoutResult, ApplicationError> create(String owner, UUID subscriptionId, String key) {
+        return create(owner, subscriptionId, null, key);
+    }
+    /**
+     * Reserves or recovers a hosted checkout for a pending paid extension of an owned plan.
+     * @param owner authenticated producer identifier
+     * @param subscriptionId owned plan
+     * @param extensionId pending extension of that plan
+     * @param key durable client operation identifier
+     * @return hosted navigation data or a consistent application failure
+     */
+    @Override
+    public Result<CheckoutResult, ApplicationError> createForExtension(String owner, UUID subscriptionId,
+            UUID extensionId, String key) {
+        if (extensionId == null) {
+            return Result.failure(ApplicationError.notFound("quota_extension", "null"));
+        }
+        return create(owner, subscriptionId, extensionId, key);
+    }
+    private Result<CheckoutResult, ApplicationError> create(String owner, UUID subscriptionId, UUID extensionId, String key) {
         if (key == null || key.isBlank() || key.length() > 128) { return invalid("subscription.operation.invalid"); }
         final ProducerId producer;
         try { producer = new ProducerId(owner); }
         catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
         }
-        var contract = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer);
-        if (contract.isEmpty()) {
-            return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
-        }
-        if (contract.get().snapshot().status() != SubscriptionStatus.PENDING_PAYMENT
-                || contract.get().snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) {
-            return conflict("subscription.checkout.state");
-        }
+        var payable = target(producer, subscriptionId, extensionId);
+        if (payable.isFailure()) { return Result.failure(payable.failure().orElseThrow()); }
         if (!gateway.configured()) { return unavailable(); }
+        var target = payable.success().orElseThrow();
         // Expired links are reconciled before another attempt can be reserved.
-        var latest = attempts.latest(subscriptionId);
+        var latest = latest(target);
         if (latest.isPresent() && !clock.instant().isBefore(latest.get().expiresAt())
                 && !Set.of("EXPIRED").contains(latest.get().status())) {
             try {
@@ -84,12 +116,12 @@ public class CheckoutServiceImpl implements CheckoutService {
             } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
         }
         Result<Reservation, ApplicationError> reserved = work.exclusive(owner, () -> {
-            var sub = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer).orElseThrow();
-            if (sub.snapshot().status() != SubscriptionStatus.PENDING_PAYMENT || sub.snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) { return conflict("subscription.checkout.state"); }
+            var current = target(producer, subscriptionId, extensionId);
+            if (current.isFailure()) { return Result.failure(current.failure().orElseThrow()); }
             var operation = work.findOperation(owner, key);
             if (operation.isPresent()) {
                 var op = operation.get();
-                if (!op.kind().equals("CREATE_CHECKOUT") || !op.fingerprint().equals(subscriptionId.toString())) {
+                if (!op.kind().equals("CREATE_CHECKOUT") || !op.fingerprint().equals(target.key().toString())) {
                     return conflict("subscription.operation.conflict");
                 }
                 var previous = attempts.find(op.resourceId()).orElseThrow();
@@ -97,19 +129,19 @@ public class CheckoutServiceImpl implements CheckoutService {
                     return conflict("subscription.checkout.expired");
                 }
                 if ("PENDING".equals(previous.status())) { return conflict("subscription.payment.unresolved"); }
-                return Result.success(new Reservation(previous, sub.snapshot().price(), false));
+                return Result.success(new Reservation(previous, target.price(), false));
             }
-            var active = attempts.latest(subscriptionId).filter(a -> !Set.of("EXPIRED").contains(a.status()));
+            var active = latest(target).filter(a -> !Set.of("EXPIRED").contains(a.status()));
             if (active.isPresent()) {
                 if ("PENDING".equals(active.get().status())) { return conflict("subscription.payment.unresolved"); }
-                work.recordOperation(owner, key, "CREATE_CHECKOUT", subscriptionId.toString(), active.get().id());
-                return Result.success(new Reservation(active.get(), sub.snapshot().price(), false));
+                work.recordOperation(owner, key, "CREATE_CHECKOUT", target.key().toString(), active.get().id());
+                return Result.success(new Reservation(active.get(), target.price(), false));
             }
             var now = clock.instant();
             var attempt = attempts.save(new PaymentAttempt(UUID.randomUUID(), subscriptionId, owner,
-                    "CREATING", null, null, now, now.plus(ttl)));
-            work.recordOperation(owner, key, "CREATE_CHECKOUT", subscriptionId.toString(), attempt.id());
-            return Result.success(new Reservation(attempt, sub.snapshot().price(), true));
+                    "CREATING", null, null, now, now.plus(ttl), Map.of(), target.extensionId()));
+            work.recordOperation(owner, key, "CREATE_CHECKOUT", target.key().toString(), attempt.id());
+            return Result.success(new Reservation(attempt, target.price(), true));
         });
         if (reserved.isFailure()) { return Result.failure(reserved.failure().orElseThrow()); }
         var reservation = reserved.success().orElseThrow();
@@ -133,6 +165,35 @@ public class CheckoutServiceImpl implements CheckoutService {
             });
         } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
     }
+    /** Resolves what is payable now: a pending individual plan, or a pending paid extension of a plan in force. */
+    private Result<Target, ApplicationError> target(ProducerId producer, UUID subscriptionId, UUID extensionId) {
+        var contract = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer);
+        if (contract.isEmpty()) {
+            return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
+        }
+        var plan = contract.get().snapshot();
+        if (extensionId == null) {
+            if (plan.status() != SubscriptionStatus.PENDING_PAYMENT || plan.mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL) {
+                return conflict("subscription.checkout.state");
+            }
+            return Result.success(new Target(subscriptionId, null, plan.price()));
+        }
+        var extension = extensions.findById(new QuotaExtensionId(extensionId.toString()))
+                .filter(found -> found.snapshot().subscriptionId().equals(plan.id()));
+        if (extension.isEmpty()) {
+            return Result.failure(ApplicationError.notFound("quota_extension", extensionId.toString()));
+        }
+        var pending = extension.get().snapshot();
+        if (pending.status() != QuotaExtensionStatus.PENDING_PAYMENT || pending.source() != QuotaExtensionSource.PAYMENT
+                || !contract.get().hasActiveEntitlement(clock.instant())) {
+            return conflict("subscription.checkout.state");
+        }
+        return Result.success(new Target(subscriptionId, extensionId, pending.price()));
+    }
+    private Optional<PaymentAttempt> latest(Target target) {
+        return target.extensionId() == null ? attempts.latest(target.subscriptionId())
+                : attempts.latestForExtension(target.extensionId());
+    }
     /**
      * Applies authoritative provider evidence rather than browser-return claims.
      * @param paymentId provider transaction identifier received through a trusted integration
@@ -150,17 +211,18 @@ public class CheckoutServiceImpl implements CheckoutService {
         return work.exclusive(attempt.producerId(), () -> {
             var current = attempts.find(attempt.id()).orElseThrow();
             var sub = subscriptions.findById(new SubscriptionId(current.subscriptionId().toString())).orElseThrow();
-            if (sub.snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || sub.snapshot().price() == null
-                    || !"PEN".equals(payment.currency()) || !sub.snapshot().price().total().equals(payment.amount())
-                    || payment.initiatedAt() == null || payment.initiatedAt().isBefore(current.createdAt().minusSeconds(5))
-                    || !payment.initiatedAt().isBefore(current.expiresAt())) {
+            if (current.extensionId() != null) {
+                return applyExtension(current, sub, payment);
+            }
+            if (sub.snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || !matches(current, payment, sub.snapshot().price())) {
                 return invalid("subscription.payment.mismatch");
             }
             if ("approved".equals(payment.status())) {
-                if (payment.approvedAt() == null || payment.approvedAt().isBefore(payment.initiatedAt()) || payment.approvedAt().isAfter(clock.instant().plusSeconds(300))) {
-                    return invalid("subscription.payment.mismatch");
+                if (!approvedInTime(payment)) { return invalid("subscription.payment.mismatch"); }
+                try {
+                    sub.activateIndividual(payment.id(), payment.amount(), payment.currency(), payment.approvedAt(),
+                            renewalStart(sub, payment.approvedAt()));
                 }
-                try { sub.activateIndividual(payment.id(), payment.amount(), payment.currency(), payment.approvedAt()); }
                 catch (IllegalArgumentException | IllegalStateException ex) { return conflict(ex.getMessage()); }
                 subscriptions.save(sub);
                 attempts.save(current.withPaymentState(payment.id(), "approved"));
@@ -171,6 +233,50 @@ public class CheckoutServiceImpl implements CheckoutService {
             }
             return Result.success(true);
         });
+    }
+    /** Adds the paid hectares to the plan once; a repeated notification only refreshes the attempt. */
+    private Result<Boolean, ApplicationError> applyExtension(PaymentAttempt current, Subscription sub,
+            PaymentGateway.VerifiedPayment payment) {
+        var extension = extensions.findById(new QuotaExtensionId(current.extensionId().toString())).orElseThrow();
+        if (!matches(current, payment, extension.snapshot().price())) {
+            return invalid("subscription.payment.mismatch");
+        }
+        if ("approved".equals(payment.status())) {
+            if (!approvedInTime(payment)) { return invalid("subscription.payment.mismatch"); }
+            try {
+                if (extension.approvePayment(payment.id(), payment.amount(), payment.currency(), payment.approvedAt())) {
+                    sub.extendQuota(extension.snapshot().addedArea());
+                    subscriptions.save(sub);
+                    extensions.save(extension);
+                }
+            } catch (IllegalArgumentException | IllegalStateException ex) { return conflict(ex.getMessage()); }
+            attempts.save(current.withPaymentState(payment.id(), "approved"));
+        } else if (Set.of("pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled").contains(payment.status())) {
+            attempts.save(current.withPaymentState(payment.id(), payment.status()));
+        }
+        return Result.success(true);
+    }
+    private static boolean matches(PaymentAttempt current, PaymentGateway.VerifiedPayment payment, SubscriptionPrice price) {
+        return price != null && "PEN".equals(payment.currency()) && price.total().equals(payment.amount())
+                && payment.initiatedAt() != null && !payment.initiatedAt().isBefore(current.createdAt().minusSeconds(5))
+                && payment.initiatedAt().isBefore(current.expiresAt());
+    }
+    private boolean approvedInTime(PaymentGateway.VerifiedPayment payment) {
+        return payment.approvedAt() != null && !payment.approvedAt().isBefore(payment.initiatedAt())
+                && !payment.approvedAt().isAfter(clock.instant().plusSeconds(300));
+    }
+    /**
+     * A renewal paid while the current plan is still in force starts when that plan ends, so no paid day is lost.
+     * @param renewal the plan being activated
+     * @param approvedAt verified approval time
+     * @return the start of the paid year
+     */
+    private Instant renewalStart(Subscription renewal, Instant approvedAt) {
+        return subscriptions.findCurrent(renewal.snapshot().producerId(), approvedAt)
+                .filter(other -> !other.snapshot().id().equals(renewal.snapshot().id()))
+                .filter(other -> other.hasActiveEntitlement(approvedAt))
+                .map(other -> other.snapshot().period().endsAt())
+                .orElse(approvedAt);
     }
     /**
      * Reads locally persisted attempt state without contacting the provider.
