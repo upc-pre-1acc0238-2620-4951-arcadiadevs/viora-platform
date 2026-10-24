@@ -3,9 +3,13 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects;
 import java.time.Instant;
 import java.util.*;
 
-/** Immutable attempt with transaction-specific observations, separate from entitlement. */
+/**
+ * Immutable attempt with transaction-specific observations, separate from entitlement. It pays either a pending plan
+ * or, when {@code extensionId} is set, a pending extension of that plan.
+ */
 public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, String status,
-        String preferenceId, String checkoutUrl, Instant createdAt, Instant expiresAt, Map<String, String> paymentStates) {
+        String preferenceId, String checkoutUrl, Instant createdAt, Instant expiresAt, Map<String, String> paymentStates,
+        UUID extensionId) {
     /**
      * Validates a durable attempt and freezes its transaction observations.
      * @throws IllegalArgumentException if identity, lifetime, state or observations are invalid
@@ -25,11 +29,15 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
     }
     public PaymentAttempt(UUID id, UUID subscriptionId, String producerId, String status,
             String preferenceId, String checkoutUrl, Instant createdAt, Instant expiresAt) {
-        this(id, subscriptionId, producerId, status, preferenceId, checkoutUrl, createdAt, expiresAt, Map.of());
+        this(id, subscriptionId, producerId, status, preferenceId, checkoutUrl, createdAt, expiresAt, Map.of(), null);
+    }
+    public PaymentAttempt(UUID id, UUID subscriptionId, String producerId, String status,
+            String preferenceId, String checkoutUrl, Instant createdAt, Instant expiresAt, Map<String, String> paymentStates) {
+        this(id, subscriptionId, producerId, status, preferenceId, checkoutUrl, createdAt, expiresAt, paymentStates, null);
     }
     public PaymentAttempt withCheckout(String preference, String url) {
         return new PaymentAttempt(id, subscriptionId, producerId, "CREATING".equals(status) ? "OPEN" : status,
-                preference, url, createdAt, expiresAt, paymentStates);
+                preference, url, createdAt, expiresAt, paymentStates, extensionId);
     }
     /**
      * Updates attempt lifecycle without expiring an unresolved or approved payment.
@@ -41,7 +49,7 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
         if ("EXPIRED".equals(next) && Set.of("PENDING", "APPROVED").contains(status)) {
             throw new IllegalStateException("subscription.payment.unresolved");
         }
-        return new PaymentAttempt(id, subscriptionId, producerId, next, preferenceId, checkoutUrl, createdAt, expiresAt, paymentStates);
+        return new PaymentAttempt(id, subscriptionId, producerId, next, preferenceId, checkoutUrl, createdAt, expiresAt, paymentStates, extensionId);
     }
     /**
      * Applies an authoritative transaction state; an unrelated rejection cannot hide a pending payment.
@@ -64,6 +72,6 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
         if ("APPROVED".equals(status) || observed.containsValue("approved")) { projected = "APPROVED"; }
         else if (observed.values().stream().anyMatch(pending::contains)) { projected = "PENDING"; }
         else if (observed.values().stream().anyMatch(Set.of("rejected", "cancelled")::contains)) { projected = "REJECTED"; }
-        return new PaymentAttempt(id, subscriptionId, producerId, projected, preferenceId, checkoutUrl, createdAt, expiresAt, observed);
+        return new PaymentAttempt(id, subscriptionId, producerId, projected, preferenceId, checkoutUrl, createdAt, expiresAt, observed, extensionId);
     }
 }

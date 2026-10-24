@@ -8,13 +8,19 @@ import org.junit.jupiter.api.*;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.CheckoutServiceImpl;
 import com.arcadiadevs.viora.platform.subscription.application.ports.*;
+import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
 import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
 import static org.junit.jupiter.api.Assertions.*;
 class CheckoutServiceTest {
-    static class Store implements SubscriptionRepository, PaymentAttemptRepository, SubscriptionUnitOfWork {
+    static class Store implements SubscriptionRepository, PaymentAttemptRepository, SubscriptionUnitOfWork, QuotaExtensionRepository {
+        final Map<String, QuotaExtension> extensions = new HashMap<>();
+        public QuotaExtension save(QuotaExtension e) { extensions.put(e.snapshot().id().quotaExtensionId(), e); return e; }
+        public Optional<QuotaExtension> findById(QuotaExtensionId id) { return Optional.ofNullable(extensions.get(id.quotaExtensionId())); }
+        public boolean existsByExtensionCodeIdAndProducerId(ExtensionCodeId code, ProducerId producer) { return false; }
+        public Optional<PaymentAttempt> latestForExtension(UUID id) { return attempts.values().stream().filter(a -> id.equals(a.extensionId())).max(Comparator.comparing(PaymentAttempt::createdAt)); }
         final Map<UUID, Subscription> contracts = new HashMap<>();
         final Map<UUID, PaymentAttempt> attempts = new HashMap<>();
         final Map<String, Operation> operations = new HashMap<>();
@@ -28,7 +34,7 @@ class CheckoutServiceTest {
         public boolean existsPendingByProducerId(ProducerId p) { return contracts.values().stream().anyMatch(s -> s.snapshot().producerId().equals(p) && s.snapshot().status() == SubscriptionStatus.PENDING_PAYMENT); }
         public PaymentAttempt save(PaymentAttempt a) { attempts.put(a.id(), a); return a; }
         public Optional<PaymentAttempt> find(UUID id) { return Optional.ofNullable(attempts.get(id)); }
-        public Optional<PaymentAttempt> latest(UUID id) { return attempts.values().stream().filter(a -> a.subscriptionId().equals(id)).max(Comparator.comparing(PaymentAttempt::createdAt)); }
+        public Optional<PaymentAttempt> latest(UUID id) { return attempts.values().stream().filter(a -> a.subscriptionId().equals(id) && a.extensionId() == null).max(Comparator.comparing(PaymentAttempt::createdAt)); }
         public <T> T exclusive(String p, Supplier<T> action) { return action.get(); }
         public Optional<Operation> findOperation(String p, String key) { return Optional.ofNullable(operations.get(p + key)); }
         public void recordOperation(String p, String key, String kind, String hash, UUID id) { operations.put(p + key, new Operation(kind, hash, id)); }
@@ -63,7 +69,7 @@ class CheckoutServiceTest {
     final Subscription sub = Subscription.createIndividual(new ProducerId("550e8400-e29b-41d4-a716-446655440000"), "PRODUCER_ANNUAL", quota, price, now.minusSeconds(10));
     final UUID contractId = UUID.fromString(sub.snapshot().id().subscriptionId());
     final CheckoutService service = new CheckoutServiceImpl(store, store, store, gateway, events::add,
-            Clock.fixed(now.plusSeconds(20), ZoneOffset.UTC), Duration.ofHours(24));
+            Clock.fixed(now.plusSeconds(20), ZoneOffset.UTC), Duration.ofHours(24), store);
     @BeforeEach void setup() { store.save(sub); }
     @Test void repeatedClicksReusePreferenceAcrossDifferentKeys() {
         var first = service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "k1").success().orElseThrow();
@@ -139,7 +145,7 @@ class CheckoutServiceTest {
 
     private CheckoutService afterExpiry() {
         return new CheckoutServiceImpl(store, store, store, gateway, events::add,
-                Clock.fixed(now.plus(Duration.ofHours(25)), ZoneOffset.UTC), Duration.ofHours(24));
+                Clock.fixed(now.plus(Duration.ofHours(25)), ZoneOffset.UTC), Duration.ofHours(24), store);
     }
     @Test void expiredPendingObservationSurvivesAnEmptyProviderSearch() {
         var checkout = service.create(sub.snapshot().producerId().producerId(), contractId, "initial").success().orElseThrow();

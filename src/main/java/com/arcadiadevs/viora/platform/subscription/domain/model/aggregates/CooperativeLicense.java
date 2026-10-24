@@ -1,12 +1,14 @@
 package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ExtensionCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.PlanMode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.RedeemedCode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPeriod;
@@ -26,7 +28,7 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     private final CooperativeId cooperativeId;
     private final String cooperativeName;
     private final int seats;
-    private final HectaresQuota contractedArea;
+    private HectaresQuota contractedArea;
     private BigDecimal committedAreaHa;
     private final SubscriptionPeriod period;
     private final Long revision;
@@ -133,6 +135,66 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
         }
         code.redeem(producerId, at);
         return new RedeemedCode(code.snapshot().id(), id, cooperativeId, producerId, code.snapshot().quota(), period);
+    }
+
+    /**
+     * Issues a code that every producer of this license can redeem once to add {@code addedArea} hectares to their
+     * plan. Nothing is committed now: each redemption commits its hectares, so the code stops working when the license
+     * runs out of hectares.
+     *
+     * @param fingerprint the fingerprint of the code
+     * @param addedArea   the hectares each producer gets
+     * @param expiresAt   the last instant the code can be redeemed, exclusive
+     * @return the active code
+     * @throws IllegalArgumentException if an argument is null
+     */
+    public QuotaExtensionCode issueExtensionCode(CodeFingerprint fingerprint, HectaresQuota addedArea,
+                                                 Instant expiresAt) {
+        return QuotaExtensionCode.issue(id, fingerprint, addedArea, expiresAt);
+    }
+
+    /**
+     * Adds the hectares of an extension code to a plan this license sponsors, committing them on the license, or
+     * changes nothing. Whether the producer already used the code is checked by the caller, which holds that history.
+     *
+     * @param code the redeemed code; it must belong to this license
+     * @param plan the producer's plan; it must be sponsored by this license and in force
+     * @param at   the instant of the redemption
+     * @return the applied extension; the plan already holds its hectares
+     * @throws IllegalArgumentException             if an argument is null
+     * @throws ExtensionCodeNotRedeemableException if the code, the plan or the license cannot take the extension
+     */
+    public QuotaExtension redeemExtensionCode(QuotaExtensionCode code, Subscription plan, Instant at) {
+        if (code == null || plan == null || at == null) {
+            throw new IllegalArgumentException("subscription.extension_code.redemption.incomplete");
+        }
+        var current = plan.snapshot();
+        if (!id.equals(code.snapshot().licenseId()) || !id.equals(current.licenseId())
+                || current.mode() != PlanMode.PLAN_COOPERATIVO_PATROCINADO || !plan.hasActiveEntitlement(at)
+                || !period.contains(at) || !code.isRedeemable(at)) {
+            throw new ExtensionCodeNotRedeemableException();
+        }
+        var added = code.snapshot().addedArea();
+        var committed = committedAreaHa.add(added.hectares());
+        if (committed.compareTo(contractedArea.hectares()) > 0) {
+            throw new ExtensionCodeNotRedeemableException();
+        }
+        plan.extendQuota(added);
+        this.committedAreaHa = committed;
+        return QuotaExtension.fromCode(plan, code, at);
+    }
+
+    /**
+     * Grows the area the cooperative contracted, such as when it buys more hectares for its producers.
+     *
+     * @param extra the hectares added to the contract
+     * @throws IllegalArgumentException if {@code extra} is null
+     */
+    public void addContractedArea(HectaresQuota extra) {
+        if (extra == null) {
+            throw new IllegalArgumentException("subscription.quota.null");
+        }
+        contractedArea = new HectaresQuota(contractedArea.hectares().add(extra.hectares()));
     }
 
     /**

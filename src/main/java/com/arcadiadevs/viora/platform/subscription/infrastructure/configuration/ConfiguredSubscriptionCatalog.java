@@ -59,4 +59,20 @@ public class ConfiguredSubscriptionCatalog implements SubscriptionCatalog {
         }
         return pricing.quote(quota);
     }
+
+    /**
+     * Calculates the price of hectares added to a plan of the configured offer.
+     * @param planCode the plan's offer identifier
+     * @param addedQuota validated hectares to add
+     * @param months complete months left of the plan
+     * @return immutable extension terms
+     * @throws IllegalArgumentException if the plan, hectares or months are invalid
+     */
+    @Override
+    public SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int months) {
+        if (!offer.code().equals(planCode)) {
+            throw new IllegalArgumentException("subscription.plan.invalid");
+        }
+        return pricing.quoteExtension(addedQuota, months);
+    }
 }

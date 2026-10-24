@@ -18,5 +18,6 @@ public class PaymentAttemptRepositoryImpl implements PaymentAttemptRepository {
         return attempt;
     }
     @Override public Optional<PaymentAttempt> find(UUID id) { return rows.findById(id).map(PaymentAttemptPersistenceAssembler::toDomainFromPersistence); }
-    @Override public Optional<PaymentAttempt> latest(UUID id) { return rows.findFirstBySubscriptionIdOrderByInitiatedAtDesc(id).map(PaymentAttemptPersistenceAssembler::toDomainFromPersistence); }
+    @Override public Optional<PaymentAttempt> latest(UUID id) { return rows.findFirstBySubscriptionIdAndExtensionIdIsNullOrderByInitiatedAtDesc(id).map(PaymentAttemptPersistenceAssembler::toDomainFromPersistence); }
+    @Override public Optional<PaymentAttempt> latestForExtension(UUID id) { return rows.findFirstByExtensionIdOrderByInitiatedAtDesc(id).map(PaymentAttemptPersistenceAssembler::toDomainFromPersistence); }
 }

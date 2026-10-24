@@ -20,6 +20,16 @@ public interface SubscriptionCatalog {
     SubscriptionPrice quote(String planCode, IndividualHectaresQuota quota);
 
     /**
+     * Quotes hectares added to a plan in force for the complete months it has left.
+     * @param planCode the plan's catalog code
+     * @param addedQuota validated hectares to add
+     * @param months complete months left of the plan
+     * @return server-calculated payment terms
+     * @throws IllegalArgumentException if the plan, hectares or months are invalid
+     */
+    SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int months);
+
+    /**
      * Public commercial conditions supplied by configuration and domain policy.
      * @param code plan identifier
      * @param currency settlement currency

@@ -18,6 +18,16 @@ public interface CheckoutService {
     Result<CheckoutResult, ApplicationError> create(String owner, UUID subscriptionId, String key);
 
     /**
+     * Creates or recovers a checkout for a pending paid extension of an owned plan, without adding hectares.
+     * @param owner authenticated producer
+     * @param subscriptionId owned plan
+     * @param extensionId pending extension of that plan
+     * @param key durable operation key
+     * @return checkout or consistent failure
+     */
+    Result<CheckoutResult, ApplicationError> createForExtension(String owner, UUID subscriptionId, UUID extensionId, String key);
+
+    /**
      * Reconciles provider evidence, never browser return parameters.
      * @param paymentId authenticated provider transaction identifier
      * @return durable processing acknowledgement

@@ -17,6 +17,7 @@ public final class PaymentAttemptPersistenceAssembler {
         row.setId(attempt.id());
         row.setSubscriptionId(attempt.subscriptionId());
         row.setProducerId(attempt.producerId());
+        row.setExtensionId(attempt.extensionId());
         row.setStatus(attempt.status());
         row.setPreferenceId(attempt.preferenceId());
         row.setCheckoutUrl(attempt.checkoutUrl());
@@ -34,6 +35,7 @@ public final class PaymentAttemptPersistenceAssembler {
      */
     public static PaymentAttempt toDomainFromPersistence(PaymentAttemptPersistenceEntity row) {
         return new PaymentAttempt(row.getId(), row.getSubscriptionId(), row.getProducerId(), row.getStatus(),
-                row.getPreferenceId(), row.getCheckoutUrl(), row.getInitiatedAt(), row.getExpiresAt(), row.getPaymentStates());
+                row.getPreferenceId(), row.getCheckoutUrl(), row.getInitiatedAt(), row.getExpiresAt(), row.getPaymentStates(),
+                row.getExtensionId());
     }
 }
