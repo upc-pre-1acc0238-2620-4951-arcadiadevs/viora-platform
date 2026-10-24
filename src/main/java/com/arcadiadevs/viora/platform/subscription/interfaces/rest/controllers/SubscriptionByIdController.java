@@ -46,6 +46,7 @@ public class SubscriptionByIdController {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(
                     ApplicationError.notFound("subscription", id.toString()));
         }
-        return ResponseEntity.ok(SubscriptionDetailsAssembler.toResource(found.orElseThrow(), clock.instant()));
+        return ResponseEntity.ok(SubscriptionDetailsAssembler.toResource(found.orElseThrow(), clock.instant(),
+                queries.paymentStatus(users.requireAuthenticatedUserId(), id)));
     }
 }

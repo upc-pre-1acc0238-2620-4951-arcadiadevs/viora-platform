@@ -42,6 +42,7 @@ class SubscriptionByIdHttpTest {
             .connectTimeout(Duration.ofSeconds(5)).build();
     @LocalServerPort private int port;
     @Autowired private SubscriptionRepository subscriptions;
+    @Autowired private com.arcadiadevs.viora.platform.subscription.domain.repositories.PaymentAttemptRepository attempts;
     @Autowired private UserAccountRepository accounts;
     @Autowired private TokenService tokens;
     @Autowired private JdbcTemplate jdbc;
@@ -79,6 +80,44 @@ class SubscriptionByIdHttpTest {
         assertEquals(330.0, JsonPath.<Double>read(response.body(), "$.totalAmount"));
         assertNull(JsonPath.read(response.body(), "$.startsAt"));
         assertNull(JsonPath.read(response.body(), "$.endsAt"));
+    }
+
+    @Test
+    void currentQueryExposesPendingPaymentWithoutGrantingAccess() throws Exception {
+        var contract = pending(owner);
+        var attempt = new PaymentAttempt(UUID.randomUUID(), UUID.fromString(id(contract)), owner.producerId(),
+                "OPEN", "pending-preference", "https://sandbox.mercadopago.com.pe/checkout", NOW, NOW.plusSeconds(3600));
+        attempts.save(attempt.withPaymentState("987654322", "pending"));
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/subscriptions"))
+                .header("Authorization", "Bearer " + token).GET().build();
+        var response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        assertEquals("PENDING", JsonPath.read(response.body(), "$.paymentStatus"));
+        assertEquals(false, JsonPath.read(response.body(), "$.entitlementActive"));
+    }
+
+    @Test
+    void ignoresPaymentEvidenceOwnedByAnotherProducer() throws Exception {
+        var contract = pending(owner);
+        var attempt = new PaymentAttempt(UUID.randomUUID(), UUID.fromString(id(contract)), UUID.randomUUID().toString(),
+                "OPEN", "foreign-preference", "https://sandbox.mercadopago.com.pe/checkout", NOW, NOW.plusSeconds(3600));
+        attempts.save(attempt.withPaymentState("987654323", "rejected"));
+        var response = get(id(contract), token);
+        assertEquals(200, response.statusCode());
+        assertNull(JsonPath.read(response.body(), "$.paymentStatus"));
+        assertEquals(false, JsonPath.read(response.body(), "$.entitlementActive"));
+    }
+
+    @Test
+    void exposesVerifiedRejectionWithoutGrantingAccess() throws Exception {
+        var contract = pending(owner);
+        var attempt = new PaymentAttempt(UUID.randomUUID(), UUID.fromString(id(contract)), owner.producerId(),
+                "OPEN", "test-preference", "https://sandbox.mercadopago.com.pe/checkout", NOW, NOW.plusSeconds(3600));
+        attempts.save(attempt.withPaymentState("987654321", "rejected"));
+        var response = get(id(contract), token);
+        assertContract(response, contract, false);
+        assertEquals("REJECTED", JsonPath.read(response.body(), "$.paymentStatus"));
+        assertEquals("PENDING_PAYMENT", JsonPath.read(response.body(), "$.status"));
     }
 
     @Test
