@@ -29,6 +29,9 @@ public class CheckoutReturnPageController {
     /** Path of the return link; the Android app declares the same one in its manifest. */
     public static final String PATH = "/payments/return";
 
+    /** Path of the return link of a plan extension payment ({@code MercadoPagoGateway.EXTENSION_RETURN_SUFFIX}). */
+    public static final String EXTENSION_PATH = "/payments/return/extension";
+
     private static final String TEMPLATE = "templates/web/payment-return-open.html";
 
     private final DeepLinkProperties deepLinkProperties;
@@ -51,15 +54,29 @@ public class CheckoutReturnPageController {
      */
     @GetMapping(value = PATH, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> page() {
+        return page(PATH);
+    }
+
+    /**
+     * Answers the same page for the payment of a plan extension, which the app opens on its own result screen.
+     *
+     * @return 200 with the page
+     */
+    @GetMapping(value = EXTENSION_PATH, produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> extensionPage() {
+        return page(EXTENSION_PATH);
+    }
+
+    private ResponseEntity<String> page(String path) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .contentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8))
-                .body(template.replace("{{intentUrl}}", intentUrl()));
+                .body(template.replace("{{intentUrl}}", intentUrl(path)));
     }
 
     /** {@code intent://<host>/payments/return#Intent;scheme=https;package=<app>;end}. */
-    private String intentUrl() {
-        var link = URI.create(deepLinkProperties.baseUrl() + PATH);
+    private String intentUrl(String path) {
+        var link = URI.create(deepLinkProperties.baseUrl() + path);
         var packageName = deepLinkProperties.android().packageName();
         var intent = "intent://" + link.getHost() + link.getRawPath() + "#Intent;scheme=" + link.getScheme();
         if (!packageName.isEmpty()) {

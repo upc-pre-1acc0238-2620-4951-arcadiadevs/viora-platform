@@ -35,4 +35,13 @@ class CheckoutReturnPageControllerTest {
                 .andExpect(content().string(not(containsString("<script>alert"))))
                 .andExpect(content().string(not(containsString("approved"))));
     }
+
+    @Test
+    @DisplayName("Opens the app on the extension result for the payment of a plan extension")
+    void opensTheExtensionResult() throws Exception {
+        mvc.perform(get("/payments/return/extension?collection_status=approved"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "intent://viora.example/payments/return/extension#Intent;scheme=https;package=pe.edu.upc.viora;end")));
+    }
 }

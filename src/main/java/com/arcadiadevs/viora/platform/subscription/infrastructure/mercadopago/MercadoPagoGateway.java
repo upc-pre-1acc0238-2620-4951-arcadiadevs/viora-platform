@@ -23,6 +23,8 @@ public class MercadoPagoGateway implements PaymentGateway {
     private final String itemTitle;
     private record Merchant(String id, boolean testAccount) { }
     private volatile Merchant merchantIdentity;
+    /** Appended to the return URL for extension payments; the app declares the same path. */
+    public static final String EXTENSION_RETURN_SUFFIX = "/extension";
     @org.springframework.beans.factory.annotation.Autowired
     public MercadoPagoGateway(@Value("${viora.payments.enabled}") boolean enabled,
             @Value("${viora.payments.sandbox}") boolean sandbox,
@@ -58,16 +60,28 @@ public class MercadoPagoGateway implements PaymentGateway {
     }
     @Override public Checkout create(PaymentAttempt attempt, SubscriptionPrice price) {
         requireConfiguration();
+        var back = returnUrlFor(attempt);
         Map<String, Object> body = Map.of("external_reference", attempt.id().toString(),
                 "items", List.of(Map.of("id", attempt.subscriptionId().toString(), "title", itemTitle,
                     "quantity", 1, "currency_id", "PEN", "unit_price", price.total().amount())),
                 "expires", true, "expiration_date_from", attempt.createdAt().toString(), "expiration_date_to", attempt.expiresAt().toString(),
-                "notification_url", notificationUrl, "back_urls", Map.of("success", returnUrl, "failure", returnUrl, "pending", returnUrl));
+                "notification_url", notificationUrl, "back_urls", Map.of("success", back, "failure", back, "pending", back));
         try {
             var result = client.post().uri("/checkout/preferences").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                     .body(body).retrieve().body(Map.class);
             return checkout(result);
         } catch (RuntimeException ex) { throw new Unavailable(); }
+    }
+    /**
+     * The payment of a plan extension returns to its own path under the return URL, so the app opens the extension
+     * result instead of the plan purchase.
+     */
+    private String returnUrlFor(PaymentAttempt attempt) {
+        if (attempt.extensionId() == null) { return returnUrl; }
+        var query = returnUrl.indexOf('?');
+        var path = query < 0 ? returnUrl : returnUrl.substring(0, query);
+        var extension = path.replaceFirst("/+$", "") + EXTENSION_RETURN_SUFFIX;
+        return query < 0 ? extension : extension + returnUrl.substring(query);
     }
     @Override public Optional<Checkout> recover(UUID intentId) {
         requireConfiguration();

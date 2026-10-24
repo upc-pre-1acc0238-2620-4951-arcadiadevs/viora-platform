@@ -43,6 +43,20 @@ class MercadoPagoGatewayTest {
         }
         assertEquals("pref-1", gateway.create(attempt, price).preferenceId());
     }
+
+    @Test void extensionPaymentReturnsToItsOwnPath() {
+        var now = Instant.parse("2026-10-21T12:00:00Z");
+        var attempt = new PaymentAttempt(intent, UUID.randomUUID(), "owner", "CREATING", null, null, now,
+                now.plusSeconds(86400), java.util.Map.of(), UUID.randomUUID());
+        server.expect(requestTo("https://api.mercadopago.com/checkout/preferences")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.back_urls.success").value("https://example.test/payments/return/extension"))
+            .andExpect(jsonPath("$.back_urls.failure").value("https://example.test/payments/return/extension"))
+            .andRespond(withSuccess("{\"id\":\"pref-2\",\"collector_id\":42,\"sandbox_init_point\":\"https://sandbox.mercadopago.com.pe/checkout/test\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.mercadopago.com/users/me")).andRespond(withSuccess("{\"id\":42}", MediaType.APPLICATION_JSON));
+        var price = new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18"))
+                .quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 10);
+        assertEquals("pref-2", gateway.create(attempt, price).preferenceId());
+    }
     @Test void realPaymentCannotEnterSandboxEvenWithApprovedStatus() {
         server.expect(requestTo("https://api.mercadopago.com/v1/payments/123"))
             .andRespond(withSuccess("{\"id\":123,\"collector_id\":42,\"live_mode\":true}", MediaType.APPLICATION_JSON));
