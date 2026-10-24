@@ -96,17 +96,24 @@ public class ProfileCommandServiceImpl implements ProfileCommandService {
         try {
             var userId = new UserId(command.userId());
             var optionalProfile = profileRepository.findByUserId(userId);
-            if (optionalProfile.isEmpty()) {
+            // An account that signed up without its details (older sign-up flow) has no profile yet: its first save
+            // creates it, as long as the account itself exists.
+            if (optionalProfile.isEmpty() && !externalIamService.existsUser(userId)) {
                 return Result.failure(ApplicationError.notFound("profile", command.userId()));
             }
 
-            var profile = optionalProfile.get();
             var fullName = new FullName(command.fullName());
             var country = new CountryCode(command.country());
             String formattedPhone = phoneNumberValidator.formatToE164(command.phoneNumber(), command.country());
             var phoneNumber = new PhoneNumber(formattedPhone);
 
-            profile.updateContact(fullName, country, phoneNumber);
+            Profile profile;
+            if (optionalProfile.isPresent()) {
+                profile = optionalProfile.get();
+                profile.updateContact(fullName, country, phoneNumber);
+            } else {
+                profile = Profile.create(userId, fullName, country, phoneNumber);
+            }
             var savedProfile = profileRepository.save(profile);
 
             for (var event : profile.domainEvents()) {
