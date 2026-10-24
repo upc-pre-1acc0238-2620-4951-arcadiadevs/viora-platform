@@ -39,7 +39,9 @@ public class CurrentSubscriptionController {
     public ResponseEntity<?> current() {
         var current = queries.current(users.requireAuthenticatedUserId());
         return current.<ResponseEntity<?>>map(subscription -> ResponseEntity.ok(
-                SubscriptionDetailsAssembler.toResource(subscription, clock.instant())))
+                SubscriptionDetailsAssembler.toResource(subscription, clock.instant(),
+                        queries.paymentStatus(users.requireAuthenticatedUserId(),
+                                java.util.UUID.fromString(subscription.snapshot().id().subscriptionId())))))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

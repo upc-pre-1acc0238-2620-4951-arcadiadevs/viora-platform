@@ -16,6 +16,17 @@ public final class SubscriptionDetailsAssembler {
      * @return public details
      */
     public static SubscriptionDetailsResource toResource(Subscription subscription, Instant at) {
+        return toResource(subscription, at, null);
+    }
+
+    /**
+     * Maps an owned contract with its persisted payment attempt projection.
+     * @param subscription owned contract
+     * @param at entitlement evaluation time
+     * @param paymentStatus persisted attempt state, nullable
+     * @return public subscription details
+     */
+    public static SubscriptionDetailsResource toResource(Subscription subscription, Instant at, String paymentStatus) {
         var s = subscription.snapshot();
         var active = subscription.hasActiveEntitlement(at);
         var status = s.status() == SubscriptionStatus.ACTIVE && !active
@@ -27,6 +38,6 @@ public final class SubscriptionDetailsAssembler {
                 s.price() == null ? null : s.price().total().amount(),
                 s.period() == null ? null : s.period().startsAt(),
                 s.period() == null ? null : s.period().endsAt(), active,
-                s.cooperativeId() == null ? null : s.cooperativeId().cooperativeId());
+                s.cooperativeId() == null ? null : s.cooperativeId().cooperativeId(), paymentStatus);
     }
 }
