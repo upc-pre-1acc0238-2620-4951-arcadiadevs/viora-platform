@@ -57,6 +57,18 @@ class MercadoPagoGatewayTest {
                 .quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 10);
         assertEquals("pref-2", gateway.create(attempt, price).preferenceId());
     }
+    @Test void closingAPreferenceEndsItsValidityNow() {
+        server.expect(requestTo("https://api.mercadopago.com/checkout/preferences/pref-1")).andExpect(method(HttpMethod.PUT))
+            .andExpect(jsonPath("$.expires").value(true))
+            .andExpect(jsonPath("$.expiration_date_to").value("2026-10-21T13:00:00Z"))
+            .andRespond(withSuccess("{\"id\":\"pref-1\"}", MediaType.APPLICATION_JSON));
+        gateway.close("pref-1", Instant.parse("2026-10-21T13:00:00Z"));
+    }
+    @Test void aClosingThatTheProviderDoesNotConfirmFails() {
+        server.expect(requestTo("https://api.mercadopago.com/checkout/preferences/pref-1")).andExpect(method(HttpMethod.PUT))
+            .andRespond(withServerError());
+        assertThrows(PaymentGateway.Unavailable.class, () -> gateway.close("pref-1", Instant.parse("2026-10-21T13:00:00Z")));
+    }
     @Test void realPaymentCannotEnterSandboxEvenWithApprovedStatus() {
         server.expect(requestTo("https://api.mercadopago.com/v1/payments/123"))
             .andRespond(withSuccess("{\"id\":123,\"collector_id\":42,\"live_mode\":true}", MediaType.APPLICATION_JSON));

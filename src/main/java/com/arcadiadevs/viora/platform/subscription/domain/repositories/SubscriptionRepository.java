@@ -36,11 +36,11 @@ public interface SubscriptionRepository {
     Optional<Subscription> findById(SubscriptionId id);
 
     /**
-     * Checks whether another individual purchase remains open.
+     * Finds the individual purchase still waiting for its payment.
      * @param producerId producer identity
-     * @return whether a pending contract exists
+     * @return the pending contract when present
      */
-    boolean existsPendingByProducerId(ProducerId producerId);
+    Optional<Subscription> findPendingByProducerId(ProducerId producerId);
 
     /**
      * Resolves active access first, otherwise the latest owned contract.
