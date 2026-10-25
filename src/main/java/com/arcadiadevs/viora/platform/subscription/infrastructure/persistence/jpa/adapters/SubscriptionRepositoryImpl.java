@@ -57,14 +57,15 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
     }
 
     /**
-     * Checks pending purchases independently of the latest row ordering.
+     * Finds the open individual purchase of a producer.
      * @param producerId producer identity
-     * @return whether a pending contract exists
+     * @return the pending contract when present
      */
     @Override
-    public boolean existsPendingByProducerId(ProducerId producerId) {
-        return persistenceRepository.existsByProducerIdAndStatus(
-                UUID.fromString(producerId.producerId()), SubscriptionStatus.PENDING_PAYMENT);
+    public Optional<Subscription> findPendingByProducerId(ProducerId producerId) {
+        return persistenceRepository.findFirstByProducerIdAndStatusOrderByCreatedAtDesc(
+                UUID.fromString(producerId.producerId()), SubscriptionStatus.PENDING_PAYMENT)
+                .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
     }
 
     /**

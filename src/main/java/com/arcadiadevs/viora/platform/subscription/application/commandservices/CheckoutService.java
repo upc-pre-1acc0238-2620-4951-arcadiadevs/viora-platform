@@ -28,6 +28,15 @@ public interface CheckoutService {
     Result<CheckoutResult, ApplicationError> createForExtension(String owner, UUID subscriptionId, UUID extensionId, String key);
 
     /**
+     * Closes the unpaid checkout of a pending plan so its terms can change. Provider evidence is reconciled first:
+     * an approved or still unresolved payment keeps the plan as it is.
+     * @param owner authenticated producer
+     * @param subscriptionId owned pending plan
+     * @return acknowledgement once no link can pay the current terms, or a consistent failure
+     */
+    Result<Boolean, ApplicationError> release(String owner, UUID subscriptionId);
+
+    /**
      * Reconciles provider evidence, never browser return parameters.
      * @param paymentId authenticated provider transaction identifier
      * @return durable processing acknowledgement

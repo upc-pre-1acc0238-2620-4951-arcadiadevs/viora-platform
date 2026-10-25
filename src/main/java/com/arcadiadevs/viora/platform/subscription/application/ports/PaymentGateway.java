@@ -43,6 +43,14 @@ public interface PaymentGateway {
     List<VerifiedPayment> findPayments(UUID intentId);
 
     /**
+     * Ends the validity of a hosted preference, so its link can no longer start a payment.
+     * @param preferenceId provider preference identifier
+     * @param at instant from which the link stops accepting payments
+     * @throws Unavailable if the provider does not confirm the change
+     */
+    void close(String preferenceId, Instant at);
+
+    /**
      * Provider-hosted navigation information without credentials.
      * @param preferenceId provider preference identifier
      * @param checkoutUrl validated hosted payment URL

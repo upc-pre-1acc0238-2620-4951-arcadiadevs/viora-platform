@@ -136,6 +136,16 @@ public class MercadoPagoGateway implements PaymentGateway {
             return List.copyOf(payments);
         } catch (RuntimeException ex) { throw new Unavailable(); }
     }
+    @Override public void close(String preferenceId, Instant at) {
+        requireConfiguration();
+        if (preferenceId == null || !preferenceId.matches("[a-zA-Z0-9-]+") || at == null) { throw new Unavailable(); }
+        try {
+            var result = client.put().uri("/checkout/preferences/" + preferenceId)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(Map.of("expires", true, "expiration_date_to", at.toString())).retrieve().body(Map.class);
+            if (result == null || !preferenceId.equals(required(result, "id"))) { throw new Unavailable(); }
+        } catch (RuntimeException ex) { throw new Unavailable(); }
+    }
     private String collector() {
         return merchant().id();
     }

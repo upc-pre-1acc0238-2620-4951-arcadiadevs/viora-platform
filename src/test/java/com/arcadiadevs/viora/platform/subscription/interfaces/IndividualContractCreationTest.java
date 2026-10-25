@@ -66,6 +66,25 @@ class IndividualContractCreationTest {
     }
 
     @Test
+    void anUnpaidPurchaseTakesTheHectaresOfANewSelection() throws Exception {
+        var first = mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "half")
+                .contentType("application/json").content("{\"planCode\":\"PRODUCER_ANNUAL\",\"requestedQuotaHa\":0.5}"))
+                .andExpect(status().isCreated()).andReturn();
+        var id = com.jayway.jsonpath.JsonPath.<String>read(first.getResponse().getContentAsString(), "$.id");
+        mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "two")
+                .contentType("application/json").content("{\"planCode\":\"PRODUCER_ANNUAL\",\"requestedQuotaHa\":2}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.quotaHa").value(2.0))
+                .andExpect(jsonPath("$.totalAmount").value(1320.0))
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+        mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "two-again")
+                .contentType("application/json").content("{\"planCode\":\"PRODUCER_ANNUAL\",\"requestedQuotaHa\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id));
+    }
+
+    @Test
     void rejectsAnonymousEvenWhenDemoFallbackExists() throws Exception {
         SecurityContextHolder.clearContext();
         mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "anonymous")
