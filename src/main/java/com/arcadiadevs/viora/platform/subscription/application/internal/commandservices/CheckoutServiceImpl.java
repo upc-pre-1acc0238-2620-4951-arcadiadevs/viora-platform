@@ -165,6 +165,41 @@ public class CheckoutServiceImpl implements CheckoutService {
             });
         } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
     }
+    /**
+     * Closes the unpaid checkout of a pending plan so its terms can change. Provider evidence is reconciled first:
+     * an approved or still unresolved payment keeps the plan as it is.
+     * @param owner authenticated producer
+     * @param subscriptionId owned pending plan
+     * @return acknowledgement once no link can pay the current terms, or a consistent failure
+     */
+    @Override
+    public Result<Boolean, ApplicationError> release(String owner, UUID subscriptionId) {
+        var latest = attempts.latest(subscriptionId);
+        if (latest.isEmpty() || "EXPIRED".equals(latest.get().status())) { return Result.success(true); }
+        var open = latest.get();
+        if (!owner.equals(open.producerId())) {
+            return Result.failure(ApplicationError.notFound("subscription", subscriptionId.toString()));
+        }
+        if (Set.of("PENDING", "APPROVED").contains(open.status())) { return conflict("subscription.payment.unresolved"); }
+        if (!gateway.configured()) { return unavailable(); }
+        try {
+            var payments = gateway.findPayments(open.id());
+            for (var payment : payments) { var applied = apply(payment); if (applied.isFailure()) { return Result.failure(applied.failure().orElseThrow()); } }
+            if (payments.stream().anyMatch(p -> !Set.of("rejected", "cancelled").contains(p.status()))) {
+                return conflict("subscription.payment.unresolved");
+            }
+            // A rejected payment leaves the link open for another try, so it is closed as well.
+            var preference = open.preferenceId() != null ? Optional.of(open.preferenceId())
+                    : gateway.recover(open.id()).map(PaymentGateway.Checkout::preferenceId);
+            if (preference.isPresent()) { gateway.close(preference.get(), clock.instant()); }
+        } catch (PaymentGateway.Unavailable ex) { return unavailable(); }
+        return work.exclusive(owner, () -> {
+            var stored = attempts.find(open.id()).orElseThrow();
+            if (Set.of("PENDING", "APPROVED").contains(stored.status())) { return conflict("subscription.payment.unresolved"); }
+            if (!"EXPIRED".equals(stored.status())) { attempts.save(stored.withStatus("EXPIRED")); }
+            return Result.success(true);
+        });
+    }
     /** Resolves what is payable now: a pending individual plan, or a pending paid extension of a plan in force. */
     private Result<Target, ApplicationError> target(ProducerId producer, UUID subscriptionId, UUID extensionId) {
         var contract = subscriptions.findByIdAndProducerId(new SubscriptionId(subscriptionId.toString()), producer);

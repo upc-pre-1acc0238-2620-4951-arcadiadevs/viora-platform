@@ -36,8 +36,8 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
     private final CooperativeLicenseId licenseId;
     private final InvitationCodeId redeemedCodeId;
     private final Long revision;
-    private final String planCode;
-    private final SubscriptionPrice price;
+    private String planCode;
+    private SubscriptionPrice price;
     private String paymentId;
     private final Instant createdAt;
 
@@ -151,6 +151,27 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
                 new HectaresQuota(quota.value()), null, null, null, null, 0L, planCode, price, null, at);
         validateModeState(snapshot);
         return new Subscription(snapshot);
+    }
+
+    /**
+     * Changes the terms of an individual purchase that is still waiting for its payment, so the producer can buy
+     * another surface without leaving an unpaid contract behind. The caller closes its checkout first.
+     * @param planCode selected offer
+     * @param quota validated individual capacity
+     * @param price server-owned terms for that capacity
+     * @throws IllegalArgumentException if an argument is missing
+     * @throws IllegalStateException if the contract is not a pending individual purchase
+     */
+    public void requote(String planCode, IndividualHectaresQuota quota, SubscriptionPrice price) {
+        if (planCode == null || planCode.isBlank() || quota == null || price == null) {
+            throw new IllegalArgumentException("subscription.snapshot.incomplete");
+        }
+        if (mode != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || status != SubscriptionStatus.PENDING_PAYMENT) {
+            throw new IllegalStateException("subscription.requote.invalid");
+        }
+        this.planCode = planCode;
+        this.quota = new HectaresQuota(quota.value());
+        this.price = price;
     }
 
     /**

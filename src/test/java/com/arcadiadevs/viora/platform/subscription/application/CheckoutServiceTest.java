@@ -5,7 +5,12 @@ import java.time.*;
 import java.util.*;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.*;
+import com.arcadiadevs.viora.platform.shared.application.result.*;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
+import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.SubscriptionCommandServiceImpl;
+import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
+import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
 import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.CheckoutServiceImpl;
 import com.arcadiadevs.viora.platform.subscription.application.ports.*;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
@@ -31,7 +36,7 @@ class CheckoutServiceTest {
         }
         public Optional<Subscription> findCurrent(ProducerId p, Instant at) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p)).findFirst(); }
         public boolean existsActiveByProducerId(ProducerId p, Instant at) { return contracts.values().stream().anyMatch(s -> s.snapshot().producerId().equals(p) && s.hasActiveEntitlement(at)); }
-        public boolean existsPendingByProducerId(ProducerId p) { return contracts.values().stream().anyMatch(s -> s.snapshot().producerId().equals(p) && s.snapshot().status() == SubscriptionStatus.PENDING_PAYMENT); }
+        public Optional<Subscription> findPendingByProducerId(ProducerId p) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p) && s.snapshot().status() == SubscriptionStatus.PENDING_PAYMENT).findFirst(); }
         public PaymentAttempt save(PaymentAttempt a) { attempts.put(a.id(), a); return a; }
         public Optional<PaymentAttempt> find(UUID id) { return Optional.ofNullable(attempts.get(id)); }
         public Optional<PaymentAttempt> latest(UUID id) { return attempts.values().stream().filter(a -> a.subscriptionId().equals(id) && a.extensionId() == null).max(Comparator.comparing(PaymentAttempt::createdAt)); }
@@ -59,6 +64,8 @@ class CheckoutServiceTest {
             if (failSearch) { throw new Unavailable(); }
             return payment == null || omitSearchResults ? List.of() : List.of(payment);
         }
+        final List<String> closed = new ArrayList<>();
+        public void close(String preferenceId, Instant at) { closed.add(preferenceId); }
     }
     final Instant now = Instant.parse("2026-10-21T12:00:00Z");
     final Store store = new Store();
@@ -141,6 +148,60 @@ class CheckoutServiceTest {
         assertEquals("REJECTED", service.latest(contractId).orElseThrow().status());
         assertTrue(service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "retry").isSuccess());
         assertEquals(1, gateway.creates);
+    }
+
+    private final String producer = "550e8400-e29b-41d4-a716-446655440000";
+    private final SubscriptionPricingPolicy pricing = new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18"));
+    private final SubscriptionCommandServiceImpl purchases = new SubscriptionCommandServiceImpl(store, store,
+            new SubscriptionCatalog() {
+                public List<PlanOffer> plans() { return List.of(); }
+                public SubscriptionPrice quote(String plan, IndividualHectaresQuota q) { return pricing.quote(q); }
+                public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int months) { throw new UnsupportedOperationException(); }
+            }, owner -> true, Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
+    private Result<SubscriptionCommandService.CreatedSubscription, ApplicationError> buy(String hectares, String key) {
+        return purchases.handle(new CreateSubscriptionCommand(producer, "PRODUCER_ANNUAL", new BigDecimal(hectares), key));
+    }
+    @Test void anUnpaidPurchaseTakesTheNewSelectionAndItsOpenLinkIsClosed() {
+        var checkout = service.create(producer, contractId, "k").success().orElseThrow();
+        var requoted = buy("2", "other-size").success().orElseThrow();
+        assertEquals(contractId, requoted.id());
+        assertEquals(0, new BigDecimal("2").compareTo(sub.snapshot().quota().hectares()));
+        assertEquals(pricing.quote(new IndividualHectaresQuota(new BigDecimal("2"))), sub.snapshot().price());
+        assertEquals(List.of("preference-1"), gateway.closed);
+        assertEquals("EXPIRED", store.find(checkout.intentId()).orElseThrow().status());
+        assertNotEquals(checkout.intentId(), service.create(producer, contractId, "k2").success().orElseThrow().intentId());
+    }
+    @Test void aPurchaseWithoutCheckoutTakesTheNewSelectionWithoutTheProvider() {
+        assertTrue(buy("0.5", "smaller").isSuccess());
+        assertEquals(0, new BigDecimal("0.5").compareTo(sub.snapshot().quota().hectares()));
+        assertTrue(gateway.closed.isEmpty());
+    }
+    @Test void theSameSelectionKeepsThePurchaseAndItsLink() {
+        service.create(producer, contractId, "k");
+        assertEquals(contractId, buy("5", "same").success().orElseThrow().id());
+        assertEquals(price, sub.snapshot().price());
+        assertTrue(gateway.closed.isEmpty());
+    }
+    @Test void anUnresolvedPaymentKeepsThePurchaseAsItIs() {
+        var checkout = service.create(producer, contractId, "k").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "in_process", price.total(), "PEN", now.plusSeconds(21), null);
+        assertTrue(buy("2", "other-size").isFailure());
+        assertEquals(price, sub.snapshot().price());
+        assertTrue(gateway.closed.isEmpty());
+        assertEquals("PENDING", store.find(checkout.intentId()).orElseThrow().status());
+    }
+    @Test void aRejectedPaymentStillLetsThePurchaseChangeAndClosesItsLink() {
+        var checkout = service.create(producer, contractId, "k").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "rejected", price.total(), "PEN", now.plusSeconds(21), null);
+        service.confirm("123");
+        assertTrue(buy("2", "other-size").isSuccess());
+        assertEquals(List.of("preference-1"), gateway.closed);
+    }
+    @Test void aProviderFailureKeepsThePurchaseAsItIs() {
+        service.create(producer, contractId, "k");
+        gateway.failSearch = true;
+        assertTrue(buy("2", "other-size").isFailure());
+        assertEquals(price, sub.snapshot().price());
     }
 
     private CheckoutService afterExpiry() {
