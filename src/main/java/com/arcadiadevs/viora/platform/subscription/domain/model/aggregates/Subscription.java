@@ -243,6 +243,34 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
     }
 
     /**
+     * Ends the access of a plan whose payment was refunded or charged back. Only the payment that activated the plan
+     * can end it, and only once.
+     *
+     * @param paymentId the provider payment that was reversed
+     * @return true if the plan was active under that payment and is now cancelled
+     */
+    public boolean revokeReversedPayment(String paymentId) {
+        if (paymentId == null || !paymentId.equals(this.paymentId) || status != SubscriptionStatus.ACTIVE) {
+            return false;
+        }
+        status = SubscriptionStatus.CANCELLED;
+        return true;
+    }
+
+    /**
+     * Takes back the hectares of an extension whose payment was refunded or charged back.
+     *
+     * @param removed the hectares the extension had added
+     * @throws IllegalArgumentException if {@code removed} is null or would leave the plan without hectares
+     */
+    public void reduceQuota(HectaresQuota removed) {
+        if (removed == null) {
+            throw new IllegalArgumentException("subscription.quota.null");
+        }
+        quota = new HectaresQuota(quota.hectares().subtract(removed.hectares()));
+    }
+
+    /**
      * Checks whether the producer can use Viora under this subscription.
      *
      * @param at the instant to check
