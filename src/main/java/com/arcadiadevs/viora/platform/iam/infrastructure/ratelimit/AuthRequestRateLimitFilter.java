@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit.ClientAddress;
+import com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit.SlidingWindowCounter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -62,7 +64,7 @@ public class AuthRequestRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
-        var wait = requests.tryAcquire(clientAddress(request), clock.instant());
+        var wait = requests.tryAcquire(ClientAddress.of(request), clock.instant());
         if (wait.isPresent()) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(wait.getAsLong()));
@@ -74,14 +76,5 @@ public class AuthRequestRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(request, response);
-    }
-
-    /** Render puts the address of the client first in {@code X-Forwarded-For}; without it, the peer address. */
-    private static String clientAddress(HttpServletRequest request) {
-        var forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

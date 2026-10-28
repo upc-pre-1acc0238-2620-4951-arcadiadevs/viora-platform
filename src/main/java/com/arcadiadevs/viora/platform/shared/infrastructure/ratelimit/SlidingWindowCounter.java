@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.iam.infrastructure.ratelimit;
+package com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Keys whose window has emptied are dropped on the next acquire of any key, so the map cannot grow without bound
  * with keys that are never seen again.</p>
  */
-final class SlidingWindowCounter {
+public final class SlidingWindowCounter {
 
     private final int maxEvents;
     private final Duration window;
@@ -27,7 +27,7 @@ final class SlidingWindowCounter {
      * @param window    the length of the window
      * @throws IllegalArgumentException if a setting is not positive
      */
-    SlidingWindowCounter(int maxEvents, Duration window) {
+    public SlidingWindowCounter(int maxEvents, Duration window) {
         if (maxEvents < 1 || window == null || window.isNegative() || window.isZero()) {
             throw new IllegalArgumentException("rate_limit.settings.positive");
         }
@@ -42,7 +42,7 @@ final class SlidingWindowCounter {
      * @param at  the instant of the event
      * @return empty when the event was recorded, or the seconds until the oldest event leaves the window
      */
-    OptionalLong tryAcquire(String key, Instant at) {
+    public OptionalLong tryAcquire(String key, Instant at) {
         events.values().removeIf(deque -> {
             synchronized (deque) {
                 prune(deque, at);
@@ -68,7 +68,7 @@ final class SlidingWindowCounter {
      *
      * @param key the key to forget
      */
-    void reset(String key) {
+    public void reset(String key) {
         events.remove(key);
     }
 

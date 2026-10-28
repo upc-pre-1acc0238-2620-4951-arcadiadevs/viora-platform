@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.ratelimit;
 
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.ratelimit.AuthAttemptLimiter;
+import com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit.SlidingWindowCounter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
