@@ -100,7 +100,8 @@ class PaymentNotificationHttpTest {
     void approvedPaymentWithDifferentAmountCannotActivateAccess() throws Exception {
         evidence("approved", new Money(new BigDecimal("1.00")));
         var response = notify(paymentId, "payment", signature(paymentId));
-        assertEquals(422, response.statusCode(), response.body());
+        // Acknowledged so Mercado Pago stops retrying; the payment is recorded as unapplied for its refund
+        assertEquals(200, response.statusCode(), response.body());
         assertEquals(SubscriptionStatus.PENDING_PAYMENT,
                 subscriptions.findById(contract.snapshot().id()).orElseThrow().snapshot().status());
     }

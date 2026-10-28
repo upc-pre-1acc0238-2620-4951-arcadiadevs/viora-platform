@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.subscription.application.internal.commandservices;
 
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
@@ -17,6 +19,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
  */
 @Service
 public class CheckoutServiceImpl implements CheckoutService {
+    private static final Logger LOG = LoggerFactory.getLogger(CheckoutServiceImpl.class);
     private final SubscriptionRepository subscriptions;
     private final PaymentAttemptRepository attempts;
     private final SubscriptionUnitOfWork work;
@@ -236,8 +239,14 @@ public class CheckoutServiceImpl implements CheckoutService {
      */
     @Override
     public Result<Boolean, ApplicationError> confirm(String paymentId) {
-        try { return apply(gateway.verify(paymentId)); }
+        final PaymentGateway.VerifiedPayment payment;
+        try { payment = gateway.verify(paymentId); }
         catch (PaymentGateway.Unavailable ex) { return unavailable(); }
+        var result = apply(payment);
+        if ("approved".equals(payment.status())) {
+            closeLink(payment.intentId());
+        }
+        return result;
     }
     private Result<Boolean, ApplicationError> apply(PaymentGateway.VerifiedPayment payment) {
         var found = attempts.find(payment.intentId());
@@ -250,7 +259,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 return applyExtension(current, sub, payment);
             }
             if (sub.snapshot().mode() != PlanMode.PLAN_PRODUCTOR_INDIVIDUAL || !matches(current, payment, sub.snapshot().price())) {
-                return invalid("subscription.payment.mismatch");
+                return unapplied(current, payment, "subscription.payment.mismatch");
             }
             if ("approved".equals(payment.status())) {
                 if (!approvedInTime(payment)) { return invalid("subscription.payment.mismatch"); }
@@ -258,7 +267,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                     sub.activateIndividual(payment.id(), payment.amount(), payment.currency(), payment.approvedAt(),
                             renewalStart(sub, payment.approvedAt()));
                 }
-                catch (IllegalArgumentException | IllegalStateException ex) { return conflict(ex.getMessage()); }
+                catch (IllegalArgumentException | IllegalStateException ex) { return unapplied(current, payment, ex.getMessage()); }
                 subscriptions.save(sub);
                 attempts.save(current.withPaymentState(payment.id(), "approved"));
                 sub.domainEvents().forEach(events::publishEvent);
@@ -280,7 +289,7 @@ public class CheckoutServiceImpl implements CheckoutService {
             PaymentGateway.VerifiedPayment payment) {
         var extension = extensions.findById(new QuotaExtensionId(current.extensionId().toString())).orElseThrow();
         if (!matches(current, payment, extension.snapshot().price())) {
-            return invalid("subscription.payment.mismatch");
+            return unapplied(current, payment, "subscription.payment.mismatch");
         }
         if ("approved".equals(payment.status())) {
             if (!approvedInTime(payment)) { return invalid("subscription.payment.mismatch"); }
@@ -290,7 +299,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                     subscriptions.save(sub);
                     extensions.save(extension);
                 }
-            } catch (IllegalArgumentException | IllegalStateException ex) { return conflict(ex.getMessage()); }
+            } catch (IllegalArgumentException | IllegalStateException ex) { return unapplied(current, payment, ex.getMessage()); }
             attempts.save(current.withPaymentState(payment.id(), "approved"));
         } else if (PaymentAttempt.REVERSED_STATES.contains(payment.status())) {
             // The hectares go back only once: the attempt remembers the payment is no longer approved
@@ -336,6 +345,28 @@ public class CheckoutServiceImpl implements CheckoutService {
     private static <T> Result<T, ApplicationError> conflict(String key) {
         var error = ApplicationError.conflict("subscription", key);
         return Result.failure(new ApplicationError(error.code(), error.message(), error.details(), Map.of("reason", key)));
+    }
+    /**
+     * An approved payment the plan cannot take (a second payment, or one for an outdated price) is recorded on its
+     * attempt and logged for a refund, and acknowledged, so the provider stops retrying a notification that will never
+     * apply. Any other payment state keeps the usual rejection.
+     */
+    private Result<Boolean, ApplicationError> unapplied(PaymentAttempt current, PaymentGateway.VerifiedPayment payment,
+            String reason) {
+        if (!"approved".equals(payment.status())) {
+            return invalid(reason);
+        }
+        attempts.save(current.withPaymentState(payment.id(), PaymentAttempt.UNAPPLIED));
+        LOG.error("Approved payment {} of attempt {} ({} {}) was not applied ({}): refund it in Mercado Pago",
+                payment.id(), current.id(), payment.amount().amount(), payment.currency(), reason);
+        return Result.success(false);
+    }
+    /** Stops the checkout link of an approved attempt from taking more payments; a failure only leaves it open. */
+    private void closeLink(UUID intentId) {
+        attempts.find(intentId).map(PaymentAttempt::preferenceId).filter(Objects::nonNull).ifPresent(preference -> {
+            try { gateway.close(preference, clock.instant()); }
+            catch (PaymentGateway.Unavailable ex) { LOG.warn("Checkout link {} could not be closed", preference); }
+        });
     }
     private static <T> Result<T, ApplicationError> invalid(String key) {
         return Result.failure(ApplicationError.businessRuleViolation("subscription", key));
