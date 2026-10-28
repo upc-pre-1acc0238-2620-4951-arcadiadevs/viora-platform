@@ -120,7 +120,7 @@ public class PlotCommandServiceImpl implements PlotCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("plot-creation", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("plot-creation", ex));
         }
     }
 
@@ -181,7 +181,7 @@ public class PlotCommandServiceImpl implements PlotCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("plot-update", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("plot-update", ex));
         }
     }
 
@@ -216,7 +216,7 @@ public class PlotCommandServiceImpl implements PlotCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("plot-removal", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("plot-removal", ex));
         }
     }
 
@@ -255,7 +255,7 @@ public class PlotCommandServiceImpl implements PlotCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("plot-restoration", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("plot-restoration", ex));
         }
     }
 

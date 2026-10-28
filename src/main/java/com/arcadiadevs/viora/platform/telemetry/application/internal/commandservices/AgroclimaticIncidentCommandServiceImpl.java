@@ -99,7 +99,7 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("incident-raise", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("incident-raise", ex));
         }
     }
 
@@ -125,7 +125,7 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("incident-normalize", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("incident-normalize", ex));
         }
     }
 
@@ -153,7 +153,7 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("incident-postpone", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("incident-postpone", ex));
         }
     }
 
@@ -181,7 +181,7 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("incident-step-complete", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("incident-step-complete", ex));
         }
     }
 

@@ -85,7 +85,7 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("harvest-record", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("harvest-record", ex));
         }
     }
 
@@ -127,7 +127,7 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("harvest-rectify", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("harvest-rectify", ex));
         }
     }
 
@@ -166,7 +166,7 @@ public class HarvestRecordCommandServiceImpl implements HarvestRecordCommandServ
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("harvest-remove", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("harvest-remove", ex));
         }
     }
 }
