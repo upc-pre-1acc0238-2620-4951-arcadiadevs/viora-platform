@@ -227,6 +227,31 @@ class CooperativeCodeRedemptionIntegrationTest {
     }
 
     @Test
+    @DisplayName("Two codes redeemed at the same time create one subscription and spend one code")
+    void concurrentRedemptionsCreateOneSubscription() throws Exception {
+        var first = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var second = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var start = new CountDownLatch(1);
+        try (var executor = new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2))) {
+            Callable<Integer> one = () -> {
+                start.await();
+                return redeem(first).andReturn().getResponse().getStatus();
+            };
+            Callable<Integer> other = () -> {
+                start.await();
+                return redeem(second).andReturn().getResponse().getStatus();
+            };
+            Future<Integer> a = executor.submit(one);
+            Future<Integer> b = executor.submit(other);
+            start.countDown();
+            assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(201, 409);
+        }
+
+        assertThat(subscriptionsOf(producer)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("Hectares sent by the client are ignored: the subscription covers the code's quota")
     void clientHectaresAreIgnored() throws Exception {
         var code = newCode(license, Instant.now().plus(Duration.ofDays(7)), new BigDecimal("8"));
