@@ -12,7 +12,7 @@ class OpenMeteoWeatherClientAdapterTest {
     @Test
     @DisplayName("Should return 7-day forecast with realistic values and valid date sequence")
     void shouldReturnSevenDayForecast() {
-        var adapter = new OpenMeteoWeatherClientAdapter();
+        var adapter = new OpenMeteoWeatherClientAdapter(true);
         var forecast = adapter.fetchSevenDayForecast(-18.05, -70.25);
 
         assertThat(forecast).hasSize(7);

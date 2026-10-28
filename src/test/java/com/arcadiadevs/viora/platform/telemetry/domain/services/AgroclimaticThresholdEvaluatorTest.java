@@ -76,8 +76,10 @@ class AgroclimaticThresholdEvaluatorTest {
     }
 
     @Test
-    @DisplayName("Should detect warning frost when minimum temperature is between -2.0°C and 1.0°C")
+    @DisplayName("Should detect warning frost when minimum temperature is between -2.0°C and 1.5°C")
     void shouldDetectWarningFrost() {
+        assertThat(evaluator.evaluateFrostRisk(1.5)).isPresent();
+        assertThat(evaluator.evaluateFrostRisk(1.6)).isEmpty();
         var triggerOpt = evaluator.evaluateFrostRisk(0.5);
         assertThat(triggerOpt).isPresent();
         var trigger = triggerOpt.get();
