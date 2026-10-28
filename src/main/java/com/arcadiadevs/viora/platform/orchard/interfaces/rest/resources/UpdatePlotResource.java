@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.orchard.interfaces.rest.resources;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -32,7 +33,8 @@ public record UpdatePlotResource(
         @Schema(description = "Tree spacing in meters", example = "4.5")
         Double treeSpacingM,
 
-        @Schema(description = "Date of last pruning labor (ISO-8601)", example = "2026-09-10")
+        @PastOrPresent(message = "Last pruning date cannot be in the future")
+        @Schema(description = "Date of last pruning labor (ISO-8601), not in the future", example = "2026-09-10")
         LocalDate lastPruningDate,
 
         @NotBlank(message = "Polygon GeoJSON cannot be blank")
