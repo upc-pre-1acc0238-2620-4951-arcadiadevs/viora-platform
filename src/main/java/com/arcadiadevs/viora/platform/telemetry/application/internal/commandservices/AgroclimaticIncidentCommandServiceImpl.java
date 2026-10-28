@@ -70,10 +70,15 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
             var type = IncidentType.from(command.type());
             var severity = IncidentSeverity.from(command.severity());
 
-            var activeOpt = incidentRepository.findActiveByPlotIdAndType(plotId, type);
-            if (activeOpt.isPresent()) {
-                // Already an active incident for this plot and type; return existing without duplicate
-                return Result.success(activeOpt.get().snapshot().id().incidentId());
+            // An open incident of this type, active or postponed, is kept instead of raising a duplicate; a postponed
+            // one becomes active again once its postponement is over
+            var openOpt = incidentRepository.findOpenByPlotIdAndType(plotId, type);
+            if (openOpt.isPresent()) {
+                var open = openOpt.get();
+                if (open.wakeIfPostponementEnded(Instant.now())) {
+                    incidentRepository.save(open);
+                }
+                return Result.success(open.snapshot().id().incidentId());
             }
 
             var breachInfo = new ThresholdBreachInfo(
@@ -178,6 +183,8 @@ public class AgroclimaticIncidentCommandServiceImpl implements AgroclimaticIncid
             publishAndClearDomainEvents(incident);
 
             return Result.success(saved.snapshot().id().incidentId());
+        } catch (IllegalStateException ex) {
+            return Result.failure(ApplicationError.businessRuleViolation("incident-lifecycle", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {

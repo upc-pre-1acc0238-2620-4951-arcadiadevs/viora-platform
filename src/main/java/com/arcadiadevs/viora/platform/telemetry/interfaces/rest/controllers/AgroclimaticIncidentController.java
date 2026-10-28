@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.telemetry.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.resources.MessageResource;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
@@ -216,13 +218,23 @@ public class AgroclimaticIncidentController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Mitigation step successfully completed",
                     content = @Content(schema = @Schema(implementation = MessageResource.class))),
-            @ApiResponse(responseCode = "404", description = "Incident or step not found")
+            @ApiResponse(responseCode = "400", description = "The body asks to reopen the step, which is not supported"),
+            @ApiResponse(responseCode = "404", description = "Incident or step not found"),
+            @ApiResponse(responseCode = "422", description = "The incident is already normalized")
     })
     public ResponseEntity<?> completeMitigationStep(
             @Parameter(description = "Parent incident UUID") @PathVariable String incidentId,
             @Parameter(description = "Target step UUID") @PathVariable String stepId,
             @RequestBody(required = false) @Nullable CompleteMitigationStepResource resource
     ) {
+        if (resource != null && Boolean.FALSE.equals(resource.completed())) {
+            // Only completing is supported; a step is never reopened
+            return ResponseEntityAssembler.toResponseEntityFromResult(
+                    Result.<String, ApplicationError>failure(ApplicationError.validationError("completed",
+                            "mitigation_step.reopen_not_supported")),
+                    id -> new MessageResource("mitigation_step.completed_successfully"),
+                    HttpStatus.OK);
+        }
         var command = CompleteMitigationStepCommandFromResourceAssembler.toCommand(incidentId, stepId);
         var result = commandService.handle(command);
         return ResponseEntityAssembler.toResponseEntityFromResult(
