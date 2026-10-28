@@ -41,12 +41,12 @@ public class SubscriptionByIdController {
     @GetMapping("/{id}")
     @Operation(summary = "Get a subscription owned by the signed-in producer")
     public ResponseEntity<?> get(@PathVariable UUID id) {
-        var found = queries.find(users.requireAuthenticatedUserId(), id);
+        var found = queries.find(users.requireCurrentUserId(), id);
         if (found.isEmpty()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(
                     ApplicationError.notFound("subscription", id.toString()));
         }
         return ResponseEntity.ok(SubscriptionDetailsAssembler.toResource(found.orElseThrow(), clock.instant(),
-                queries.paymentStatus(users.requireAuthenticatedUserId(), id)));
+                queries.paymentStatus(users.requireCurrentUserId(), id)));
     }
 }

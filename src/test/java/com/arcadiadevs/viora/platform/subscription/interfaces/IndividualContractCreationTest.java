@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "viora.security.demo.enabled=true")
+@SpringBootTest
 class IndividualContractCreationTest {
     @Autowired private WebApplicationContext context;
     @Autowired private SubscriptionCommandService commands;

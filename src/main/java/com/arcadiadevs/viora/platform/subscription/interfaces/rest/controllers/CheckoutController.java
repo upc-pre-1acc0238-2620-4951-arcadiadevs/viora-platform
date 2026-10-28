@@ -35,6 +35,6 @@ public class CheckoutController {
     @Operation(summary = "Prepare or recover an owned Mercado Pago checkout")
     public ResponseEntity<?> create(@PathVariable UUID id, @RequestHeader("Idempotency-Key") String key) {
         return ResponseEntityAssembler.toResponseEntityFromResult(
-                payments.create(users.requireAuthenticatedUserId(), id, key), result -> result, HttpStatus.CREATED);
+                payments.create(users.requireCurrentUserId(), id, key), result -> result, HttpStatus.CREATED);
     }
 }

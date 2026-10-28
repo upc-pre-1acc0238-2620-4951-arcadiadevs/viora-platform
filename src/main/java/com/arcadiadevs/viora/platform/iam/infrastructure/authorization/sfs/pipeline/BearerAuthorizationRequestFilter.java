@@ -68,8 +68,7 @@ public class BearerAuthorizationRequestFilter extends OncePerRequestFilter {
         }
 
         // A token that was presented but does not authenticate (expired, tampered, issued before the last password
-        // change) answers 401, so the app renews the session. Treating it as anonymous would hand the request to the
-        // demo producer fallback and show somebody else's data.
+        // change) answers 401, so the app renews the session. On a public route it is ignored instead.
         if (token != null && !authenticated && !isPublic(request)) {
             SecurityContextHolder.clearContext();
             unauthorizedHandler.commence(request, response, new BadCredentialsException("security.bearer_token.rejected"));

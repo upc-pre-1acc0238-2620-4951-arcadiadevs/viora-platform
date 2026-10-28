@@ -64,8 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:cooperativecoderedemption;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "viora.subscription.seed.enabled=true",
-        "viora.security.demo.enabled=true"
+        "viora.subscription.seed.enabled=true"
 })
 @DisplayName("Cooperative code redemption integration")
 class CooperativeCodeRedemptionIntegrationTest {

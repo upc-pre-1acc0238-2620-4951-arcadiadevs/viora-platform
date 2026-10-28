@@ -72,7 +72,7 @@ public class QuotaExtensionController {
     @GetMapping("/extension-terms")
     @Operation(summary = "Get how an owned plan can grow now")
     public ResponseEntity<?> terms(@PathVariable UUID subscriptionId) {
-        return queries.terms(users.requireAuthenticatedUserId(), subscriptionId)
+        return queries.terms(users.requireCurrentUserId(), subscriptionId)
                 .<ResponseEntity<?>>map(terms -> ResponseEntity.ok(QuotaExtensionResourceAssembler.toResource(terms)))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("subscription", subscriptionId.toString())));
@@ -91,7 +91,7 @@ public class QuotaExtensionController {
     public ResponseEntity<?> request(@PathVariable UUID subscriptionId,
                                      @Valid @RequestBody RequestQuotaExtensionResource request,
                                      @RequestHeader("Idempotency-Key") String key) {
-        var owner = users.requireAuthenticatedUserId();
+        var owner = users.requireCurrentUserId();
         var result = commands.handle(new RequestQuotaExtensionCommand(owner, subscriptionId, request.addedHa(), key));
         if (result.isFailure()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(result.failure().orElseThrow());
@@ -114,7 +114,7 @@ public class QuotaExtensionController {
     @GetMapping("/extensions/{extensionId}")
     @Operation(summary = "Get an extension of an owned plan")
     public ResponseEntity<?> get(@PathVariable UUID subscriptionId, @PathVariable UUID extensionId) {
-        return queries.find(users.requireAuthenticatedUserId(), subscriptionId, extensionId)
+        return queries.find(users.requireCurrentUserId(), subscriptionId, extensionId)
                 .<ResponseEntity<?>>map(found -> ResponseEntity.ok(toResource(found, queries.paymentStatus(extensionId))))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("quota_extension", extensionId.toString())));
@@ -133,7 +133,7 @@ public class QuotaExtensionController {
     public ResponseEntity<?> checkout(@PathVariable UUID subscriptionId, @PathVariable UUID extensionId,
                                       @RequestHeader("Idempotency-Key") String key) {
         return ResponseEntityAssembler.toResponseEntityFromResult(
-                payments.createForExtension(users.requireAuthenticatedUserId(), subscriptionId, extensionId, key),
+                payments.createForExtension(users.requireCurrentUserId(), subscriptionId, extensionId, key),
                 result -> result, HttpStatus.CREATED);
     }
 
