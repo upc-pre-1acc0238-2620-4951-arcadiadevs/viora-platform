@@ -36,7 +36,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** A frost in the forecast ends as a stored incident, whether the producer opens the forecast or the monitor runs. */
+/**
+ * A frost or a heat wave in the forecast ends as a stored incident, whether the producer opens the forecast or the
+ * monitor runs.
+ */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:frostforecast;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop"
@@ -91,6 +94,22 @@ class FrostForecastIncidentIntegrationTest {
         when(forecastProvider.fetchSevenDayForecast(anyDouble(), anyDouble())).thenReturn(List.of());
 
         mvc.perform(get("/api/v1/plots/" + plotId + "/forecasts")).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void aHeatWaveInTheForecastIsStoredToo() throws Exception {
+        var plotId = createPlot();
+        var day = WeatherForecastDay.create(LocalDate.now().plusDays(2), new AmbientTemperature(37.0),
+                new AmbientTemperature(18.0), new Percentage(0.0), new WindSpeed(5.0), Instant.now());
+        when(forecastProvider.fetchSevenDayForecast(anyDouble(), anyDouble())).thenReturn(List.of(day));
+
+        monitor.checkAllPlots();
+
+        var incident = incidentRepository.findActiveByPlotIdAndType(new PlotId(plotId), IncidentType.HEAT_WAVE);
+        assertThat(incident).isPresent();
+        assertThat(incident.get().snapshot().severity()).isEqualTo(IncidentSeverity.CRITICAL);
+        assertThat(incidentRepository.findActiveByPlotIdAndType(new PlotId(plotId), IncidentType.FROST_WARNING))
+                .isEmpty();
     }
 
     private void forecastWithMinimum(double minimum) {

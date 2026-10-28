@@ -1,10 +1,10 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.queries;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 
 /**
  * Domain query representing a request for fruit thinning milestone events.
@@ -27,7 +27,7 @@ public record GetThinningEventsQuery(
             throw new IllegalArgumentException("thinning.actor.null_or_empty");
         }
         if (campaignYear == null) {
-            campaignYear = new CampaignYear(Year.now(ZoneOffset.UTC).getValue());
+            campaignYear = new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue());
         }
     }
 

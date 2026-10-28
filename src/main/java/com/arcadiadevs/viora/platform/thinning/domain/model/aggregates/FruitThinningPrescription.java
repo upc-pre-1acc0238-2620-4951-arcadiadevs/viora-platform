@@ -125,6 +125,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
      * @param actorId       the identifier of the sampling user
      * @param batchId       field sampling batch identifier
      * @param treeRecords   list of tree sampling records
+     * @throws IllegalStateException if the prescription was already issued; a batch already ingested is still a no-op
      */
     public void ingestSamplingsBatch(
             UserId actorId,
@@ -137,6 +138,10 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             if (existingRound.batchId().equals(batchId)) {
                 return;
             }
+        }
+        // Once the prescription is issued its load is fixed: a later round would make the load shown differ from it
+        if (status != PrescriptionStatus.SAMPLING_IN_PROGRESS) {
+            throw new IllegalStateException("thinning.sampling.prescription_issued");
         }
 
         boolean wasRepresentativeBefore = SamplingCoverageEvaluator.isRepresentative(samplingRounds);

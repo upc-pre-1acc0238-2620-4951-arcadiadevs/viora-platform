@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.telemetry.application.commandservices.Agro
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RaiseAgroclimaticIncidentCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.events.WeatherForecastIngestedEvent;
 import com.arcadiadevs.viora.platform.telemetry.domain.services.AgroclimaticThresholdEvaluator;
+import com.arcadiadevs.viora.platform.telemetry.domain.services.IncidentTrigger;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,9 @@ public class WeatherForecastIngestedEventHandler {
     }
 
     /**
-     * Listens for ingested forecast events and raises agroclimatic incidents if frost thresholds are breached.
+     * Listens for ingested forecast events and raises agroclimatic incidents when the forecast reaches the frost or
+     * the heat wave thresholds. Water stress is not judged here: it needs a soil probe, and the virtual node only
+     * estimates soil moisture without knowing the irrigation.
      *
      * @param event the weather forecast ingested event
      */
@@ -40,19 +43,20 @@ public class WeatherForecastIngestedEventHandler {
             return;
         }
 
-        var triggerOpt = thresholdEvaluator.evaluateFrostRisk(event.minTemp());
-        triggerOpt.ifPresent(trigger -> {
-            var command = new RaiseAgroclimaticIncidentCommand(
-                    event.plotId(),
-                    trigger.type().name(),
-                    trigger.severity().name(),
-                    trigger.breachInfo().metricName(),
-                    trigger.breachInfo().currentValue(),
-                    trigger.breachInfo().thresholdValue(),
-                    trigger.breachInfo().unit(),
-                    trigger.mitigationInstructionKeys()
-            );
-            incidentCommandService.handle(command);
-        });
+        thresholdEvaluator.evaluateFrostRisk(event.minTemp()).ifPresent(trigger -> raise(event, trigger));
+        thresholdEvaluator.evaluateHeatRisk(event.maxTemp()).ifPresent(trigger -> raise(event, trigger));
+    }
+
+    private void raise(WeatherForecastIngestedEvent event, IncidentTrigger trigger) {
+        incidentCommandService.handle(new RaiseAgroclimaticIncidentCommand(
+                event.plotId(),
+                trigger.type().name(),
+                trigger.severity().name(),
+                trigger.breachInfo().metricName(),
+                trigger.breachInfo().currentValue(),
+                trigger.breachInfo().thresholdValue(),
+                trigger.breachInfo().unit(),
+                trigger.mitigationInstructionKeys()
+        ));
     }
 }

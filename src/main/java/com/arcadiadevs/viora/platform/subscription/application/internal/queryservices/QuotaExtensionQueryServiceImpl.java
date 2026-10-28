@@ -64,24 +64,28 @@ public class QuotaExtensionQueryServiceImpl implements QuotaExtensionQueryServic
         var endsAt = s.period() == null ? null : s.period().endsAt();
         if (!plan.hasActiveEntitlement(now)) {
             return new ExtensionTerms(id, s.mode().name(), false, "subscription.extension.not_active", "NONE",
-                    s.quota().hectares(), endsAt, null, null, null, null, null);
+                    s.quota().hectares(), endsAt, null, null, null, null, null, null, null);
         }
         if (s.mode() == PlanMode.PLAN_COOPERATIVO_PATROCINADO) {
             return new ExtensionTerms(id, s.mode().name(), true, null, "CODE", s.quota().hectares(), endsAt,
-                    null, null, null, null, null);
+                    null, null, null, null, null, null, null);
         }
         if (PlanExtensionPolicy.isInRenewalWindow(s.period(), now)) {
             return new ExtensionTerms(id, s.mode().name(), false, "subscription.extension.renewal_window", "RENEW",
-                    s.quota().hectares(), endsAt, null, null, null, null, null);
+                    s.quota().hectares(), endsAt, null, null, null, null, null, null, null);
         }
         var offer = catalog.plans().stream().filter(candidate -> candidate.code().equals(s.planCode())).findFirst();
+        var days = PlanExtensionPolicy.billableDays(s.period(), now);
         return new ExtensionTerms(id, s.mode().name(), offer.isPresent(), offer.isPresent() ? null : "subscription.plan.invalid",
                 offer.isPresent() ? "PAY" : "NONE", s.quota().hectares(), endsAt,
                 PlanExtensionPolicy.billableMonths(s.period(), now),
                 offer.map(SubscriptionCatalog.PlanOffer::monthlyRatePerHa).orElse(null),
                 offer.map(SubscriptionCatalog.PlanOffer::currency).orElse(null),
                 offer.map(SubscriptionCatalog.PlanOffer::minimumQuotaHa).orElse(null),
-                offer.map(SubscriptionCatalog.PlanOffer::quotaIncrementHa).orElse(null));
+                offer.map(SubscriptionCatalog.PlanOffer::quotaIncrementHa).orElse(null),
+                offer.isPresent() ? days : null,
+                offer.isPresent() ? catalog.extensionRatePerHa(s.planCode(), days, PlanExtensionPolicy.periodDays(s.period()))
+                        : null);
     }
 
     @Override

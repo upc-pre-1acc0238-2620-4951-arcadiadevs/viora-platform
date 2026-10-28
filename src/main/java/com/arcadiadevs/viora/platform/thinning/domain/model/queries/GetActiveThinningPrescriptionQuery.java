@@ -1,11 +1,11 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.queries;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 
 /**
  * Query requesting the thinning prescription associated with an active orchard plot and campaign.
@@ -28,7 +28,7 @@ public record GetActiveThinningPrescriptionQuery(
             throw new IllegalArgumentException("thinning.query.plot_id.null");
         }
         if (campaignYear == null) {
-            campaignYear = new CampaignYear(Year.now(ZoneOffset.UTC).getValue());
+            campaignYear = new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue());
         }
     }
 

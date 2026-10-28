@@ -55,8 +55,12 @@ public interface QuotaExtensionQueryService {
      * @param currency         the settlement currency; null unless {@code PAY}
      * @param minimumHa        the smallest paid extension; null unless {@code PAY}
      * @param incrementHa      the step of a paid extension; null unless {@code PAY}
+     * @param billableDays     the days a paid extension bills now; null unless {@code PAY}
+     * @param extensionRatePerHa the tax-included price of one hectare for those days, which times the hectares
+     *                         and rounded to cents is the total charged; null unless {@code PAY}
      */
     record ExtensionTerms(UUID subscriptionId, String mode, boolean extendable, String reason, String action,
                           BigDecimal quotaHa, Instant endsAt, Integer billableMonths, BigDecimal monthlyRatePerHa,
-                          String currency, BigDecimal minimumHa, BigDecimal incrementHa) { }
+                          String currency, BigDecimal minimumHa, BigDecimal incrementHa, Integer billableDays,
+                          BigDecimal extensionRatePerHa) { }
 }

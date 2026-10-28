@@ -83,9 +83,10 @@ public final class TelemetrySeriesPersistenceAssembler {
         }
 
         // Add newly ingested readings that aren't already present in target
+        // A set, so merging a series stays linear in its readings
         var existingReadingIds = target.getReadings().stream()
                 .map(HourlyTelemetryReadingPersistenceEntity::getId)
-                .toList();
+                .collect(java.util.stream.Collectors.toSet());
 
         for (var readingSnap : snap.readings()) {
             var readingUuid = UUID.fromString(readingSnap.id().readingId());

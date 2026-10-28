@@ -10,12 +10,14 @@ import java.time.LocalDate;
  * @param forecastDate the first projected forecast date
  * @param minTemp      the lowest projected temperature in the series
  * @param occurredOn   the event occurrence timestamp
+ * @param maxTemp      the highest projected temperature in the series
  */
 public record WeatherForecastIngestedEvent(
         String plotId,
         LocalDate forecastDate,
         Double minTemp,
-        Instant occurredOn
+        Instant occurredOn,
+        Double maxTemp
 ) {
     public WeatherForecastIngestedEvent {
         if (plotId == null || plotId.isBlank()) {
@@ -24,7 +26,7 @@ public record WeatherForecastIngestedEvent(
         if (forecastDate == null) {
             throw new IllegalArgumentException("telemetry.forecast_day.date.null");
         }
-        if (minTemp == null) {
+        if (minTemp == null || maxTemp == null) {
             throw new IllegalArgumentException("telemetry.temperature.null");
         }
         if (occurredOn == null) {

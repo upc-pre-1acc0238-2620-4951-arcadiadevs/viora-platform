@@ -53,6 +53,7 @@ public final class QuotaExtensionResourceAssembler {
     public static ExtensionTermsResource toResource(ExtensionTerms terms) {
         return new ExtensionTermsResource(terms.subscriptionId().toString(), terms.mode(), terms.extendable(),
                 terms.reason(), terms.action(), terms.quotaHa(), terms.endsAt(), terms.billableMonths(),
-                terms.monthlyRatePerHa(), terms.currency(), terms.minimumHa(), terms.incrementHa());
+                terms.monthlyRatePerHa(), terms.currency(), terms.minimumHa(), terms.incrementHa(),
+                terms.billableDays(), terms.extensionRatePerHa());
     }
 }

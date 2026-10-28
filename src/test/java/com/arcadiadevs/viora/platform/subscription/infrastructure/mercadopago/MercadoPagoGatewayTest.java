@@ -54,7 +54,7 @@ class MercadoPagoGatewayTest {
             .andRespond(withSuccess("{\"id\":\"pref-2\",\"collector_id\":42,\"sandbox_init_point\":\"https://sandbox.mercadopago.com.pe/checkout/test\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://api.mercadopago.com/users/me")).andRespond(withSuccess("{\"id\":42}", MediaType.APPLICATION_JSON));
         var price = new SubscriptionPricingPolicy(new BigDecimal("55"), new BigDecimal("0.18"))
-                .quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 10);
+                .quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 300, 365);
         assertEquals("pref-2", gateway.create(attempt, price).preferenceId());
     }
     @Test void closingAPreferenceEndsItsValidityNow() {

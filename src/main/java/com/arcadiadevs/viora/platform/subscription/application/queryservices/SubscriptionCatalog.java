@@ -20,14 +20,25 @@ public interface SubscriptionCatalog {
     SubscriptionPrice quote(String planCode, IndividualHectaresQuota quota);
 
     /**
-     * Quotes hectares added to a plan in force for the complete months it has left.
+     * Quotes hectares added to a plan in force for the days it has left.
      * @param planCode the plan's catalog code
      * @param addedQuota validated hectares to add
-     * @param months complete months left of the plan
+     * @param days days left of the plan
+     * @param periodDays days of the whole plan
      * @return server-calculated payment terms
-     * @throws IllegalArgumentException if the plan, hectares or months are invalid
+     * @throws IllegalArgumentException if the plan, hectares or days are invalid
      */
-    SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int months);
+    SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int days, int periodDays);
+
+    /**
+     * The tax-included price of one hectare for the days left of a plan, which the app multiplies by the hectares.
+     * @param planCode the plan's catalog code
+     * @param days days left of the plan
+     * @param periodDays days of the whole plan
+     * @return PEN per hectare
+     * @throws IllegalArgumentException if the plan or days are invalid
+     */
+    BigDecimal extensionRatePerHa(String planCode, int days, int periodDays);
 
     /**
      * Public commercial conditions supplied by configuration and domain policy.

@@ -1,10 +1,10 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.queries;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 
 /**
  * Domain query for retrieving the sampling coverage summary of a plot and campaign.
@@ -38,6 +38,6 @@ public record GetSamplingSummaryByPlotIdQuery(
      * @param plotId target plot identifier
      */
     public GetSamplingSummaryByPlotIdQuery(PlotId plotId) {
-        this(plotId, new CampaignYear(Year.now(ZoneOffset.UTC).getValue()));
+        this(plotId, new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue()));
     }
 }
