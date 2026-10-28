@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
+import com.arcadiadevs.viora.platform.iam.infrastructure.ratelimit.InMemoryAuthAttemptLimiter;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.VerificationCodeGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
@@ -43,6 +45,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -53,6 +56,7 @@ import static org.mockito.Mockito.when;
 class UserAccountCommandServiceImplTest {
 
     private static final String EMAIL = "productor@viora.ag";
+    private static final String DEMO_EMAIL = "demo@viora.pe";
     private static final String NEW_HASH = "$argon2id$v=19$m=65536,t=3,p=4$newhash";
     private static final VerificationCode CODE = new VerificationCode("482913");
 
@@ -97,7 +101,8 @@ class UserAccountCommandServiceImplTest {
     void setUp() {
         VerificationCodeGenerator fixedGenerator = () -> CODE;
         service = new UserAccountCommandServiceImpl(userAccountRepository, eventPublisher, fixedGenerator, HASHER,
-                new FakePasswordHasher(), LINK_TOKENS, emailService, "2026-10");
+                new FakePasswordHasher(), LINK_TOKENS, emailService, "2026-10", DEMO_EMAIL,
+                new InMemoryAuthAttemptLimiter(5, 15, 2, 60));
     }
 
     @Test
@@ -384,6 +389,36 @@ class UserAccountCommandServiceImplTest {
         service.handle(signUpCommand(true));
 
         verify(eventPublisher).publishEvent(any(UserSignedUpWithProfileEvent.class));
+    }
+
+    @Test
+    @DisplayName("Sends at most the allowed reset links to one email, answering every request the same")
+    void resetLinksToOneEmailAreLimited() {
+        when(userAccountRepository.findByEmail(any(EmailAddress.class)))
+                .thenAnswer(invocation -> Optional.of(UserAccountFixtures.activeAccount(EMAIL, NEW_HASH,
+                        UserRole.ROLE_PRODUCER)));
+
+        for (int i = 0; i < 4; i++) {
+            assertThat(service.handle(new RequestPasswordResetCommand(EMAIL))).isInstanceOf(Result.Success.class);
+        }
+
+        verify(emailService, times(2)).sendPasswordResetEmail(eq(EMAIL), anyString());
+    }
+
+    @Test
+    @DisplayName("Nobody can change the password of the shared demo account or ask for its reset link")
+    void demoAccountKeepsItsPassword() {
+        var demo = UserAccountFixtures.activeAccount(DEMO_EMAIL, FakePasswordHasher.hashOf("Password123").value(),
+                UserRole.ROLE_PRODUCER);
+        when(userAccountRepository.findById(any(UserId.class))).thenReturn(Optional.of(demo));
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(demo));
+
+        var change = service.handle(new ChangeUserPasswordCommand(demo.snapshot().id().userId(), "Password123",
+                "OtraClave2026"));
+        service.handle(new RequestPasswordResetCommand(DEMO_EMAIL));
+
+        assertThat(failure(change).details()).isEqualTo("user.account.demo_protected");
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
     }
 
     private static RegisterUserAccountCommand signUpCommand(boolean termsAccepted) {

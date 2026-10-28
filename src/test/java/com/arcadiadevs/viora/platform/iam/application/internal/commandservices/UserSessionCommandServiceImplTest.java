@@ -1,5 +1,8 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
+import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
+import com.arcadiadevs.viora.platform.iam.infrastructure.ratelimit.InMemoryAuthAttemptLimiter;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.AuthenticatedSession;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.SecureTokenGenerator;
@@ -61,7 +64,7 @@ class UserSessionCommandServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserSessionCommandServiceImpl(userAccountRepository, sessions, new FakePasswordHasher(),
-                tokenService, new SequentialTokenGenerator());
+                tokenService, new SequentialTokenGenerator(), new InMemoryAuthAttemptLimiter(3, 15, 3, 60));
         account = UserAccountFixtures.activeAccount(EMAIL, FakePasswordHasher.hashOf("Password123").value(),
                 UserRole.ROLE_PRODUCER);
         lenient().when(tokenService.generateAccessToken(anyString(), anyString(), anyString(), anyLong()))
@@ -90,6 +93,58 @@ class UserSessionCommandServiceImplTest {
         assertThat(wrongPassword).isEqualTo(unknownEmail);
         assertThat(wrongPassword.details()).isEqualTo("user.credentials.invalid");
         assertThat(sessions.byHash).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Refuses an email after too many failed attempts, even with the right password")
+    void tooManyFailedSignInsLockTheEmailForAWhile() {
+        for (int i = 0; i < 3; i++) {
+            failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));
+        }
+
+        var error = failure(service.handle(new AuthenticateUserCommand(EMAIL, "Password123")));
+
+        assertThat(error.code()).isEqualTo("SIGN_IN_TOO_MANY_REQUESTS");
+        assertThat(error.properties()).containsKey("retryAfterSeconds");
+        assertThat(sessions.byHash).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A successful sign-in forgets the earlier failures of that email")
+    void successfulSignInResetsTheFailures() {
+        failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));
+        failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));
+        success(service.handle(new AuthenticateUserCommand(EMAIL, "Password123")));
+        failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));
+        failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));
+
+        success(service.handle(new AuthenticateUserCommand(EMAIL, "Password123")));
+    }
+
+    @Test
+    @DisplayName("Checks a password hash even for an unknown email, so both take as long")
+    void unknownEmailStillChecksAPasswordHash() {
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        var fake = new FakePasswordHasher();
+        var countingHasher = new PasswordHasher() {
+            @Override
+            public PasswordHash hash(NewPassword password) {
+                return fake.hash(password);
+            }
+
+            @Override
+            public boolean matches(String plainPassword, PasswordHash hash) {
+                checks.incrementAndGet();
+                return fake.matches(plainPassword, hash);
+            }
+        };
+        var timed = new UserSessionCommandServiceImpl(userAccountRepository, sessions, countingHasher, tokenService,
+                new SequentialTokenGenerator(), new InMemoryAuthAttemptLimiter(3, 15, 3, 60));
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.empty());
+
+        failure(timed.handle(new AuthenticateUserCommand("nadie@viora.ag", "Password123")));
+
+        assertThat(checks).hasValue(1);
     }
 
     @Test

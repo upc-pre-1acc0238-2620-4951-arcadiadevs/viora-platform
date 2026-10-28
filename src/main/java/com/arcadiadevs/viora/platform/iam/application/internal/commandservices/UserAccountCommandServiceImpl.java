@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserAccountCommandService;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.codes.VerificationCodeGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.ratelimit.AuthAttemptLimiter;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.SecureTokenGenerator;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.EmailVerificationCooldownException;
 import com.arcadiadevs.viora.platform.iam.domain.exceptions.InvalidEmailVerificationCodeException;
@@ -58,36 +59,11 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
     private final TransactionalEmailService emailService;
     private final String termsVersion;
     private final String protectedEmail;
+    private final AuthAttemptLimiter attemptLimiter;
 
     /**
-     * Creates the command service.
-     *
-     * @param userAccountRepository the user account repository port
-     * @param eventPublisher        publisher of the domain events raised by the aggregate
-     * @param codeGenerator         generator of email verification codes
-     * @param codeHasher            hasher of those codes
-     * @param passwordHasher        hasher of passwords
-     * @param tokenGenerator        generator and hasher of the tokens carried by password reset links
-     * @param emailService          transactional email port delivering the codes
-     * @param termsVersion          version of the terms that sign-up records as accepted
-     * @throws IllegalArgumentException if any dependency is null or the terms version is blank
-     */
-    public UserAccountCommandServiceImpl(
-            UserAccountRepository userAccountRepository,
-            ApplicationEventPublisher eventPublisher,
-            VerificationCodeGenerator codeGenerator,
-            VerificationCodeHasher codeHasher,
-            PasswordHasher passwordHasher,
-            SecureTokenGenerator tokenGenerator,
-            TransactionalEmailService emailService,
-            String termsVersion
-    ) {
-        this(userAccountRepository, eventPublisher, codeGenerator, codeHasher, passwordHasher, tokenGenerator,
-                emailService, termsVersion, "");
-    }
-
-    /**
-     * Creates the command service with the shared demo account, which nobody can delete.
+     * Creates the command service with the shared demo account, whose password nobody can change and which nobody
+     * can delete.
      *
      * @param userAccountRepository the user account repository port
      * @param eventPublisher        publisher of the domain events raised by the aggregate
@@ -98,6 +74,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
      * @param emailService          transactional email port delivering the codes
      * @param termsVersion          version of the terms that sign-up records as accepted
      * @param protectedEmail        email of the shared demo account; blank when there is none
+     * @param attemptLimiter        limits the password reset links sent to each email
      * @throws IllegalArgumentException if any dependency is null or the terms version is blank
      */
     @Autowired
@@ -110,7 +87,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             SecureTokenGenerator tokenGenerator,
             TransactionalEmailService emailService,
             @Value("${viora.iam.terms-version}") String termsVersion,
-            @Value("${viora.demo-account.email:}") String protectedEmail
+            @Value("${viora.demo-account.email:}") String protectedEmail,
+            AuthAttemptLimiter attemptLimiter
     ) {
         if (userAccountRepository == null) {
             throw new IllegalArgumentException("user.repository.null");
@@ -133,6 +111,9 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         if (emailService == null) {
             throw new IllegalArgumentException("email.service.null");
         }
+        if (attemptLimiter == null) {
+            throw new IllegalArgumentException("user.attempt_limiter.null");
+        }
         if (termsVersion == null || termsVersion.isBlank()) {
             throw new IllegalArgumentException("user.terms.version.null_or_empty");
         }
@@ -145,6 +126,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
         this.emailService = emailService;
         this.termsVersion = termsVersion.trim();
         this.protectedEmail = protectedEmail == null ? "" : protectedEmail.trim();
+        this.attemptLimiter = attemptLimiter;
     }
 
     /**
@@ -304,6 +286,9 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             }
 
             var account = optionalAccount.get();
+            if (isDemoAccount(account)) {
+                return Result.failure(ApplicationError.forbidden("user", "user.account.demo_protected"));
+            }
             var newPassword = new NewPassword(command.newPassword());
             try {
                 account.changePassword(command.currentRawPassword(), newPassword, passwordHasher, Instant.now());
@@ -333,7 +318,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                 return Result.failure(ApplicationError.notFound("user", command.userId()));
             }
             var account = optionalAccount.get();
-            if (!protectedEmail.isEmpty() && protectedEmail.equalsIgnoreCase(account.snapshot().email().value())) {
+            if (isDemoAccount(account)) {
                 return Result.failure(ApplicationError.forbidden("user", "user.account.demo_protected"));
             }
             try {
@@ -359,7 +344,9 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             var email = new EmailAddress(command.email());
             var optionalAccount = userAccountRepository.findByEmail(email);
 
-            if (optionalAccount.isPresent()) {
+            // Too many links to one email, or the shared demo account, get the same answer and no email
+            if (optionalAccount.isPresent() && !isDemoAccount(optionalAccount.get())
+                    && attemptLimiter.tryAcquirePasswordReset(email.value(), Instant.now())) {
                 var account = optionalAccount.get();
                 var resetToken = tokenGenerator.generate();
                 try {
@@ -487,5 +474,9 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                 delivery.run();
             }
         });
+    }
+
+    private boolean isDemoAccount(UserAccount account) {
+        return !protectedEmail.isEmpty() && protectedEmail.equalsIgnoreCase(account.snapshot().email().value());
     }
 }
