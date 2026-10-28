@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /** REST entry point for confirming thinning field execution and reading it back. */
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(value = "/api/v1/thinning-prescriptions/{id}/execution-confirmations",
         produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Thinning Execution")
+@PreAuthorize("@prescriptionAccess.isAccessible(#id)")
 public class ThinningExecutionController {
     private final ConfirmThinningExecutionCommandService service;
     private final ThinningPrescriptionOutlookService outlookService;
@@ -46,6 +48,8 @@ public class ThinningExecutionController {
             @ApiResponse(responseCode = "201", description = "Execution recorded",
                     content = @Content(schema = @Schema(implementation = ExecutionConfirmationResource.class))),
             @ApiResponse(responseCode = "400", description = "Invalid UUID or execution data",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "The prescription belongs to another producer",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "404", description = "Prescription not found",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),

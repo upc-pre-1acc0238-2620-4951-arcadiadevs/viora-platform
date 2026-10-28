@@ -23,7 +23,7 @@ public class ProfileReadinessAdapter implements ProducerProfilePort {
     }
 
     /**
-     * Requires a known producer and a completed profile, never a demo fallback.
+     * Requires a known producer and a completed profile.
      * @param producerId authenticated identity
      * @return whether an individual purchase is allowed
      */

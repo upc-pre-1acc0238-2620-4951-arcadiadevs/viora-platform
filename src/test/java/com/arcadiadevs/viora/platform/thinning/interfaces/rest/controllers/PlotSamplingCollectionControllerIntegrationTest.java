@@ -49,7 +49,7 @@ class PlotSamplingCollectionControllerIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(testActorId, null, List.of())
         );
-        var controller = new PlotSamplingCollectionController(queryService, new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
+        var controller = new PlotSamplingCollectionController(queryService, new SpringSecurityCurrentUserProvider());
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

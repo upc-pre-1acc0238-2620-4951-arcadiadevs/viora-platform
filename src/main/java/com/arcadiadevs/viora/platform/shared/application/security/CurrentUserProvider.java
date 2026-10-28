@@ -6,7 +6,7 @@ import java.util.Optional;
  * Port resolving the identity of the user behind the current request.
  *
  * <p>REST controllers depend on this port instead of reading the security framework directly, so the way the
- * identity is obtained (JWT today, a demo fallback in the {@code demo} profile) stays in infrastructure.</p>
+ * identity is obtained (a JWT today) stays in infrastructure.</p>
  */
 public interface CurrentUserProvider {
 
@@ -21,20 +21,9 @@ public interface CurrentUserProvider {
      * Resolves the current user identifier or fails when nobody is authenticated.
      *
      * @return the user identifier
-     * @throws AuthenticationRequiredException if no user is authenticated and no demo fallback applies
-     */
-    String requireCurrentUserId();
-
-    /**
-     * Resolves the user who really signed in, never the demo fallback. For operations that change what belongs to a
-     * person, such as redeeming a cooperative code, which must not happen on the demo producer's behalf.
-     *
-     * @return the authenticated user identifier
      * @throws AuthenticationRequiredException if no user is authenticated
      */
-    default String requireAuthenticatedUserId() {
-        return currentUserId().orElseThrow(AuthenticationRequiredException::new);
-    }
+    String requireCurrentUserId();
 
     /**
      * Checks whether the given user identifier is the current user, so a request can only reach the user's own
@@ -42,7 +31,7 @@ public interface CurrentUserProvider {
      *
      * @param userId the user identifier the request is about
      * @return true if it is the current user; false otherwise
-     * @throws AuthenticationRequiredException if no user is authenticated and no demo fallback applies
+     * @throws AuthenticationRequiredException if no user is authenticated
      */
     boolean isCurrentUser(String userId);
 }

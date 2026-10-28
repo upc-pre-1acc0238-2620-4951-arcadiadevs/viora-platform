@@ -57,7 +57,7 @@ class FieldSamplingControllerIntegrationTest {
                 new UsernamePasswordAuthenticationToken(UUID.randomUUID().toString(), null, List.of())
         );
         var controller = new FieldSamplingController(thinningCommandService, samplingSummaryQueryService,
-                new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
+                new SpringSecurityCurrentUserProvider());
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

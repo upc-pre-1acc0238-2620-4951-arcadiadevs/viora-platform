@@ -24,20 +24,24 @@ import java.time.LocalDate;
 @NullMarked
 public record TreeSampleResourceItem(
         @NotBlank(message = "thinning.tree_tag.null_or_empty")
+        @Size(max = 50, message = "thinning.tree_tag.too_long")
         @Schema(description = "Physical tag identifier of the sampled olive tree", example = "T-01", requiredMode = Schema.RequiredMode.REQUIRED)
         String treeTag,
 
         @NotNull(message = "thinning.shoot_count.positive")
         @Min(value = 1, message = "thinning.shoot_count.positive")
+        @Max(value = 1000, message = "thinning.shoot_count.too_large")
         @Schema(description = "Total number of counted representative shoots (> 0)", example = "10", requiredMode = Schema.RequiredMode.REQUIRED)
         Integer shootCount,
 
         @NotNull(message = "thinning.fruit_count.negative")
         @Min(value = 0, message = "thinning.fruit_count.negative")
+        @Max(value = 100_000, message = "thinning.fruit_count.too_large")
         @Schema(description = "Total number of set fruits observed across shoots (>= 0)", example = "120", requiredMode = Schema.RequiredMode.REQUIRED)
         Integer fruitSetCount,
 
         @DecimalMin(value = "0.01", message = "thinning.trunk_diameter.positive")
+        @DecimalMax(value = "3000", message = "thinning.trunk_diameter.too_large")
         @Schema(description = "Trunk diameter in mm (optional)", example = "165.5", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
         @Nullable Double trunkDiameterMm,
 

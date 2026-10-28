@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -142,8 +143,10 @@ public class ThinningPrescriptionsController {
                     content = @Content(schema = @Schema(implementation = PrescriptionResource.class))
             ),
             @ApiResponse(responseCode = "400", description = "Invalid prescription UUID"),
+            @ApiResponse(responseCode = "403", description = "The prescription belongs to another producer"),
             @ApiResponse(responseCode = "404", description = "Prescription not found or its plot is no longer active")
     })
+    @PreAuthorize("@prescriptionAccess.isAccessible(#id)")
     public ResponseEntity<?> getThinningPrescription(
             @PathVariable @Parameter(description = "Unique prescription UUID", required = true) String id
     ) {

@@ -23,7 +23,11 @@ class CommercialSizeScaleTest {
             "410, 381/410",
             "411, 411/460",
             "461, 461/510",
-            "512, 511/560"
+            "512, 511/560",
+            "2000, 1961/2010",
+            "2000.4, 1961/2010",
+            "2001, >2000",
+            "1e300, >2000"
     })
     void gradesFruitsPerKilogramWithTheIocScale(double fruitsPerKg, String grade) {
         assertEquals(grade, CommercialSizeScale.gradeOf(fruitsPerKg));

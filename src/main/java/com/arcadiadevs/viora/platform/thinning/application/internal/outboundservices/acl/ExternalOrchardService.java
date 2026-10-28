@@ -40,6 +40,19 @@ public class ExternalOrchardService {
     }
 
     /**
+     * Resolves the producer who owns a plot, active or not, to decide who may reach the data hanging from it.
+     *
+     * @param plotId the Thinning PlotId value object
+     * @return the owner identifier, or empty when the plot is unknown
+     */
+    public Optional<String> findPlotOwnerId(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotOwnerId(plotId.plotId());
+    }
+
+    /**
      * Resolves the olive variety of an active plot, used to pick the caliber model calibration.
      *
      * @param plotId the Thinning PlotId value object

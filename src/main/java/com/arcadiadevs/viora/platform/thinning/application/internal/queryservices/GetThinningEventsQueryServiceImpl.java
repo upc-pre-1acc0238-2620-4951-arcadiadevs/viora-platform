@@ -59,7 +59,8 @@ public class GetThinningEventsQueryServiceImpl implements GetThinningEventsQuery
 
         List<PlotId> targetPlotIds;
         if (query.plotId() != null) {
-            if (!externalOrchardService.existsActivePlot(query.plotId())) {
+            // Another producer's plot answers like a missing one, so the filter reveals nothing about it
+            if (!externalOrchardService.findActivePlotIdsByProducerId(query.actorId()).contains(query.plotId())) {
                 return Result.failure(ApplicationError.notFound("Plot", query.plotId().plotId()));
             }
             targetPlotIds = List.of(query.plotId());

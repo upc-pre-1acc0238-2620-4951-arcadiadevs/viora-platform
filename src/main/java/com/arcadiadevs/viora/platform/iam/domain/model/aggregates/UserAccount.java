@@ -171,13 +171,10 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
     }
 
     /**
-     * Signs up again over a pending account that was never verified, keeping its identity.
+     * Signs up again over an account still pending verification, by the same person: the caller checked the
+     * password typed now against the stored one. It refreshes the accepted terms and the profile details and issues
+     * a fresh code. The password never changes here: whoever knows only the email cannot take over the account.
      *
-     * <p>Replaces the password, the accepted terms and the verification code, and raises the sign-up events again so
-     * the profile is updated. This is how a pending registration is retried, so nobody can hold an email address by
-     * registering it without verifying it.</p>
-     *
-     * @param newPasswordHash          derived password hash
      * @param newTermsAcceptance       the accepted terms version and instant
      * @param onboardingProfileDetails profile details submitted at sign-up, or null when there are none
      * @param verificationCodeHash     hash of the new email verification code
@@ -187,22 +184,17 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
      * @throws EmailVerificationCooldownException if the previous code was sent less than 45 seconds ago
      */
     public void restartSignUp(
-            PasswordHash newPasswordHash,
             TermsAcceptance newTermsAcceptance,
             OnboardingProfileDetails onboardingProfileDetails,
             String verificationCodeHash,
             Instant now
     ) {
-        if (newPasswordHash == null) {
-            throw new IllegalArgumentException("user.password_hash.null");
-        }
         if (newTermsAcceptance == null) {
             throw new IllegalArgumentException("user.terms.not_accepted");
         }
         ensurePendingVerification("user.email.already_exists");
         ensureResendCooldownElapsed(now);
 
-        this.passwordHash = newPasswordHash;
         this.termsAcceptance = newTermsAcceptance;
         this.updatedAt = now;
         registerSignUpDetails(onboardingProfileDetails, now);

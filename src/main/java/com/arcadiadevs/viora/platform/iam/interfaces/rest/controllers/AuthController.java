@@ -173,8 +173,7 @@ public class AuthController {
             description = "Deletes the authenticated account for good after checking its password: profile, plots and everything recorded on them, settlements, dossiers, subscriptions and sessions. Answers 204. A wrong password answers 422 with reason user.password.current_invalid and deletes nothing; the shared demo account answers 403.",
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<?> deleteAccount(@Valid @RequestBody DeleteAccountResource resource) {
-        // A real session only: an anonymous request must never reach the demo producer fallback.
-        var userId = currentUserProvider.requireAuthenticatedUserId();
+        var userId = currentUserProvider.requireCurrentUserId();
         var result = userAccountCommandService.handle(new DeleteUserAccountCommand(userId, resource.password()));
         return switch (result) {
             case Result.Success<Void, ApplicationError> ignored -> ResponseEntity.noContent().build();

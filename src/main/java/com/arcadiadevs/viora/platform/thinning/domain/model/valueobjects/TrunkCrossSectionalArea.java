@@ -7,12 +7,18 @@ package com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects;
  */
 public record TrunkCrossSectionalArea(Double trunkDiameterMm) {
 
+    /** Three metres: wider than the oldest olive trunks, so a bigger value is a typing error. */
+    public static final double MAX_TRUNK_DIAMETER_MM = 3000.0;
+
     /**
      * Compact constructor validating positive diameter.
      */
     public TrunkCrossSectionalArea {
-        if (trunkDiameterMm == null || trunkDiameterMm <= 0.0) {
+        if (trunkDiameterMm == null || !Double.isFinite(trunkDiameterMm) || trunkDiameterMm <= 0.0) {
             throw new IllegalArgumentException("thinning.trunk_diameter.positive");
+        }
+        if (trunkDiameterMm > MAX_TRUNK_DIAMETER_MM) {
+            throw new IllegalArgumentException("thinning.trunk_diameter.too_large");
         }
     }
 

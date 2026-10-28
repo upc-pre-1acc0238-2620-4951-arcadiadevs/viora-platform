@@ -34,8 +34,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionP
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP, JWT validation and database coverage without mocking the authentication or read path. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "viora.security.demo.enabled=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(CurrentSubscriptionHttpTest.FixedTime.class)
 class CurrentSubscriptionHttpTest {
     private static final Instant NOW = Instant.parse("2028-03-01T12:00:00Z");

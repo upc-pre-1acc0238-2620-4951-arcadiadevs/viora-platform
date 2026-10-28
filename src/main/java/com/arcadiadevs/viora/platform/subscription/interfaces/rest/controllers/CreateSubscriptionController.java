@@ -49,7 +49,7 @@ public class CreateSubscriptionController {
     @Operation(summary = "Create an individual subscription pending payment")
     public ResponseEntity<?> create(@Valid @RequestBody CreateSubscriptionResource request,
             @RequestHeader("Idempotency-Key") String key) {
-        var owner = users.requireAuthenticatedUserId();
+        var owner = users.requireCurrentUserId();
         var result = commands.handle(new CreateSubscriptionCommand(owner, request.planCode(), request.requestedQuotaHa(), key));
         if (result.isFailure()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(result.failure().orElseThrow());

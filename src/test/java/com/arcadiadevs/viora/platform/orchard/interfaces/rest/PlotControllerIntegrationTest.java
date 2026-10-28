@@ -70,7 +70,7 @@ class PlotControllerIntegrationTest {
                 new UsernamePasswordAuthenticationToken(producerId.toString(), null, List.of())
         );
         var plotController = new PlotController(plotCommandService, plotQueryService,
-                new SpringSecurityCurrentUserProvider(false, "550e8400-e29b-41d4-a716-446655440000"));
+                new SpringSecurityCurrentUserProvider());
         mockMvc = MockMvcBuilders.standaloneSetup(plotController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

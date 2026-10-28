@@ -10,6 +10,9 @@ public final class HarvestSettlement {
 
     public static final int MAX_NOTES_LENGTH = 1000;
 
+    /** Largest commercial caliber accepted; the smallest table olive is far below 2000 fruits per kilogram. */
+    public static final double MAX_COMMERCIAL_FRUITS_PER_KG = 2000.0;
+
     private final HarvestSettlementSnapshot state;
 
     private HarvestSettlement(HarvestSettlementSnapshot state) {
@@ -52,7 +55,8 @@ public final class HarvestSettlement {
     public static OliveWeight validateFigures(OliveWeight green, OliveWeight black, Double commercialFruitsPerKg,
             String notes) {
         if (commercialFruitsPerKg != null
-                && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0)) {
+                && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0
+                        || commercialFruitsPerKg > MAX_COMMERCIAL_FRUITS_PER_KG)) {
             throw new IllegalArgumentException("settlement.fruits_per_kg.invalid");
         }
         if (notes != null && notes.length() > MAX_NOTES_LENGTH) {

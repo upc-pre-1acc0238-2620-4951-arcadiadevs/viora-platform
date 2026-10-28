@@ -73,7 +73,7 @@ public class QuotaExtensionRedemptionController {
             @ApiResponse(responseCode = "429", description = "Too many failed attempts; see Retry-After")
     })
     public ResponseEntity<?> redeem(@Valid @RequestBody RedeemExtensionCodeResource resource) {
-        var producerId = users.requireAuthenticatedUserId();
+        var producerId = users.requireCurrentUserId();
         var result = commands.handle(new RedeemExtensionCodeCommand(producerId, resource.code()));
         return ResponseEntityAssembler.toResponseEntityFromResult(result, this::toResource, HttpStatus.CREATED);
     }

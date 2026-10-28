@@ -21,6 +21,9 @@ public record HarvestYield(
         Double blackKg
 ) {
 
+    /** One hundred thousand tonnes: above what any plot can yield in a campaign, so more is a typing error. */
+    public static final double MAX_KILOGRAMS = 100_000_000.0;
+
     /**
      * Compact constructor enforcing agronomic invariants for harvest yield.
      *
@@ -32,6 +35,9 @@ public record HarvestYield(
         }
         var effectiveGreen = (greenKg != null) ? greenKg : 0.0;
         var effectiveBlack = (blackKg != null) ? blackKg : 0.0;
+        if (!isPlausible(totalKg) || !isPlausible(effectiveGreen) || !isPlausible(effectiveBlack)) {
+            throw new IllegalArgumentException("phenology.harvest_yield.too_large");
+        }
 
         if (effectiveGreen < 0.0) {
             throw new IllegalArgumentException("phenology.harvest_yield.green_negative");
@@ -55,5 +61,9 @@ public record HarvestYield(
      */
     public static HarvestYield ofTotal(Double totalKg) {
         return new HarvestYield(totalKg, 0.0, 0.0);
+    }
+
+    private static boolean isPlausible(double kilograms) {
+        return Double.isFinite(kilograms) && kilograms <= MAX_KILOGRAMS;
     }
 }
