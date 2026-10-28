@@ -50,7 +50,7 @@ class GetThinningEventsQueryServiceImplTest {
     @Test
     @DisplayName("Should return NOT_FOUND error when plot does not exist in orchard context")
     void shouldReturnNotFoundWhenPlotDoesNotExist() {
-        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(false);
+        when(externalOrchardService.findActivePlotIdsByProducerId(actorId)).thenReturn(List.of());
 
         var query = new GetThinningEventsQuery(actorId, campaignYear, plotId);
         var result = queryService.handle(query);
@@ -61,9 +61,21 @@ class GetThinningEventsQueryServiceImplTest {
     }
 
     @Test
+    @DisplayName("Should answer NOT_FOUND for a plot of another producer, revealing nothing about it")
+    void shouldReturnNotFoundForAnotherProducersPlot() {
+        when(externalOrchardService.findActivePlotIdsByProducerId(actorId))
+                .thenReturn(List.of(new PlotId(UUID.randomUUID().toString())));
+
+        var result = queryService.handle(new GetThinningEventsQuery(actorId, campaignYear, plotId));
+
+        assertThat(result.failure().orElseThrow().code()).isEqualTo("PLOT_NOT_FOUND");
+        verify(prescriptionRepository, never()).findByPlotIdInAndCampaignYear(any(), any());
+    }
+
+    @Test
     @DisplayName("Should return empty list when plot exists but no prescription is found")
     void shouldReturnEmptyListWhenNoPrescriptionFound() {
-        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(externalOrchardService.findActivePlotIdsByProducerId(actorId)).thenReturn(List.of(plotId));
         when(prescriptionRepository.findByPlotIdInAndCampaignYear(List.of(plotId), campaignYear)).thenReturn(List.of());
 
         var query = new GetThinningEventsQuery(actorId, campaignYear, plotId);
@@ -76,7 +88,7 @@ class GetThinningEventsQueryServiceImplTest {
     @Test
     @DisplayName("Should return SAMPLING_COMPLETED event when prescription has representative sampling round")
     void shouldReturnSamplingCompletedEvent() {
-        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(externalOrchardService.findActivePlotIdsByProducerId(actorId)).thenReturn(List.of(plotId));
         when(externalOrchardService.findPlotName(plotId)).thenReturn(Optional.of("Plot 101"));
 
         var prescription = PrescriptionTestData.representative(plotId);
@@ -105,7 +117,7 @@ class GetThinningEventsQueryServiceImplTest {
     @Test
     @DisplayName("Should return both SAMPLING_COMPLETED and THINNING_EXECUTED sorted descending by occurredAt")
     void shouldReturnEventsSortedDescending() {
-        when(externalOrchardService.existsActivePlot(plotId)).thenReturn(true);
+        when(externalOrchardService.findActivePlotIdsByProducerId(actorId)).thenReturn(List.of(plotId));
         when(externalOrchardService.findPlotName(plotId)).thenReturn(Optional.of("Plot 101"));
 
         var samplingInstant = Instant.parse("2026-11-10T09:00:00Z");

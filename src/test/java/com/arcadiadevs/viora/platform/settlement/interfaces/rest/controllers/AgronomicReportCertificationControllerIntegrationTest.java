@@ -23,6 +23,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -324,7 +325,8 @@ class AgronomicReportCertificationControllerIntegrationTest {
             assertTrue(start.await(10, TimeUnit.SECONDS));
             return certify(plotId, 2028, "sig", "Ing", "1", null).andReturn().getResponse().getStatus();
         };
-        try (var executor = Executors.newFixedThreadPool(2)) {
+        // Both requests run as the owner signed in on this thread
+        try (var executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2))) {
             var first = executor.submit(request);
             var second = executor.submit(request);
             assertTrue(ready.await(10, TimeUnit.SECONDS));
@@ -335,6 +337,17 @@ class AgronomicReportCertificationControllerIntegrationTest {
         }
         assertEquals(1, certificationCount(plotId));
         assertEquals(1, eventsOf(plotId).size());
+    }
+
+    @Test
+    void anotherProducerCannotCertifyTheCampaign() throws Exception {
+        var plotId = createPlot("CRIOLLA");
+        settleThreeConsecutive(plotId);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("6ba7b810-9dad-11d1-80b4-00c04fd430c8", null, List.of()));
+
+        certify(plotId, 2028, "sig", "Ing", "1", null).andExpect(status().isForbidden());
+        assertEquals(0, certificationCount(plotId));
     }
 
     private com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.DossierCertificationSnapshot stored(

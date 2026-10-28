@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Year;
@@ -40,6 +41,7 @@ import java.util.Locale;
 @RequestMapping(value = "/api/v1/plots/{plotId}/samplings", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Field Sampling", description = "Endpoints for guided olive shoot sampling and statistical coverage evaluation")
 @NullMarked
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class FieldSamplingController {
 
     private final FruitThinningPrescriptionCommandService thinningCommandService;

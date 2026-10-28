@@ -30,6 +30,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /** REST entry point for settling and consulting the annual harvest of a plot. */
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping(value = "/api/v1/plots/{plotId}/harvest-settlements", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Harvest Settlement")
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class HarvestSettlementController {
     private final HarvestSettlementCommandService service;
     private final HarvestSettlementQueryService queryService;
