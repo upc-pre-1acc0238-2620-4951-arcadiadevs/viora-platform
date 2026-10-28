@@ -354,6 +354,38 @@ class UserAccountCommandServiceImplTest {
         verify(userAccountRepository, never()).delete(recent);
     }
 
+    @Test
+    @DisplayName("A second sign-up with another password only resends the code: the pending account keeps its password")
+    void signUpOverPendingAccountWithAnotherPasswordCannotTakeItOver() {
+        var pending = pendingAccount(Instant.now().minusSeconds(60));
+        var originalHash = pending.snapshot().passwordHash();
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(pending));
+        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = service.handle(new RegisterUserAccountCommand(EMAIL, "Atacante2026", "ROLE_PRODUCER", true,
+                "Attacker", "PE", "+51911111111"));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
+        assertThat(pending.snapshot().passwordHash()).isEqualTo(originalHash);
+        verify(eventPublisher, never()).publishEvent(any(UserSignedUpWithProfileEvent.class));
+        verify(emailService).sendEmailVerificationEmail(EMAIL, "482913");
+    }
+
+    @Test
+    @DisplayName("A second sign-up with the same password refreshes the profile details of the pending account")
+    void signUpOverPendingAccountWithTheSamePasswordRefreshesIt() {
+        var pending = UserAccount.signUp(new EmailAddress(EMAIL), FakePasswordHasher.hashOf(NEW_HASH),
+                UserRole.ROLE_PRODUCER, new TermsAcceptance("2026-10", Instant.now().minusSeconds(60)), null,
+                HASHER.hash(CODE), Instant.now().minusSeconds(60));
+        pending.clearDomainEvents();
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(pending));
+        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.handle(signUpCommand(true));
+
+        verify(eventPublisher).publishEvent(any(UserSignedUpWithProfileEvent.class));
+    }
+
     private static RegisterUserAccountCommand signUpCommand(boolean termsAccepted) {
         return new RegisterUserAccountCommand(EMAIL, NEW_HASH, "ROLE_PRODUCER", termsAccepted,
                 "Juan Perez", "PE", "+51987654321");

@@ -149,7 +149,9 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
 
     /**
      * Signs up a pending account and emails its verification code. Signing up again over a pending account that was
-     * never verified reuses it, with a fresh code.
+     * never verified reuses it, with a fresh code: with the same password it also refreshes the terms and the profile
+     * details, and with another password it only sends a new code, so it cannot replace the password of an account
+     * somebody else is about to verify. Both answer the same.
      *
      * @param command registration command
      * @return the account identifier, or a conflict when the email already belongs to an active account
@@ -168,7 +170,7 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             }
 
             var now = Instant.now();
-            var passwordHash = passwordHasher.hash(new NewPassword(command.password()));
+            var newPassword = new NewPassword(command.password());
             var role = UserRole.from(command.role());
             var termsAcceptance = command.termsAccepted() ? new TermsAcceptance(termsVersion, now) : null;
             var profileDetails = command.hasProfileDetails()
@@ -184,7 +186,11 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                     return Result.failure(ApplicationError.validationError("argument", "user.role.sign_up_not_allowed"));
                 }
                 try {
-                    account.restartSignUp(passwordHash, termsAcceptance, profileDetails, codeHash, now);
+                    if (passwordHasher.matches(command.password(), account.snapshot().passwordHash())) {
+                        account.restartSignUp(termsAcceptance, profileDetails, codeHash, now);
+                    } else {
+                        account.resendEmailVerification(codeHash, now);
+                    }
                 } catch (EmailVerificationCooldownException ex) {
                     return Result.failure(ApplicationError.tooManyRequests("email-verification", ex.getMessage(),
                             ex.retryAfterSeconds()));
@@ -192,7 +198,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                     return Result.failure(ApplicationError.conflict("user", ex.getMessage()));
                 }
             } else {
-                account = UserAccount.signUp(email, passwordHash, role, termsAcceptance, profileDetails, codeHash, now);
+                account = UserAccount.signUp(email, passwordHasher.hash(newPassword), role, termsAcceptance,
+                        profileDetails, codeHash, now);
             }
             var savedAccount = userAccountRepository.save(account);
             publishDomainEvents(account);
