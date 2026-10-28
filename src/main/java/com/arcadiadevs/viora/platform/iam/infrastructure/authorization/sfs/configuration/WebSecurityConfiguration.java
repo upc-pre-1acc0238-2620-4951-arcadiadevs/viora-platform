@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.iam.infrastructure.hashing.argon2.Argon2Ha
 import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
 import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -41,19 +42,22 @@ public class WebSecurityConfiguration {
     private final Argon2HashingService hashingService;
     private final AuthenticationEntryPoint unauthorizedRequestHandler;
     private final DeepLinkProperties deepLinkProperties;
+    private final List<String> allowedOrigins;
 
     public WebSecurityConfiguration(
             @Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService,
             BearerTokenService tokenService,
             Argon2HashingService hashingService,
             AuthenticationEntryPoint unauthorizedRequestHandler,
-            DeepLinkProperties deepLinkProperties
+            DeepLinkProperties deepLinkProperties,
+            @Value("${web.cors.allowed-origins:*}") List<String> allowedOrigins
     ) {
         this.userDetailsService = userDetailsService;
         this.tokenService = tokenService;
         this.hashingService = hashingService;
         this.unauthorizedRequestHandler = unauthorizedRequestHandler;
         this.deepLinkProperties = deepLinkProperties;
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
@@ -83,7 +87,9 @@ public class WebSecurityConfiguration {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(configurer -> configurer.configurationSource(request -> {
             var cors = new CorsConfiguration();
-            cors.setAllowedOrigins(List.of("*"));
+            // CORS_ALLOWED_ORIGINS (comma separated) restricts the browsers that may call the API; the app is not a
+            // browser and is not affected
+            cors.setAllowedOrigins(allowedOrigins);
             cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
             cors.setAllowedHeaders(List.of("*"));
             return cors;
