@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.shared.interfaces.rest.security;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,7 +14,10 @@ import java.net.http.HttpResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-/** Deny by default through the real filter chain: without a token only the public routes answer. */
+/**
+ * Deny by default through the real filter chain: without a token only the public routes answer, and no body larger
+ * than the limit is ever read.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.datasource.url=jdbc:h2:mem:anonymousaccess;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop"
@@ -59,6 +63,16 @@ class AnonymousAccessHttpTest {
     })
     void publicRoutesNeverAsk401ForAToken(String method, String path) throws Exception {
         assertNotEquals(401, send(method, path));
+    }
+
+    @Test
+    void aBodyAboveTheLimitIsRejectedBeforeAnythingReadsIt() throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + PLOT
+                        + "/field-notes/7c9e6679-7425-40de-944b-e07fc1f90ae7/photo"))
+                .header("Content-Type", "image/jpeg")
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[3 * 1024 * 1024]))
+                .build();
+        assertEquals(413, CLIENT.send(request, HttpResponse.BodyHandlers.discarding()).statusCode());
     }
 
     private int send(String method, String path) throws Exception {

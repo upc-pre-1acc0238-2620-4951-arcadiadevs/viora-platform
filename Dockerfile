@@ -33,5 +33,6 @@ COPY --from=build /app/target/*.jar app.jar
 ENV PORT=8080
 EXPOSE 8080
 
-# Ejecutar la aplicación mapeando el puerto asignado por Render
-ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT}"]
+# Ejecutar la aplicación mapeando el puerto asignado por Render. El heap queda acotado al 75 % de la memoria del
+# contenedor, para que un pico de memoria falle con OutOfMemoryError en vez de matar el contenedor entero.
+ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=75 -jar app.jar --server.port=${PORT}"]
