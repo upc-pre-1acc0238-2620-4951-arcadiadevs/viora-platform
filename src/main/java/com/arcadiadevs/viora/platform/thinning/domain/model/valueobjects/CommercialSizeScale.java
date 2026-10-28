@@ -20,6 +20,12 @@ public final class CommercialSizeScale {
 
     private static final int OPEN_INTERVAL_STEP = 50;
 
+    /**
+     * Largest count the scale names; above it the label is {@code ">2000"}. Even the smallest table olive weighs
+     * well over half a gram, so a bigger count is a typing error, never a real caliber.
+     */
+    public static final int MAX_FRUITS_PER_KG = 2000;
+
     private CommercialSizeScale() {
     }
 
@@ -27,7 +33,8 @@ public final class CommercialSizeScale {
      * Returns the size grade label containing a fruits-per-kilogram value, for example {@code "91/100"}.
      *
      * @param fruitsPerKg number of fruits per kilogram, positive
-     * @return the grade label, or {@code "<60"} for fruit larger than the first grade of the scale
+     * @return the grade label, {@code "<60"} for fruit larger than the first grade of the scale, or
+     *         {@code ">2000"} above {@link #MAX_FRUITS_PER_KG}
      */
     public static String gradeOf(double fruitsPerKg) {
         if (!Double.isFinite(fruitsPerKg) || fruitsPerKg <= 0.0) {
@@ -37,6 +44,9 @@ public final class CommercialSizeScale {
         if (count < SCALE_START) {
             return "<" + SCALE_START;
         }
+        if (count > MAX_FRUITS_PER_KG) {
+            return ">" + MAX_FRUITS_PER_KG;
+        }
         long lower = SCALE_START;
         for (int upper : UPPER_BOUNDS) {
             if (count <= upper) {
@@ -44,11 +54,10 @@ public final class CommercialSizeScale {
             }
             lower = upper + 1L;
         }
-        long upper = UPPER_BOUNDS[UPPER_BOUNDS.length - 1];
-        while (count > upper) {
-            lower = upper + 1;
-            upper += OPEN_INTERVAL_STEP;
-        }
-        return lower + "/" + upper;
+        // Above the last bound the intervals are open-ended, 50 fruits wide: 411/460, 461/510 and so on.
+        long lastUpper = UPPER_BOUNDS[UPPER_BOUNDS.length - 1];
+        long intervals = (count - lastUpper - 1) / OPEN_INTERVAL_STEP + 1;
+        long upper = lastUpper + intervals * OPEN_INTERVAL_STEP;
+        return (upper - OPEN_INTERVAL_STEP + 1) + "/" + upper;
     }
 }

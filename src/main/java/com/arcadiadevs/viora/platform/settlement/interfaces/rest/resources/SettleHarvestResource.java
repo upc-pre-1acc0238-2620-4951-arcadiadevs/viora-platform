@@ -17,8 +17,10 @@ public record SettleHarvestResource(
         @NotNull(message = "{settlement.weight.invalid}") @PositiveOrZero(message = "{settlement.weight.invalid}")
         @Schema(description = "Black olives delivered, kg", example = "6050.0") Double blackOlivesKg,
         @Positive(message = "{settlement.fruits_per_kg.invalid}")
+        @DecimalMax(value = "2000", message = "{settlement.fruits_per_kg.invalid}")
         @Schema(description = "Optional commercial caliber of the delivered table olives, fruits per kilogram "
-                + "(IOC size scale). It calibrates Viora's caliber projection.", example = "105.0", nullable = true)
+                + "(IOC size scale), up to 2000. It calibrates Viora's caliber projection.", example = "105.0",
+                maximum = "2000", nullable = true)
         Double commercialFruitsPerKg,
         @Size(max = 1000, message = "{settlement.notes.too_long}")
         @Schema(description = "Optional notes, up to 1000 characters", example = "Campaign weights verified.")

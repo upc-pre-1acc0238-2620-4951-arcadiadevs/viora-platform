@@ -199,6 +199,8 @@ class HarvestSettlementControllerIntegrationTest {
             "{\"campaignYear\":2101,\"greenOlivesKg\":10,\"blackOlivesKg\":10}",
             "{\"campaignYear\":2026,\"greenOlivesKg\":10}",
             "{\"campaignYear\":2026,\"greenOlivesKg\":10,\"blackOlivesKg\":10,\"commercialFruitsPerKg\":0}",
+            "{\"campaignYear\":2026,\"greenOlivesKg\":10,\"blackOlivesKg\":10,\"commercialFruitsPerKg\":2000.5}",
+            "{\"campaignYear\":2026,\"greenOlivesKg\":10,\"blackOlivesKg\":10,\"commercialFruitsPerKg\":1e300}",
             "{\"campaignYear\":\"x\",\"greenOlivesKg\":10,\"blackOlivesKg\":10}"
     })
     void rejectsInvalidBodiesWithoutOpeningAReport(String payload) throws Exception {
