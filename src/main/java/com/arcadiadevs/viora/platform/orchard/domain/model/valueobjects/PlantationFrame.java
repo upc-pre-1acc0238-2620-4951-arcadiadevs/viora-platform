@@ -9,6 +9,12 @@ package com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects;
  */
 public record PlantationFrame(Double rowSpacingM, Double treeSpacingM) {
 
+    /** Closest spacing accepted, in metres; even super-intensive hedgerows plant trees further apart. */
+    public static final double MIN_SPACING_M = 0.5;
+
+    /** Widest spacing accepted, in metres; far above any traditional olive frame. */
+    public static final double MAX_SPACING_M = 50.0;
+
     /**
      * Compact constructor validating positive planting spacing dimensions.
      *
@@ -18,6 +24,11 @@ public record PlantationFrame(Double rowSpacingM, Double treeSpacingM) {
     public PlantationFrame {
         if (rowSpacingM == null || rowSpacingM <= 0.0 || treeSpacingM == null || treeSpacingM <= 0.0) {
             throw new IllegalArgumentException("plot.spacing.positive");
+        }
+        if (!Double.isFinite(rowSpacingM) || !Double.isFinite(treeSpacingM)
+                || rowSpacingM < MIN_SPACING_M || treeSpacingM < MIN_SPACING_M
+                || rowSpacingM > MAX_SPACING_M || treeSpacingM > MAX_SPACING_M) {
+            throw new IllegalArgumentException("plot.spacing.out_of_range");
         }
     }
 }

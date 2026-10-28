@@ -135,18 +135,18 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should restart a pending sign-up keeping the same identity and raising the sign-up events again")
+    @DisplayName("Should restart a pending sign-up keeping the identity and the password, raising the events again")
     void shouldRestartPendingSignUp() {
         var issuedAt = Instant.now();
         var account = pendingAccount(issuedAt);
         var id = account.snapshot().id();
-        var newHash = new PasswordHash("$argon2id$v=19$m=65536,t=3,p=4$retryhash");
+        var originalHash = account.snapshot().passwordHash();
         var details = new OnboardingProfileDetails("Juan Perez", "PE", "+51987654321");
 
-        account.restartSignUp(newHash, TERMS, details, "hashed:222222", issuedAt.plusSeconds(60));
+        account.restartSignUp(TERMS, details, "hashed:222222", issuedAt.plusSeconds(60));
 
         assertThat(account.snapshot().id()).isEqualTo(id);
-        assertThat(account.snapshot().passwordHash()).isEqualTo(newHash);
+        assertThat(account.snapshot().passwordHash()).isEqualTo(originalHash);
         assertThat(account.snapshot().emailVerification().codeHash()).isEqualTo("hashed:222222");
         assertThat(account.domainEvents()).hasSize(2);
         var profileEvent = (UserSignedUpWithProfileEvent) account.domainEvents().iterator().next();
@@ -158,7 +158,7 @@ class UserAccountTest {
     void shouldNotRestartSignUpOfActiveAccount() {
         var account = UserAccountFixtures.activeAccount(email.value(), hash.value(), role);
 
-        assertThatThrownBy(() -> account.restartSignUp(hash, TERMS, null, "hashed:222222", Instant.now()))
+        assertThatThrownBy(() -> account.restartSignUp(TERMS, null, "hashed:222222", Instant.now()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("user.email.already_exists");
     }

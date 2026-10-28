@@ -28,6 +28,9 @@ public class AgroclimaticThresholdEvaluator {
             "heat_wave.step.suspend_cultural_ops"
     );
 
+    /** Forecast minimum that raises a frost warning, as the requirements set it (US18: ≤ 1.5 °C). */
+    public static final double FROST_WARNING_CELSIUS = 1.5;
+
     private static final List<String> FROST_MITIGATION_STEPS = List.of(
             "frost_warning.step.pre_irrigate_soil",
             "frost_warning.step.activate_frost_protection",
@@ -147,11 +150,11 @@ public class AgroclimaticThresholdEvaluator {
                     breach,
                     FROST_MITIGATION_STEPS
             ));
-        } else if (minTemperatureCelsius <= 1.0) {
+        } else if (minTemperatureCelsius <= FROST_WARNING_CELSIUS) {
             var breach = new ThresholdBreachInfo(
                     "MIN_TEMPERATURE",
                     minTemperatureCelsius,
-                    1.0,
+                    FROST_WARNING_CELSIUS,
                     "°C"
             );
             return Optional.of(new IncidentTrigger(

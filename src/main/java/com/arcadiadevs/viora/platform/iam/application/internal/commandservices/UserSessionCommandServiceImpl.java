@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.iam.application.internal.commandservices;
 
 import com.arcadiadevs.viora.platform.iam.application.commandservices.AuthenticatedSession;
 import com.arcadiadevs.viora.platform.iam.application.commandservices.UserSessionCommandService;
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.ratelimit.AuthAttemptLimiter;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.SecureTokenGenerator;
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.TokenService;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccount;
@@ -13,6 +14,8 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.RefreshUserSessi
 import com.arcadiadevs.viora.platform.iam.domain.model.commands.SignOutUserSessionCommand;
 import com.arcadiadevs.viora.platform.iam.domain.model.ports.PasswordHasher;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.PasswordHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserAccountStatus;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
@@ -20,6 +23,7 @@ import com.arcadiadevs.viora.platform.iam.domain.repositories.UserSessionReposit
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -39,6 +43,9 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
     private final PasswordHasher passwordHasher;
     private final TokenService tokenService;
     private final SecureTokenGenerator tokenGenerator;
+    private final AuthAttemptLimiter attemptLimiter;
+    /** Hash checked when the email has no account, so both cases take as long as a real check. */
+    private volatile PasswordHash unknownAccountHash;
 
     /**
      * Creates the session command service.
@@ -48,6 +55,7 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
      * @param passwordHasher        checks the password typed at sign-in
      * @param tokenService          issues the access tokens
      * @param tokenGenerator generates and hashes the refresh tokens
+     * @param attemptLimiter limits the failed sign-ins of each email
      * @throws IllegalArgumentException if any dependency is null
      */
     public UserSessionCommandServiceImpl(
@@ -55,7 +63,8 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
             UserSessionRepository userSessionRepository,
             PasswordHasher passwordHasher,
             TokenService tokenService,
-            SecureTokenGenerator tokenGenerator
+            SecureTokenGenerator tokenGenerator,
+            AuthAttemptLimiter attemptLimiter
     ) {
         if (userAccountRepository == null) {
             throw new IllegalArgumentException("user.repository.null");
@@ -72,36 +81,63 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
         if (tokenGenerator == null) {
             throw new IllegalArgumentException("user.refresh_token_generator.null");
         }
+        if (attemptLimiter == null) {
+            throw new IllegalArgumentException("user.attempt_limiter.null");
+        }
         this.userAccountRepository = userAccountRepository;
         this.userSessionRepository = userSessionRepository;
         this.passwordHasher = passwordHasher;
         this.tokenService = tokenService;
         this.tokenGenerator = tokenGenerator;
+        this.attemptLimiter = attemptLimiter;
     }
 
     /**
-     * Signs in with email and password. A wrong email and a wrong password get the same answer; an unverified
-     * email is only reported once the password is right.
+     * Signs in with email and password. A wrong email and a wrong password get the same answer, in the same time;
+     * an unverified email is only reported once the password is right. After too many failed attempts the email is
+     * refused for a while, even with the right password.
+     *
+     * <p>It runs outside a transaction: the password hash takes tens of milliseconds and must not hold one of the
+     * few database connections while it does. Each repository call opens its own.</p>
      *
      * @param command sign-in command
      * @return the new session, or why the credentials were rejected
      */
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Result<AuthenticatedSession, ApplicationError> handle(AuthenticateUserCommand command) {
         if (command == null) {
             return Result.failure(ApplicationError.validationError("command", "user.command.null"));
         }
+        final EmailAddress email;
         try {
-            var optionalAccount = userAccountRepository.findByEmail(new EmailAddress(command.email()));
-            if (optionalAccount.isEmpty()
-                    || !passwordHasher.matches(command.rawPassword(), optionalAccount.get().snapshot().passwordHash())) {
-                return Result.failure(ApplicationError.forbidden("user", "user.credentials.invalid"));
-            }
-            return openSessionFor(optionalAccount.get(), Instant.now());
+            email = new EmailAddress(command.email());
         } catch (IllegalArgumentException ex) {
             // A malformed email cannot belong to an account, so it gets the same answer as wrong credentials
             return Result.failure(ApplicationError.forbidden("user", "user.credentials.invalid"));
         }
+        var now = Instant.now();
+        var wait = attemptLimiter.tryAcquireSignIn(email.value(), now);
+        if (wait.isPresent()) {
+            return Result.failure(ApplicationError.tooManyRequests("sign-in", "user.sign_in.too_many_attempts",
+                    wait.getAsLong()));
+        }
+        var optionalAccount = userAccountRepository.findByEmail(email);
+        var storedHash = optionalAccount.map(account -> account.snapshot().passwordHash())
+                .orElseGet(this::unknownAccountHash);
+        boolean passwordMatches = passwordHasher.matches(command.rawPassword(), storedHash);
+        if (optionalAccount.isEmpty() || !passwordMatches) {
+            return Result.failure(ApplicationError.forbidden("user", "user.credentials.invalid"));
+        }
+        attemptLimiter.resetSignIn(email.value());
+        return openSessionFor(optionalAccount.get(), now);
+    }
+
+    private PasswordHash unknownAccountHash() {
+        if (unknownAccountHash == null) {
+            unknownAccountHash = passwordHasher.hash(new NewPassword("unknown-account-1"));
+        }
+        return unknownAccountHash;
     }
 
     /**

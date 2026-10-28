@@ -33,8 +33,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionP
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP coverage of owned identifier lookup through JWT validation and database persistence. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "viora.security.demo.enabled=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(SubscriptionByIdHttpTest.FixedTime.class)
 class SubscriptionByIdHttpTest {
     private static final Instant NOW = Instant.parse("2028-03-01T12:00:00Z");

@@ -3,16 +3,28 @@ package com.arcadiadevs.viora.platform.orchard.domain.services;
 import com.arcadiadevs.viora.platform.orchard.domain.exceptions.InvalidPlotGeometryException;
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.PlotGeometry;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * Domain service providing geometric verification and geodesic surface area calculation for cadastral geometries.
  */
 public class CadastralGeometryService {
 
-    private static final Pattern COORD_PAIR_PATTERN = Pattern.compile("\\[\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*\\]");
+    /** Longest GeoJSON text accepted; a hand-drawn plot outline is a few kilobytes at most. */
+    public static final int MAX_GEOJSON_LENGTH = 50_000;
+
+    /** Most vertices accepted in the outline ring, the closing one included. */
+    public static final int MAX_VERTICES = 500;
+
+    /** Largest plot accepted; far above any olive plot, so a bigger one is a drawing or typing error. */
+    public static final double MAX_AREA_HA = 5_000.0;
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**
      * Validates that the provided GeoJSON polygon has a valid closed ring topology with minimum required vertices.
@@ -28,6 +40,9 @@ public class CadastralGeometryService {
         var coords = parseCoordinates(geoJson);
         if (coords.size() < 4) {
             throw new InvalidPlotGeometryException("plot.geometry.vertices_min");
+        }
+        if (coords.size() > MAX_VERTICES) {
+            throw new InvalidPlotGeometryException("plot.geometry.vertices_max");
         }
 
         double[] first = coords.get(0);
@@ -48,6 +63,9 @@ public class CadastralGeometryService {
         var coords = parseCoordinates(geoJson);
         double areaSqMeters = calculateGeodesicArea(coords);
         double areaHa = Math.round((areaSqMeters / 10000.0) * 100.0) / 100.0;
+        if (areaHa > MAX_AREA_HA) {
+            throw new InvalidPlotGeometryException("plot.geometry.area_too_large");
+        }
         return areaHa <= 0.0 ? 0.01 : areaHa;
     }
 
@@ -85,12 +103,44 @@ public class CadastralGeometryService {
         return new double[]{sumLat / n, sumLon / n};
     }
 
+    /**
+     * Reads the outline ring of a GeoJSON Polygon: {@code {"type":"Polygon","coordinates":[[[lon,lat],...]]}}.
+     * Only the outer ring is accepted, since the area ignores holes, and every position must be a real WGS84
+     * longitude and latitude.
+     */
     private List<double[]> parseCoordinates(String geoJson) {
-        var matcher = COORD_PAIR_PATTERN.matcher(geoJson);
-        List<double[]> coords = new ArrayList<>();
-        while (matcher.find()) {
-            double lon = Double.parseDouble(matcher.group(1));
-            double lat = Double.parseDouble(matcher.group(2));
+        if (geoJson.length() > MAX_GEOJSON_LENGTH) {
+            throw new InvalidPlotGeometryException("plot.geometry.too_large");
+        }
+        final JsonNode root;
+        try {
+            root = JSON.readTree(geoJson);
+        } catch (JacksonException exception) {
+            throw new InvalidPlotGeometryException("plot.geometry.invalid");
+        }
+        var type = root == null ? null : root.get("type");
+        if (type == null || !type.isString() || !"Polygon".equals(type.stringValue())) {
+            throw new InvalidPlotGeometryException("plot.geometry.invalid");
+        }
+        var rings = root.get("coordinates");
+        if (rings == null || !rings.isArray() || rings.size() != 1 || !rings.get(0).isArray()) {
+            throw new InvalidPlotGeometryException("plot.geometry.invalid");
+        }
+        var ring = rings.get(0);
+        if (ring.size() > MAX_VERTICES) {
+            throw new InvalidPlotGeometryException("plot.geometry.vertices_max");
+        }
+        List<double[]> coords = new ArrayList<>(ring.size());
+        for (JsonNode position : ring) {
+            if (!position.isArray() || position.size() < 2 || !position.get(0).isNumber()
+                    || !position.get(1).isNumber()) {
+                throw new InvalidPlotGeometryException("plot.geometry.invalid");
+            }
+            double lon = position.get(0).doubleValue();
+            double lat = position.get(1).doubleValue();
+            if (!Double.isFinite(lon) || !Double.isFinite(lat) || Math.abs(lon) > 180.0 || Math.abs(lat) > 90.0) {
+                throw new InvalidPlotGeometryException("plot.geometry.coordinates_out_of_range");
+            }
             coords.add(new double[]{lon, lat});
         }
         return coords;

@@ -57,7 +57,7 @@ class AgroclimaticIncidentCommandServiceTest {
     @DisplayName("Should raise incident successfully when plot is active")
     void shouldRaiseIncidentSuccessfully() {
         when(externalOrchardService.existsActivePlot(any(PlotId.class))).thenReturn(true);
-        when(incidentRepository.findActiveByPlotIdAndType(any(PlotId.class), any(IncidentType.class))).thenReturn(Optional.empty());
+        when(incidentRepository.findOpenByPlotIdAndType(any(PlotId.class), any(IncidentType.class))).thenReturn(Optional.empty());
         when(incidentRepository.save(any(AgroclimaticIncident.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var command = new RaiseAgroclimaticIncidentCommand(
@@ -114,7 +114,7 @@ class AgroclimaticIncidentCommandServiceTest {
                 Instant.now()
         );
 
-        when(incidentRepository.findActiveByPlotIdAndType(any(PlotId.class), eq(IncidentType.HYDRIC_STRESS)))
+        when(incidentRepository.findOpenByPlotIdAndType(any(PlotId.class), eq(IncidentType.HYDRIC_STRESS)))
                 .thenReturn(Optional.of(existingIncident));
 
         var command = new RaiseAgroclimaticIncidentCommand(

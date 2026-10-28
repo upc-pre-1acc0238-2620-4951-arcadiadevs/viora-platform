@@ -118,4 +118,12 @@ public class AgroclimaticIncidentRepositoryImpl implements AgroclimaticIncidentR
         return persistenceRepository.findFirstByPlotIdAndTypeAndStatus(plotId, type, IncidentStatus.ACTIVE)
                 .map(AgroclimaticIncidentPersistenceAssembler::toDomainFromPersistence);
     }
+
+    @Override
+    public Optional<AgroclimaticIncident> findOpenByPlotIdAndType(PlotId plotId, IncidentType type) {
+        return findActiveByPlotIdAndType(plotId, type).or(() -> plotId == null || type == null
+                ? Optional.empty()
+                : persistenceRepository.findFirstByPlotIdAndTypeAndStatus(plotId, type, IncidentStatus.SNOOZED)
+                        .map(AgroclimaticIncidentPersistenceAssembler::toDomainFromPersistence));
+    }
 }

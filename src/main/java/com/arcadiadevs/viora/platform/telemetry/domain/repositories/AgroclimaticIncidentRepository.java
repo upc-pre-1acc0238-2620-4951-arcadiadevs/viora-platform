@@ -88,4 +88,13 @@ public interface AgroclimaticIncidentRepository {
      * @return Optional containing the active aggregate root if found
      */
     Optional<AgroclimaticIncident> findActiveByPlotIdAndType(PlotId plotId, IncidentType type);
+
+    /**
+     * Finds the open incident of a type on a plot: the active one, or else the postponed one.
+     *
+     * @param plotId the plot
+     * @param type   the incident type
+     * @return the open incident, or empty when every incident of that type is normalized
+     */
+    Optional<AgroclimaticIncident> findOpenByPlotIdAndType(PlotId plotId, IncidentType type);
 }

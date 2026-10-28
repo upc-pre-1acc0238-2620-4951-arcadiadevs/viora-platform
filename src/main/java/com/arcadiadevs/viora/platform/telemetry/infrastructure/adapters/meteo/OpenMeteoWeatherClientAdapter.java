@@ -9,6 +9,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -22,8 +24,9 @@ import java.util.List;
 /**
  * External infrastructure adapter implementing {@link WeatherForecastProvider} using the Open-Meteo REST API.
  *
- * <p>Provides robust 7-day agroclimatic forecast ingestion with automatic fallback to deterministic
- * microclimatic simulation in case of external network timeouts or air-gapped test environments.</p>
+ * <p>When Open-Meteo cannot be reached it returns no forecast, so the platform answers 503 instead of showing a
+ * made-up one that never forecasts frost. A deterministic simulation is used instead only when
+ * {@code viora.telemetry.forecast.simulated-fallback=true}, which the tests set because they run offline.</p>
  */
 @Component
 public class OpenMeteoWeatherClientAdapter implements WeatherForecastProvider {
@@ -32,8 +35,11 @@ public class OpenMeteoWeatherClientAdapter implements WeatherForecastProvider {
     private static final String OPEN_METEO_BASE_URL = "https://api.open-meteo.com/v1/forecast";
 
     private final RestClient restClient;
+    private final boolean simulatedFallback;
 
-    public OpenMeteoWeatherClientAdapter() {
+    @Autowired
+    public OpenMeteoWeatherClientAdapter(
+            @Value("${viora.telemetry.forecast.simulated-fallback:false}") boolean simulatedFallback) {
         var requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) Duration.ofSeconds(2).toMillis());
         requestFactory.setReadTimeout((int) Duration.ofSeconds(3).toMillis());
@@ -41,10 +47,12 @@ public class OpenMeteoWeatherClientAdapter implements WeatherForecastProvider {
                 .requestFactory(requestFactory)
                 .baseUrl(OPEN_METEO_BASE_URL)
                 .build();
+        this.simulatedFallback = simulatedFallback;
     }
 
     public OpenMeteoWeatherClientAdapter(RestClient restClient) {
         this.restClient = restClient;
+        this.simulatedFallback = false;
     }
 
     @Override
@@ -68,11 +76,11 @@ public class OpenMeteoWeatherClientAdapter implements WeatherForecastProvider {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Open-Meteo API unreachable or timed out ({}). Falling back to deterministic agroclimatic model for ({}, {}).",
-                    ex.getMessage(), latitude, longitude);
+            log.warn("Open-Meteo API unreachable or timed out ({}) for ({}, {}).", ex.getMessage(), latitude,
+                    longitude);
         }
 
-        return generateDeterministicForecast(latitude, longitude);
+        return simulatedFallback ? generateDeterministicForecast(latitude, longitude) : List.of();
     }
 
     private List<WeatherForecastDay> parseOpenMeteoResponse(OpenMeteoResponse response) {

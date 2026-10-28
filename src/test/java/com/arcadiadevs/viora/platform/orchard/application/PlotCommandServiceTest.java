@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.orchard.application;
 
 import com.arcadiadevs.viora.platform.orchard.application.internal.commandservices.PlotCommandServiceImpl;
+import com.arcadiadevs.viora.platform.orchard.application.internal.outboundservices.acl.ExternalSubscriptionService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.aggregates.Plot;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.RemovePlotCommand;
@@ -9,6 +10,8 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.commands.UpdatePlotCo
 import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
+import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
+import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.OptionalDouble;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +39,9 @@ class PlotCommandServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private ExternalSubscriptionService subscriptions;
+
     private PlotCommandServiceImpl plotCommandService;
     private final UUID producerId = UUID.randomUUID();
     private final String validGeoJson = "{\"type\":\"Polygon\",\"coordinates\":[[[-70.25,-18.05],[-70.24,-18.05],[-70.24,-18.06],[-70.25,-18.06],[-70.25,-18.05]]]}";
@@ -42,7 +49,8 @@ class PlotCommandServiceTest {
     @BeforeEach
     void setUp() {
         var geometryService = new CadastralGeometryService();
-        plotCommandService = new PlotCommandServiceImpl(plotRepository, geometryService, eventPublisher);
+        plotCommandService = new PlotCommandServiceImpl(plotRepository, geometryService, eventPublisher, subscriptions,
+                false);
     }
 
     @Test
@@ -129,15 +137,15 @@ class PlotCommandServiceTest {
     void shouldEnforceConstructorNullGuards() {
         var geometryService = new CadastralGeometryService();
 
-        assertThatThrownBy(() -> new PlotCommandServiceImpl(null, geometryService, eventPublisher))
+        assertThatThrownBy(() -> new PlotCommandServiceImpl(null, geometryService, eventPublisher, subscriptions, true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("plot.repository.null");
 
-        assertThatThrownBy(() -> new PlotCommandServiceImpl(plotRepository, null, eventPublisher))
+        assertThatThrownBy(() -> new PlotCommandServiceImpl(plotRepository, null, eventPublisher, subscriptions, true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("plot.cadastral_geometry_service.null");
 
-        assertThatThrownBy(() -> new PlotCommandServiceImpl(plotRepository, geometryService, null))
+        assertThatThrownBy(() -> new PlotCommandServiceImpl(plotRepository, geometryService, null, subscriptions, true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("plot.event_publisher.null");
     }
@@ -449,5 +457,41 @@ class PlotCommandServiceTest {
 
         assertThat(result.isFailure()).isTrue();
         verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    @Test
+    @DisplayName("Refuses a new plot without a plan that gives access, and one that does not fit in its hectares")
+    void enforcesThePlanAndItsHectares() {
+        var enforced = new PlotCommandServiceImpl(plotRepository, new CadastralGeometryService(), eventPublisher,
+                subscriptions, true);
+        var command = new DelimitPlotCommand(producerId.toString(), "Cuartel El Olivo", "CRIOLLA", validGeoJson,
+                7.0, 5.0);
+        when(plotRepository.existsByNameAndProducerId(any(PlotName.class), any(ProducerId.class))).thenReturn(false);
+
+        when(subscriptions.findEntitledQuotaHectares(producerId.toString())).thenReturn(OptionalDouble.empty());
+        var noPlan = enforced.handle(command);
+        when(subscriptions.findEntitledQuotaHectares(producerId.toString())).thenReturn(OptionalDouble.of(100.0));
+        var tooBig = enforced.handle(command);
+
+        assertThat(((Result.Failure<String, ApplicationError>) noPlan).error().details())
+                .isEqualTo("plot.subscription.inactive");
+        assertThat(((Result.Failure<String, ApplicationError>) tooBig).error().details())
+                .isEqualTo("plot.quota.exceeded");
+        verify(plotRepository, never()).save(any(Plot.class));
+    }
+
+    @Test
+    @DisplayName("Accepts a new plot that fits in the hectares of the plan")
+    void acceptsAPlotThatFits() {
+        var enforced = new PlotCommandServiceImpl(plotRepository, new CadastralGeometryService(), eventPublisher,
+                subscriptions, true);
+        when(plotRepository.existsByNameAndProducerId(any(PlotName.class), any(ProducerId.class))).thenReturn(false);
+        when(subscriptions.findEntitledQuotaHectares(producerId.toString())).thenReturn(OptionalDouble.of(500.0));
+        when(plotRepository.save(any(Plot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = enforced.handle(new DelimitPlotCommand(producerId.toString(), "Cuartel El Olivo", "CRIOLLA",
+                validGeoJson, 7.0, 5.0));
+
+        assertThat(result).isInstanceOf(Result.Success.class);
     }
 }

@@ -16,7 +16,6 @@ import com.arcadiadevs.viora.platform.phenology.domain.services.ChillSeasonEvalu
 import com.arcadiadevs.viora.platform.phenology.domain.services.ErezDynamicModelCalculator;
 import com.arcadiadevs.viora.platform.phenology.domain.services.HoblynBbiCalculatorService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -33,9 +32,11 @@ import java.util.Optional;
  * computed from the hourly temperatures observed at the plot centroid, so they do not need any harvest record:
  * the current winter (or the last one, outside June 1 - August 31) is evaluated and compared with the winter
  * before it.</p>
+ *
+ * <p>It runs outside a transaction on purpose: the hourly temperatures come from Open-Meteo and can take seconds,
+ * which must not hold one of the few database connections. Each repository read opens its own.</p>
  */
 @Service
-@Transactional(readOnly = true)
 public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryService {
 
     static final String CHILL_MODEL = "Dynamic Model (Fishman & Erez)";

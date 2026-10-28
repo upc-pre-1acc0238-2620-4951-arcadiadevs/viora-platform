@@ -26,6 +26,10 @@ public final class ThinningExecutionFixtures {
         return build(status, closesOn, UUID.randomUUID().toString(), List.of(representativeRound()));
     }
 
+    public static FruitThinningPrescription withStatus(PrescriptionStatus status, LocalDate closesOn, String plotId) {
+        return build(status, closesOn, plotId, List.of(representativeRound()));
+    }
+
     public static FruitThinningPrescription prescribedWithoutSampling(LocalDate closesOn) {
         return build(PrescriptionStatus.PRESCRIBED, closesOn, UUID.randomUUID().toString(), List.of());
     }

@@ -42,8 +42,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionP
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP and database coverage with actual JWT authentication and a simulated external payment port. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "viora.security.demo.enabled=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(CheckoutHttpTest.FixedTime.class)
 class CheckoutHttpTest {
     private static final Instant NOW = Instant.parse("2028-03-01T12:00:00Z");

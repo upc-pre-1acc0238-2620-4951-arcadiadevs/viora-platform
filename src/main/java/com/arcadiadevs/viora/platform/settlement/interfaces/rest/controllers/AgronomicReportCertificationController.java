@@ -17,12 +17,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /** REST entry point for certifying the dossier of one settled campaign of a plot. */
 @RestController
 @RequestMapping(value = "/api/v1/plots/{plotId}/certifications", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Agronomic Dossier Certification")
+@PreAuthorize("@plotAccess.isAccessible(#plotId)")
 public class AgronomicReportCertificationController {
     private final CertifyAgronomicDossierCommandService service;
 

@@ -64,8 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:cooperativecoderedemption;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "viora.subscription.seed.enabled=true",
-        "viora.security.demo.enabled=true"
+        "viora.subscription.seed.enabled=true"
 })
 @DisplayName("Cooperative code redemption integration")
 class CooperativeCodeRedemptionIntegrationTest {
@@ -224,6 +223,31 @@ class CooperativeCodeRedemptionIntegrationTest {
                 .andExpect(jsonPath("$.detail").value("You already have an active subscription"));
 
         assertThat(storedCode(second).getStatus()).isEqualTo(InvitationCodeStatus.AVAILABLE);
+        assertThat(subscriptionsOf(producer)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Two codes redeemed at the same time create one subscription and spend one code")
+    void concurrentRedemptionsCreateOneSubscription() throws Exception {
+        var first = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var second = newCode(license, Instant.now().plus(Duration.ofDays(7)));
+        var start = new CountDownLatch(1);
+        try (var executor = new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2))) {
+            Callable<Integer> one = () -> {
+                start.await();
+                return redeem(first).andReturn().getResponse().getStatus();
+            };
+            Callable<Integer> other = () -> {
+                start.await();
+                return redeem(second).andReturn().getResponse().getStatus();
+            };
+            Future<Integer> a = executor.submit(one);
+            Future<Integer> b = executor.submit(other);
+            start.countDown();
+            assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(201, 409);
+        }
+
         assertThat(subscriptionsOf(producer)).hasSize(1);
     }
 

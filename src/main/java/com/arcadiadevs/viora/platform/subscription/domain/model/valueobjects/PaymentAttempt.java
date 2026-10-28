@@ -10,6 +10,9 @@ import java.util.*;
 public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, String status,
         String preferenceId, String checkoutUrl, Instant createdAt, Instant expiresAt, Map<String, String> paymentStates,
         UUID extensionId) {
+    /** Provider states of an approved payment that was later given back to the payer. */
+    public static final Set<String> REVERSED_STATES = Set.of("refunded", "charged_back");
+
     /**
      * Validates a durable attempt and freezes its transaction observations.
      * @throws IllegalArgumentException if identity, lifetime, state or observations are invalid
@@ -59,17 +62,25 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
      */
     public PaymentAttempt withPaymentState(String paymentId, String next) {
         if (paymentId == null || !paymentId.matches("[0-9]{1,30}") || next == null
-                || !Set.of("approved", "pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled").contains(next)) {
+                || !Set.of("approved", "pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled",
+                        "refunded", "charged_back").contains(next)) {
             throw new IllegalArgumentException("subscription.payment.mismatch");
         }
         var observed = new HashMap<>(paymentStates);
         var previous = observed.get(paymentId);
         var pending = Set.of("pending", "in_process", "authorized", "in_mediation");
-        if (!"approved".equals(previous) && !(Set.of("rejected", "cancelled").contains(previous == null ? "" : previous) && pending.contains(next))) {
+        if (REVERSED_STATES.contains(next)) {
+            // Only an approved payment can be given back; a repeated notification changes nothing
+            if ("approved".equals(previous)) {
+                observed.put(paymentId, next);
+            }
+        } else if (!"approved".equals(previous) && !REVERSED_STATES.contains(previous == null ? "" : previous)
+                && !(Set.of("rejected", "cancelled").contains(previous == null ? "" : previous) && pending.contains(next))) {
             observed.put(paymentId, next);
         }
         String projected = status;
-        if ("APPROVED".equals(status) || observed.containsValue("approved")) { projected = "APPROVED"; }
+        if ("APPROVED".equals(status) || observed.containsValue("approved")
+                || observed.values().stream().anyMatch(REVERSED_STATES::contains)) { projected = "APPROVED"; }
         else if (observed.values().stream().anyMatch(pending::contains)) { projected = "PENDING"; }
         else if (observed.values().stream().anyMatch(Set.of("rejected", "cancelled")::contains)) { projected = "REJECTED"; }
         return new PaymentAttempt(id, subscriptionId, producerId, projected, preferenceId, checkoutUrl, createdAt, expiresAt, observed, extensionId);

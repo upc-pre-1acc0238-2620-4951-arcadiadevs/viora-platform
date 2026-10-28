@@ -12,7 +12,6 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.queries.GetWeatherF
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -21,9 +20,12 @@ import java.time.Instant;
  *
  * <p>Validates plot existence and active status in Orchard via ACL, retrieves plot centroid coordinates,
  * queries the weather forecast provider, and publishes {@link WeatherForecastIngestedEvent}.</p>
+ *
+ * <p>It runs outside a transaction on purpose: the weather call takes seconds and must not hold a database
+ * connection, and the frost incident raised by the event listener must commit in its own transaction (inside a
+ * read-only one it was silently never written).</p>
  */
 @Service
-@Transactional(readOnly = true)
 public class WeatherForecastQueryServiceImpl implements WeatherForecastQueryService {
 
     private final WeatherForecastProvider weatherForecastProvider;
@@ -65,6 +67,10 @@ public class WeatherForecastQueryServiceImpl implements WeatherForecastQueryServ
         double longitude = centroidOpt.map(c -> c[1]).orElse(-70.25);
 
         var forecastDays = weatherForecastProvider.fetchSevenDayForecast(latitude, longitude);
+        if (forecastDays.isEmpty()) {
+            // Without a real forecast nothing is shown or evaluated: an invented one would hide a frost
+            return Result.failure(ApplicationError.unavailable("weather-forecast", "telemetry.forecast.unavailable"));
+        }
         var daySnapshots = forecastDays.stream()
                 .map(WeatherForecastDay::snapshot)
                 .toList();

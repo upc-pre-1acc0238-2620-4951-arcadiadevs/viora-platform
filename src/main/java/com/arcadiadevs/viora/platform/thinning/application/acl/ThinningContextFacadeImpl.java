@@ -19,7 +19,6 @@ import java.util.Optional;
  * how a caliber maps onto a grade.</p>
  */
 @Service
-@Transactional(readOnly = true)
 public class ThinningContextFacadeImpl implements ThinningContextFacade {
 
     private final FruitThinningPrescriptionRepository prescriptionRepository;
@@ -37,6 +36,7 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<CampaignThinningPlan> findCampaignThinningPlan(String plotId, int campaignYear) {
         final PlotId id;
         final CampaignYear year;

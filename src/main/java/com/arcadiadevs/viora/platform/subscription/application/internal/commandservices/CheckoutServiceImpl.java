@@ -263,6 +263,12 @@ public class CheckoutServiceImpl implements CheckoutService {
                 attempts.save(current.withPaymentState(payment.id(), "approved"));
                 sub.domainEvents().forEach(events::publishEvent);
                 sub.clearDomainEvents();
+            } else if (PaymentAttempt.REVERSED_STATES.contains(payment.status())) {
+                // A refunded or charged-back plan stops giving access
+                if (sub.revokeReversedPayment(payment.id())) {
+                    subscriptions.save(sub);
+                }
+                attempts.save(current.withPaymentState(payment.id(), payment.status()));
             } else if (Set.of("pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled").contains(payment.status())) {
                 attempts.save(current.withPaymentState(payment.id(), payment.status()));
             }
@@ -286,6 +292,13 @@ public class CheckoutServiceImpl implements CheckoutService {
                 }
             } catch (IllegalArgumentException | IllegalStateException ex) { return conflict(ex.getMessage()); }
             attempts.save(current.withPaymentState(payment.id(), "approved"));
+        } else if (PaymentAttempt.REVERSED_STATES.contains(payment.status())) {
+            // The hectares go back only once: the attempt remembers the payment is no longer approved
+            if ("approved".equals(current.paymentStates().get(payment.id()))) {
+                sub.reduceQuota(extension.snapshot().addedArea());
+                subscriptions.save(sub);
+            }
+            attempts.save(current.withPaymentState(payment.id(), payment.status()));
         } else if (Set.of("pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled").contains(payment.status())) {
             attempts.save(current.withPaymentState(payment.id(), payment.status()));
         }

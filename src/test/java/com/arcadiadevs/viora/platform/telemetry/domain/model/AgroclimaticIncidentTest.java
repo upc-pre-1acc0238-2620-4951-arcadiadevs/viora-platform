@@ -205,6 +205,30 @@ class AgroclimaticIncidentTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("incident.cannot_postpone_normalized");
         }
+
+        @Test
+        @DisplayName("Should refuse a postponement longer than a week")
+        void shouldRefuseAPostponementLongerThanAWeek() {
+            var incident = AgroclimaticIncident.raise(validPlotId, IncidentType.HEAT_WAVE, IncidentSeverity.WARNING,
+                    validBreach, List.of(), Instant.now());
+
+            assertThatThrownBy(() -> incident.postpone(Duration.ofDays(8)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("incident.postpone.duration.invalid");
+        }
+
+        @Test
+        @DisplayName("Should become active again only once the postponement is over")
+        void shouldWakeUpOnceThePostponementIsOver() {
+            var incident = AgroclimaticIncident.raise(validPlotId, IncidentType.HEAT_WAVE, IncidentSeverity.WARNING,
+                    validBreach, List.of(), Instant.now());
+            incident.postpone(Duration.ofHours(4));
+
+            assertThat(incident.wakeIfPostponementEnded(Instant.now().plus(Duration.ofHours(1)))).isFalse();
+            assertThat(incident.wakeIfPostponementEnded(Instant.now().plus(Duration.ofHours(5)))).isTrue();
+            assertThat(incident.snapshot().status()).isEqualTo(IncidentStatus.ACTIVE);
+            assertThat(incident.snapshot().snoozedUntil()).isNull();
+        }
     }
 
     @Nested

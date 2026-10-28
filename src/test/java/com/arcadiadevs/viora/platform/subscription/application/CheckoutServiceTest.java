@@ -107,6 +107,21 @@ class CheckoutServiceTest {
         assertTrue(service.confirm("123").isSuccess());
         assertEquals(expiry, sub.snapshot().period().endsAt()); assertEquals(1, events.size());
     }
+    @Test void aRefundOrChargeBackEndsTheAccessOnce() {
+        var checkout = service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "k").success().orElseThrow();
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "approved", price.total(), "PEN",
+                now.plusSeconds(21), now.plusSeconds(22));
+        assertTrue(service.confirm("123").isSuccess());
+        assertTrue(sub.hasActiveEntitlement(now.plusSeconds(30)));
+
+        gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "refunded", price.total(), "PEN",
+                now.plusSeconds(21), now.plusSeconds(22));
+        assertTrue(service.confirm("123").isSuccess());
+        assertTrue(service.confirm("123").isSuccess());
+
+        assertEquals(SubscriptionStatus.CANCELLED, sub.snapshot().status());
+        assertFalse(sub.hasActiveEntitlement(now.plusSeconds(30)));
+    }
     @Test void paymentMismatchNeverActivates() {
         var checkout = service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "k").success().orElseThrow();
         gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "approved", new Money(BigDecimal.ONE), "PEN",

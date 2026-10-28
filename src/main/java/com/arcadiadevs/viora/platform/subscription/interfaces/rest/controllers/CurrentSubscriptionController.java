@@ -37,10 +37,10 @@ public class CurrentSubscriptionController {
     @GetMapping
     @Operation(summary = "Get the signed-in producer's current subscription")
     public ResponseEntity<?> current() {
-        var current = queries.current(users.requireAuthenticatedUserId());
+        var current = queries.current(users.requireCurrentUserId());
         return current.<ResponseEntity<?>>map(subscription -> ResponseEntity.ok(
                 SubscriptionDetailsAssembler.toResource(subscription, clock.instant(),
-                        queries.paymentStatus(users.requireAuthenticatedUserId(),
+                        queries.paymentStatus(users.requireCurrentUserId(),
                                 java.util.UUID.fromString(subscription.snapshot().id().subscriptionId())))))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }

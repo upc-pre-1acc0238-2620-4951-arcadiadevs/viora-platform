@@ -22,13 +22,24 @@ class ConfirmThinningExecutionCommandServiceImplTest {
     private final ExternalOrchardService orchard = mock(ExternalOrchardService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final ConfirmThinningExecutionCommandServiceImpl service =
-            new ConfirmThinningExecutionCommandServiceImpl(repository, observations, orchard, publisher);
+            new ConfirmThinningExecutionCommandServiceImpl(repository, observations, orchard, publisher,
+                    java.time.Clock.systemUTC());
     private final LocalDate date = LocalDate.of(2026, 1, 1);
     private ConfirmThinningExecutionCommand command;
 
     @BeforeEach
     void setUp() {
         command = new ConfirmThinningExecutionCommand(UUID.randomUUID().toString(), date, 25.0, 420.0, 4, null);
+        org.mockito.Mockito.lenient().when(orchard.existsActivePlot(any())).thenReturn(true);
+    }
+
+    @Test
+    void refusesTheLaborOfAnArchivedPlot() {
+        var prescription = prescribed(date);
+        when(repository.findByIdForUpdate(any())).thenReturn(Optional.of(prescription));
+        when(orchard.existsActivePlot(prescription.snapshot().plotId())).thenReturn(false);
+        assertEquals("PLOT_NOT_FOUND", service.handle(command).failure().orElseThrow().code());
+        verify(repository, never()).save(any());
     }
 
     @Test

@@ -5,8 +5,10 @@ import com.arcadiadevs.viora.platform.iam.infrastructure.hashing.argon2.Argon2Ha
 import com.arcadiadevs.viora.platform.iam.infrastructure.tokens.jwt.BearerTokenService;
 import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -40,19 +42,22 @@ public class WebSecurityConfiguration {
     private final Argon2HashingService hashingService;
     private final AuthenticationEntryPoint unauthorizedRequestHandler;
     private final DeepLinkProperties deepLinkProperties;
+    private final List<String> allowedOrigins;
 
     public WebSecurityConfiguration(
             @Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService,
             BearerTokenService tokenService,
             Argon2HashingService hashingService,
             AuthenticationEntryPoint unauthorizedRequestHandler,
-            DeepLinkProperties deepLinkProperties
+            DeepLinkProperties deepLinkProperties,
+            @Value("${web.cors.allowed-origins:*}") List<String> allowedOrigins
     ) {
         this.userDetailsService = userDetailsService;
         this.tokenService = tokenService;
         this.hashingService = hashingService;
         this.unauthorizedRequestHandler = unauthorizedRequestHandler;
         this.deepLinkProperties = deepLinkProperties;
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
@@ -82,7 +87,9 @@ public class WebSecurityConfiguration {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(configurer -> configurer.configurationSource(request -> {
             var cors = new CorsConfiguration();
-            cors.setAllowedOrigins(List.of("*"));
+            // CORS_ALLOWED_ORIGINS (comma separated) restricts the browsers that may call the API; the app is not a
+            // browser and is not affected
+            cors.setAllowedOrigins(allowedOrigins);
             cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
             cors.setAllowedHeaders(List.of("*"));
             return cors;
@@ -92,6 +99,8 @@ public class WebSecurityConfiguration {
                 .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedRequestHandler))
                 .sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                        // Deny by default: only the routes below answer without a session. Any other route needs a
+                        // valid token even when its controller forgets to resolve the current user.
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/.well-known/**",
@@ -99,8 +108,18 @@ public class WebSecurityConfiguration {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/swagger-resources/**",
-                                "/webjars/**").permitAll()
-                        .anyRequest().permitAll());
+                                "/webjars/**",
+                                "/email/**",
+                                "/error",
+                                deepLinkProperties.passwordResetPath() + "/**",
+                                "/payments/return/**").permitAll()
+                        // The plan catalog is shown before signing up, and a sealed dossier is checked by third parties
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/subscription-plans/**",
+                                "/api/v1/agronomic-dossiers/verifications/**").permitAll()
+                        // Mercado Pago signs its notifications; the controller verifies that signature
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payment-notifications/mercado-pago").permitAll()
+                        .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authorizationRequestFilter(), UsernamePasswordAuthenticationFilter.class);
