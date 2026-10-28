@@ -83,12 +83,17 @@ public class WeatherForecastQueryServiceImpl implements WeatherForecastQueryServ
                     .mapToDouble(d -> d.minTemperature().celsius())
                     .min()
                     .orElse(firstDay.minTemperature().celsius());
+            double highestTemp = forecastDays.stream()
+                    .mapToDouble(d -> d.maxTemperature().celsius())
+                    .max()
+                    .orElse(firstDay.maxTemperature().celsius());
 
             eventPublisher.publishEvent(new WeatherForecastIngestedEvent(
                     plotId.plotId(),
                     firstDay.forecastDate(),
                     lowestTemp,
-                    Instant.now()
+                    Instant.now(),
+                    highestTemp
             ));
         }
 

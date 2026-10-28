@@ -99,6 +99,17 @@ public class AgroclimaticThresholdEvaluator {
      * @return Optional containing {@link IncidentTrigger} if heat wave conditions are met
      */
     public Optional<IncidentTrigger> evaluateThermalRisk(double temperatureCelsius, double relativeHumidityPercentage) {
+        return evaluateHeatRisk(temperatureCelsius);
+    }
+
+    /**
+     * Evaluates heat wave risk from a temperature alone, such as the highest forecast maximum: the forecast carries no
+     * humidity, and the thresholds do not use it.
+     *
+     * @param temperatureCelsius the temperature in degrees Celsius
+     * @return Optional containing {@link IncidentTrigger} if heat wave conditions are met
+     */
+    public Optional<IncidentTrigger> evaluateHeatRisk(double temperatureCelsius) {
         if (temperatureCelsius >= 36.0) {
             var breach = new ThresholdBreachInfo(
                     "AMBIENT_TEMPERATURE",

@@ -31,12 +31,26 @@ class PlanExtensionDomainTest {
     }
 
     @Test
-    void pricesOnlyTheAddedHectaresForTheMonthsLeft() {
-        var price = pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 10);
-        assertEquals(new Money(new BigDecimal("1650.00")), price.total());
+    void pricesOnlyTheAddedHectaresForTheDaysLeft() {
+        // 3 ha x (55 x 12 x 300 / 365 = 542.465753 per ha) = 1627.397259 -> 1627.40
+        assertEquals(new BigDecimal("542.465753"), pricing.extensionRatePerHa(300, 365));
+        var price = pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 300, 365);
+        assertEquals(new Money(new BigDecimal("1627.40")), price.total());
         assertEquals(price.total().amount(), price.base().amount().add(price.tax().amount()));
         assertThrows(IllegalArgumentException.class,
-                () -> pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 0));
+                () -> pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 0, 365));
+        assertThrows(IllegalArgumentException.class,
+                () -> pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 366, 365));
+    }
+
+    @Test
+    void aWholePlanCostsTheSameAsBuyingItAndAStartedDayCountsWhole() {
+        assertEquals(new Money(new BigDecimal("1980.00")),
+                pricing.quoteExtension(new IndividualHectaresQuota(new BigDecimal("3")), 365, 365).total());
+        var period = new SubscriptionPeriod(Instant.parse("2028-01-01T12:00:00Z"), Instant.parse("2029-01-01T12:00:00Z"));
+        assertEquals(366, PlanExtensionPolicy.periodDays(period));
+        assertEquals(1, PlanExtensionPolicy.billableDays(period, period.endsAt().minusSeconds(60)));
+        assertEquals(2, PlanExtensionPolicy.billableDays(period, period.endsAt().minus(Duration.ofHours(25))));
     }
 
     @Test
@@ -44,7 +58,7 @@ class PlanExtensionDomainTest {
         var plan = activeIndividual(new BigDecimal("12"), NOW.minus(Duration.ofDays(60)));
         var end = plan.snapshot().period().endsAt();
         var added = new IndividualHectaresQuota(new BigDecimal("3"));
-        var price = pricing.quoteExtension(added, 10);
+        var price = pricing.quoteExtension(added, 300, 365);
         var extension = QuotaExtension.requestPaid(plan, added, 10, price, NOW);
         assertEquals(QuotaExtensionStatus.PENDING_PAYMENT, extension.snapshot().status());
 
@@ -62,7 +76,7 @@ class PlanExtensionDomainTest {
         var plan = activeIndividual(new BigDecimal("12"), NOW.minus(Duration.ofDays(350)));
         var added = new IndividualHectaresQuota(new BigDecimal("1"));
         assertThrows(IllegalStateException.class,
-                () -> QuotaExtension.requestPaid(plan, added, 1, pricing.quoteExtension(added, 1), NOW));
+                () -> QuotaExtension.requestPaid(plan, added, 1, pricing.quoteExtension(added, 15, 365), NOW));
     }
 
     @Test

@@ -46,4 +46,12 @@ public interface TelemetrySeriesRepository {
      * @return true if exists; false otherwise
      */
     boolean existsByPlotId(PlotId plotId);
+
+    /**
+     * Deletes the hourly readings older than a cutoff, of every plot.
+     *
+     * @param cutoff readings before this instant are deleted
+     * @return the readings deleted
+     */
+    int deleteReadingsOlderThan(Instant cutoff);
 }

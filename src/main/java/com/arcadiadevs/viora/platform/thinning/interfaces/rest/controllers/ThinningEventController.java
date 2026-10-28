@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
@@ -28,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 
 /**
  * REST controller exposing agronomic milestone events from the thinning bounded context for the logbook feed.
@@ -84,7 +84,7 @@ public class ThinningEventController {
         final PlotId targetPlotId;
         try {
             targetCampaignYear = campaignYear == null
-                    ? new CampaignYear(Year.now(ZoneOffset.UTC).getValue())
+                    ? new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue())
                     : new CampaignYear(campaignYear);
             targetPlotId = (plotId == null || plotId.isBlank()) ? null : new PlotId(plotId);
         } catch (IllegalArgumentException exception) {

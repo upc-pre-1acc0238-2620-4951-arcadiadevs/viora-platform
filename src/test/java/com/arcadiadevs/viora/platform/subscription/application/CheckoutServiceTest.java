@@ -126,7 +126,10 @@ class CheckoutServiceTest {
         var checkout = service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "k").success().orElseThrow();
         gateway.payment = new PaymentGateway.VerifiedPayment("123", checkout.intentId(), "approved", new Money(BigDecimal.ONE), "PEN",
                 now.plusSeconds(21), now.plusSeconds(22));
-        assertTrue(service.confirm("123").isFailure()); assertEquals(SubscriptionStatus.PENDING_PAYMENT, sub.snapshot().status());
+        // Acknowledged so the provider stops retrying, never applied, and recorded for its refund
+        assertEquals(Boolean.FALSE, service.confirm("123").success().orElseThrow());
+        assertEquals(SubscriptionStatus.PENDING_PAYMENT, sub.snapshot().status());
+        assertEquals(PaymentAttempt.UNAPPLIED, store.find(checkout.intentId()).orElseThrow().paymentStates().get("123"));
     }
     @Test void rejectionReusesStillValidCheckoutRatherThanOpeningParallelPayment() {
         var checkout = service.create("550e8400-e29b-41d4-a716-446655440000", contractId, "k").success().orElseThrow();
@@ -171,7 +174,8 @@ class CheckoutServiceTest {
             new SubscriptionCatalog() {
                 public List<PlanOffer> plans() { return List.of(); }
                 public SubscriptionPrice quote(String plan, IndividualHectaresQuota q) { return pricing.quote(q); }
-                public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int months) { throw new UnsupportedOperationException(); }
+                public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int days, int periodDays) { throw new UnsupportedOperationException(); }
+                public java.math.BigDecimal extensionRatePerHa(String plan, int days, int periodDays) { throw new UnsupportedOperationException(); }
             }, owner -> true, Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
     private Result<SubscriptionCommandService.CreatedSubscription, ApplicationError> buy(String hectares, String key) {
         return purchases.handle(new CreateSubscriptionCommand(producer, "PRODUCER_ANNUAL", new BigDecimal(hectares), key));

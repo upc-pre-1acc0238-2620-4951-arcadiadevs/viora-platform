@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
@@ -31,7 +32,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 import java.util.Locale;
 
 /**
@@ -138,7 +138,7 @@ public class FieldSamplingController {
         try {
             targetPlotId = new PlotId(plotId);
             targetCampaignYear = campaignYear == null
-                    ? new CampaignYear(Year.now(ZoneOffset.UTC).getValue())
+                    ? new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue())
                     : new CampaignYear(campaignYear);
         } catch (IllegalArgumentException exception) {
             return ResponseEntityAssembler.toResponseEntityFromResult(

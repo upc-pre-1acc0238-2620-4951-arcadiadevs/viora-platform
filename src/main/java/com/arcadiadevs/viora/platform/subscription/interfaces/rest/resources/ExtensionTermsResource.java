@@ -20,6 +20,9 @@ import java.time.Instant;
  * @param currency         the settlement currency; null unless {@code PAY}
  * @param minimumHa        the smallest paid extension; null unless {@code PAY}
  * @param incrementHa      the step of a paid extension; null unless {@code PAY}
+ * @param billableDays     the days a paid extension bills now; null unless {@code PAY}
+ * @param extensionRatePerHa the tax-included price of one hectare for those days: the total charged is the hectares
+ *                         times this rate, rounded to cents; null unless {@code PAY}
  */
 @Schema(name = "ExtensionTermsResource", description = "How a plan in force can grow now")
 public record ExtensionTermsResource(
@@ -30,10 +33,14 @@ public record ExtensionTermsResource(
         @Schema(example = "PAY") String action,
         @Schema(example = "12.00") BigDecimal quotaHa,
         Instant endsAt,
-        @Schema(example = "10") Integer billableMonths,
+        @Schema(example = "10", description = "Complete months left; informative, the price follows the days")
+        Integer billableMonths,
         @Schema(example = "55") BigDecimal monthlyRatePerHa,
         @Schema(example = "PEN") String currency,
         @Schema(example = "0.5") BigDecimal minimumHa,
-        @Schema(example = "0.5") BigDecimal incrementHa
+        @Schema(example = "0.5") BigDecimal incrementHa,
+        @Schema(example = "300") Integer billableDays,
+        @Schema(example = "542.465753", description = "PEN per hectare for the days left; total = hectares x rate, "
+                + "rounded to cents") BigDecimal extensionRatePerHa
 ) {
 }

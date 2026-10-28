@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.weather;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HourlyTemperature;
 
 import java.time.LocalDate;
@@ -16,7 +17,7 @@ public interface HourlyTemperatureProvider {
     /**
      * Local time of the plots; the hours returned and the "today" of the chill season are in this zone.
      */
-    ZoneId PLOT_TIME_ZONE = ZoneId.of("America/Lima");
+    ZoneId PLOT_TIME_ZONE = ProducerTimeZone.ZONE;
 
     /**
      * Retrieves the hourly temperatures of a range of days.

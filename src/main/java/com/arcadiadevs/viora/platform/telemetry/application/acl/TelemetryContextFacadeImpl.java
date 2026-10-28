@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.telemetry.application.acl;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.TelemetrySeriesRepository;
@@ -8,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
 
 /**
  * Implementation of the Telemetry ACL facade, telling other contexts how much climate data a plot holds without
@@ -39,7 +39,7 @@ public class TelemetryContextFacadeImpl implements TelemetryContextFacade {
             return new TelemetryCoverage(nodes, 0);
         }
         int days = (int) seriesRepository.findReadingsByPlotIdAndDateRange(id, from, to).stream()
-                .map(reading -> reading.timestamp().timestamp().atZone(ZoneOffset.UTC).toLocalDate())
+                .map(reading -> reading.timestamp().timestamp().atZone(ProducerTimeZone.ZONE).toLocalDate())
                 .distinct()
                 .count();
         return new TelemetryCoverage(nodes, days);

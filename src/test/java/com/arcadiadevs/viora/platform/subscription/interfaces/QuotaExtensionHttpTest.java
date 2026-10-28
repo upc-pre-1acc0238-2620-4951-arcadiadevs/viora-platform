@@ -98,11 +98,14 @@ class QuotaExtensionHttpTest {
         assertEquals(200, terms.statusCode(), terms.body());
         assertEquals("PAY", JsonPath.read(terms.body(), "$.action"));
         assertEquals(10, (int) JsonPath.read(terms.body(), "$.billableMonths"));
+        // 306 days left of a 366-day plan: 660 per ha-year x 306 / 366, the rate the app multiplies by the hectares
+        assertEquals(306, (int) JsonPath.read(terms.body(), "$.billableDays"));
+        assertEquals(551.803279, ((Number) JsonPath.read(terms.body(), "$.extensionRatePerHa")).doubleValue());
 
         var created = send("POST", base + "/extensions", "{\"addedHa\":3}", "extend-1");
         assertEquals(201, created.statusCode(), created.body());
         assertEquals("PENDING_PAYMENT", JsonPath.read(created.body(), "$.status"));
-        assertEquals(1650.0, ((Number) JsonPath.read(created.body(), "$.totalAmount")).doubleValue());
+        assertEquals(1655.41, ((Number) JsonPath.read(created.body(), "$.totalAmount")).doubleValue());
         assertEquals(12.0, ((Number) JsonPath.read(created.body(), "$.quotaHa")).doubleValue());
         String extensionId = JsonPath.read(created.body(), "$.id");
         var replay = send("POST", base + "/extensions", "{\"addedHa\":3}", "extend-1");
@@ -114,7 +117,7 @@ class QuotaExtensionHttpTest {
         var intentId = UUID.fromString(JsonPath.read(checkout.body(), "$.intentId"));
         var paymentId = Long.toString(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         when(gateway.verify(paymentId)).thenReturn(new PaymentGateway.VerifiedPayment(paymentId, intentId, "approved",
-                new Money(new BigDecimal("1650.00")), "PEN", NOW, NOW));
+                new Money(new BigDecimal("1655.41")), "PEN", NOW, NOW));
         assertTrue(payments.confirm(paymentId).isSuccess());
         assertTrue(payments.confirm(paymentId).isSuccess());
 

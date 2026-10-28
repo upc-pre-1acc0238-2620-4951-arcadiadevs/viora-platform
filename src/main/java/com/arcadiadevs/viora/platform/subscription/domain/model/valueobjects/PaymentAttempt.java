@@ -13,6 +13,9 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
     /** Provider states of an approved payment that was later given back to the payer. */
     public static final Set<String> REVERSED_STATES = Set.of("refunded", "charged_back");
 
+    /** An approved payment the plan could not take (a second one, or one for an outdated price): it must be refunded. */
+    public static final String UNAPPLIED = "unapplied";
+
     /**
      * Validates a durable attempt and freezes its transaction observations.
      * @throws IllegalArgumentException if identity, lifetime, state or observations are invalid
@@ -63,13 +66,18 @@ public record PaymentAttempt(UUID id, UUID subscriptionId, String producerId, St
     public PaymentAttempt withPaymentState(String paymentId, String next) {
         if (paymentId == null || !paymentId.matches("[0-9]{1,30}") || next == null
                 || !Set.of("approved", "pending", "in_process", "authorized", "in_mediation", "rejected", "cancelled",
-                        "refunded", "charged_back").contains(next)) {
+                        "refunded", "charged_back", UNAPPLIED).contains(next)) {
             throw new IllegalArgumentException("subscription.payment.mismatch");
         }
         var observed = new HashMap<>(paymentStates);
         var previous = observed.get(paymentId);
         var pending = Set.of("pending", "in_process", "authorized", "in_mediation");
-        if (REVERSED_STATES.contains(next)) {
+        if (UNAPPLIED.equals(next)) {
+            // An approved payment that could not be applied is recorded once, so it can be found and refunded
+            if (previous == null) {
+                observed.put(paymentId, next);
+            }
+        } else if (REVERSED_STATES.contains(next)) {
             // Only an approved payment can be given back; a repeated notification changes nothing
             if ("approved".equals(previous)) {
                 observed.put(paymentId, next);

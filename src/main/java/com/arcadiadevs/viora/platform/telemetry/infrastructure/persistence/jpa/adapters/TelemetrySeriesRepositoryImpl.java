@@ -98,4 +98,9 @@ public class TelemetrySeriesRepositoryImpl implements TelemetrySeriesRepository 
         }
         return seriesRepository.existsByPlotId(UUID.fromString(plotId.plotId()));
     }
+
+    @Override
+    public int deleteReadingsOlderThan(Instant cutoff) {
+        return readingRepository.deleteByReadingTimestampBefore(cutoff);
+    }
 }

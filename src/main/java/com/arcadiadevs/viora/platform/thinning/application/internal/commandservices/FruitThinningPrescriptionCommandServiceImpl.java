@@ -101,7 +101,7 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
         try {
             SamplingBatchId batchId = new SamplingBatchId(command.clientBatchId());
             prescription.ingestSamplingsBatch(actorId, batchId, domainRecords);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             return Result.failure(ApplicationError.conflict("SamplingRound", e.getMessage()));
         }
 
