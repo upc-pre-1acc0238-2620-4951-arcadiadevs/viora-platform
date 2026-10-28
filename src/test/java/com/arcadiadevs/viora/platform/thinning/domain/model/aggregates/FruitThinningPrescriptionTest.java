@@ -95,4 +95,16 @@ class FruitThinningPrescriptionTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("thinning.tree_tag.duplicate");
     }
+
+    @Test
+    @DisplayName("Should refuse a new sampling round once the prescription is issued")
+    void shouldRefuseANewSamplingRoundOnceIssued() {
+        var prescription = com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.prescribed(LocalDate.now());
+        var actorId = new UserId(UUID.randomUUID().toString());
+        var records = List.of(TreeSamplingRecord.create("T-09", 10, 100, 150.0, LocalDate.now()));
+
+        assertThatThrownBy(() -> prescription.ingestSamplingsBatch(actorId, new SamplingBatchId("late-batch"), records))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("thinning.sampling.prescription_issued");
+    }
 }
