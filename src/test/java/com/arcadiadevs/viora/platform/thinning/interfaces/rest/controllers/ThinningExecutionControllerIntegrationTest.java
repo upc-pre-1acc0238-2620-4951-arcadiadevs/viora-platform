@@ -66,8 +66,14 @@ class ThinningExecutionControllerIntegrationTest {
         SecurityContextHolder.clearContext();
     }
 
-    private String seed(PrescriptionStatus state, LocalDate cutoff) {
-        return transactions.execute(tx -> repository.save(withStatus(state, cutoff)).snapshot().id().prescriptionId());
+    /**
+     * Seeds a prescription on a real active plot: the labor of an unknown or archived plot is refused. The variety has
+     * no caliber observations here, so the projection stays uncalibrated.
+     */
+    private String seed(PrescriptionStatus state, LocalDate cutoff) throws Exception {
+        var plotId = createPlot("MANZANILLA");
+        return transactions.execute(tx -> repository.save(withStatus(state, cutoff, plotId)).snapshot().id()
+                .prescriptionId());
     }
 
     private String body(LocalDate executedDate) {
@@ -305,7 +311,9 @@ class ThinningExecutionControllerIntegrationTest {
             return mvc.perform(post(route(id)).contentType(MediaType.APPLICATION_JSON).content(body(date)))
                     .andReturn().getResponse().getStatus();
         };
-        try (var executor = Executors.newFixedThreadPool(2)) {
+        // Both requests run as the owner signed in on this thread
+        try (var executor = new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2))) {
             var first = executor.submit(request);
             var second = executor.submit(request);
             assertTrue(ready.await(10, TimeUnit.SECONDS));
@@ -320,7 +328,7 @@ class ThinningExecutionControllerIntegrationTest {
     }
 
     @Test
-    void rollbackRemovesEvidenceAndDoesNotDeliverAfterCommitEvent() {
+    void rollbackRemovesEvidenceAndDoesNotDeliverAfterCommitEvent() throws Exception {
         var id = seed(PrescriptionStatus.PRESCRIBED, date);
         transactions.executeWithoutResult(tx -> {
             assertTrue(service.handle(new ConfirmThinningExecutionCommand(id, date, 25.0, 420.0, 4, null)).isSuccess());

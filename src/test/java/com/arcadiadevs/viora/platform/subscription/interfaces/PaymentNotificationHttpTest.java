@@ -122,7 +122,8 @@ class PaymentNotificationHttpTest {
     private String signature(String id) throws Exception {
         var mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec("http-notification-fixture".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        return "ts=123,v1=" + HexFormat.of().formatHex(mac.doFinal(
-                ("id:" + id + ";request-id:http-fixture;ts:123;").getBytes(StandardCharsets.UTF_8)));
+        var ts = Long.toString(java.time.Instant.now().getEpochSecond());
+        return "ts=" + ts + ",v1=" + HexFormat.of().formatHex(mac.doFinal(
+                ("id:" + id + ";request-id:http-fixture;ts:" + ts + ";").getBytes(StandardCharsets.UTF_8)));
     }
 }

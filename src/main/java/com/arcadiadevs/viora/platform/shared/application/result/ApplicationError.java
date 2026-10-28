@@ -2,6 +2,8 @@ package com.arcadiadevs.viora.platform.shared.application.result;
 
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Map;
@@ -25,6 +27,8 @@ public record ApplicationError(
         String message,
         @Nullable String details,
         Map<String, Object> properties) {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ApplicationError.class);
 
     /**
      * Normalizes the properties so callers never have to pass an empty map explicitly.
@@ -258,6 +262,19 @@ public record ApplicationError(
                 "UNEXPECTED_ERROR",
                 "Unexpected error in %s".formatted(context),
                 reason);
+    }
+
+    /**
+     * Creates an unexpected error from an exception nobody anticipated. The exception is logged, never answered: its
+     * message can carry SQL, class names or data of the request.
+     *
+     * @param context the context or component where the error occurred
+     * @param cause   the unanticipated exception
+     * @return an {@link ApplicationError} whose detail is the generic unexpected error message
+     */
+    public static ApplicationError unexpected(String context, Throwable cause) {
+        LOG.error("Unexpected error in {}", context, cause);
+        return unexpected(context, "error.unexpected.message");
     }
 
 }

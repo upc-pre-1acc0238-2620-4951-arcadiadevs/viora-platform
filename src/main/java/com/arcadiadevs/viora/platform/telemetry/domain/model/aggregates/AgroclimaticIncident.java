@@ -26,6 +26,9 @@ public class AgroclimaticIncident extends AbstractDomainAggregateRoot<Agroclimat
     private final PlotId plotId;
     private final IncidentType type;
     private IncidentSeverity severity;
+    /** Longest postponement: a week, so an alert can never be silenced for good. */
+    public static final Duration MAX_POSTPONEMENT = Duration.ofDays(7);
+
     private IncidentStatus status;
     private final ThresholdBreachInfo breachInfo;
     private final Instant triggeredAt;
@@ -190,7 +193,7 @@ public class AgroclimaticIncident extends AbstractDomainAggregateRoot<Agroclimat
      * @param duration the duration to snooze
      */
     public void postpone(Duration duration) {
-        if (duration == null || duration.isNegative() || duration.isZero()) {
+        if (duration == null || duration.isNegative() || duration.isZero() || duration.compareTo(MAX_POSTPONEMENT) > 0) {
             throw new IllegalArgumentException("incident.postpone.duration.invalid");
         }
         if (this.status == IncidentStatus.NORMALIZED) {
@@ -209,6 +212,22 @@ public class AgroclimaticIncident extends AbstractDomainAggregateRoot<Agroclimat
     }
 
     /**
+     * Brings a postponed incident back once its postponement is over, so it is shown and deduplicated as active again.
+     *
+     * @param now the current instant
+     * @return true if the incident was postponed and is active again
+     */
+    public boolean wakeIfPostponementEnded(Instant now) {
+        if (this.status != IncidentStatus.SNOOZED || this.snoozedUntil == null || now == null
+                || now.isBefore(this.snoozedUntil)) {
+            return false;
+        }
+        this.status = IncidentStatus.ACTIVE;
+        this.snoozedUntil = null;
+        return true;
+    }
+
+    /**
      * Completes a specific actionable mitigation step within this incident.
      *
      * @param stepId    the step identifier
@@ -217,6 +236,9 @@ public class AgroclimaticIncident extends AbstractDomainAggregateRoot<Agroclimat
     public void completeMitigationStep(MitigationStepId stepId, Instant timestamp) {
         if (stepId == null) {
             throw new IllegalArgumentException("mitigation_step.id.null_or_empty");
+        }
+        if (this.status == IncidentStatus.NORMALIZED) {
+            throw new IllegalStateException("incident.cannot_change_normalized");
         }
         MitigationStep targetStep = null;
         for (MitigationStep step : this.mitigationSteps) {

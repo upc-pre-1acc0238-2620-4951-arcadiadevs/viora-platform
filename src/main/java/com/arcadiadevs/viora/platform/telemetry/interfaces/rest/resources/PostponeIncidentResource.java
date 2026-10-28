@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.telemetry.interfaces.rest.resources;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.jspecify.annotations.NullMarked;
@@ -13,9 +14,10 @@ import org.jspecify.annotations.NullMarked;
 @Schema(name = "PostponeIncidentResource", description = "Payload to postpone notifications for an active incident")
 @NullMarked
 public record PostponeIncidentResource(
-        @Schema(description = "Postponement duration in hours", example = "4")
+        @Schema(description = "Postponement duration in hours, up to a week (168)", example = "4", maximum = "168")
         @NotNull(message = "incident.postpone.duration.invalid")
         @Positive(message = "incident.postpone.duration.invalid")
+        @Max(value = 168, message = "incident.postpone.duration.invalid")
         Long durationHours
 ) {
 }

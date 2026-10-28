@@ -119,4 +119,13 @@ public class ExternalOrchardService {
                 .map(PlotId::new)
                 .toList();
     }
+
+    /**
+     * Lists every active plot, for the jobs that watch all of them.
+     *
+     * @return the active plots
+     */
+    public List<PlotId> findAllActivePlotIds() {
+        return orchardContextFacade.findAllActivePlotIds().stream().map(PlotId::new).toList();
+    }
 }

@@ -25,14 +25,16 @@ public class ConfirmThinningExecutionCommandServiceImpl implements ConfirmThinni
     private final CaliberCalibrationObservationRepository observationRepository;
     private final ExternalOrchardService externalOrchardService;
     private final ApplicationEventPublisher publisher;
+    private final Clock clock;
 
     public ConfirmThinningExecutionCommandServiceImpl(FruitThinningPrescriptionRepository repository,
             CaliberCalibrationObservationRepository observationRepository,
-            ExternalOrchardService externalOrchardService, ApplicationEventPublisher publisher) {
+            ExternalOrchardService externalOrchardService, ApplicationEventPublisher publisher, Clock clock) {
         this.repository = repository;
         this.observationRepository = observationRepository;
         this.externalOrchardService = externalOrchardService;
         this.publisher = publisher;
+        this.clock = clock;
     }
 
     @Override
@@ -45,11 +47,15 @@ public class ConfirmThinningExecutionCommandServiceImpl implements ConfirmThinni
             return Result.failure(ApplicationError.notFound("ThinningPrescription", command.prescriptionId()));
         }
         var prescription = found.get();
+        // The labor of an archived plot is not recorded: its campaign is closed to changes until it is restored
+        if (!externalOrchardService.existsActivePlot(prescription.snapshot().plotId())) {
+            return Result.failure(ApplicationError.notFound("Plot", prescription.snapshot().plotId().plotId()));
+        }
         var calibration = calibrationFor(prescription.snapshot().plotId());
         try {
             prescription.confirmExecution(command.executedDate(), command.removedKg(),
                     command.actualRemovalPercentage(), command.laborCrewSize(), command.notes(),
-                    calibration, Clock.systemUTC());
+                    calibration, clock);
         } catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.validationError("execution", exception.getMessage()));
         } catch (IllegalStateException exception) {

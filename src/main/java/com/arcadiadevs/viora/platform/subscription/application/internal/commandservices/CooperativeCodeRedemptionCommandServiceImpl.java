@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CooperativeCodeRedemptionCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
+import com.arcadiadevs.viora.platform.subscription.application.ports.SubscriptionUnitOfWork;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemCooperativeCodeCommand;
@@ -15,7 +16,6 @@ import com.arcadiadevs.viora.platform.subscription.domain.repositories.Invitatio
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -28,7 +28,6 @@ import java.time.Instant;
  * reserved before the code is looked up and given back for any other outcome.</p>
  */
 @Service
-@Transactional
 public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeCodeRedemptionCommandService {
 
     private static final String RESOURCE = "cooperative-code-redemption";
@@ -40,6 +39,7 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
     private final RedemptionAttemptLimiter attemptLimiter;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final SubscriptionUnitOfWork work;
 
     /**
      * Creates the service.
@@ -60,7 +60,8 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             ExternalIamService externalIamService,
             RedemptionAttemptLimiter attemptLimiter,
             ApplicationEventPublisher eventPublisher,
-            Clock clock
+            Clock clock,
+            SubscriptionUnitOfWork work
     ) {
         if (invitationCodeRepository == null) {
             throw new IllegalArgumentException("subscription.invitation_code_repository.null");
@@ -83,6 +84,10 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
         if (clock == null) {
             throw new IllegalArgumentException("subscription.clock.null");
         }
+        if (work == null) {
+            throw new IllegalArgumentException("subscription.unit_of_work.null");
+        }
+        this.work = work;
         this.invitationCodeRepository = invitationCodeRepository;
         this.cooperativeLicenseRepository = cooperativeLicenseRepository;
         this.subscriptionRepository = subscriptionRepository;
@@ -108,7 +113,10 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
                 return Result.failure(ApplicationError.tooManyRequests(RESOURCE,
                         "subscription.redemption.too_many_attempts", retryAfter.getAsLong()));
             }
-            var result = redeem(command, producerId, now);
+            // In one transaction under the producer's lock, as purchases do: two codes redeemed at once see each
+            // other's subscription, so only the first one creates it. The instant is read once the lock is held, so
+            // it is never earlier than the start of a subscription committed while this request waited.
+            var result = work.exclusive(producerId.producerId(), () -> redeem(command, producerId, clock.instant()));
             if (result.isSuccess()) {
                 attemptLimiter.reset(producerId);
             } else if (!isNotRedeemable(result)) {

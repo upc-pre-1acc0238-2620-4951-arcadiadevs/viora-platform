@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.subscription.application.internal.commandservices;
 
+import com.arcadiadevs.viora.platform.subscription.application.ports.SubscriptionUnitOfWork;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemCooperativeCodeCommand;
@@ -31,7 +32,22 @@ class CooperativeCodeRedemptionCommandServiceImplTest {
     private final RedemptionAttemptLimiter limiter = mock(RedemptionAttemptLimiter.class);
     private final CooperativeCodeRedemptionCommandServiceImpl service = new CooperativeCodeRedemptionCommandServiceImpl(
             codes, licenses, subscriptions, iam, limiter, mock(ApplicationEventPublisher.class),
-            Clock.fixed(Instant.parse("2026-10-20T15:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-10-20T15:00:00Z"), ZoneOffset.UTC), new SubscriptionUnitOfWork() {
+                @Override
+                public <T> T exclusive(String producerId, java.util.function.Supplier<T> work) {
+                    return work.get();
+                }
+
+                @Override
+                public java.util.Optional<Operation> findOperation(String producerId, String key) {
+                    return java.util.Optional.empty();
+                }
+
+                @Override
+                public void recordOperation(String producerId, String key, String kind, String fingerprint,
+                        java.util.UUID resourceId) {
+                }
+            });
 
     @Test
     @DisplayName("A user IAM knows with another role than producer gets 403 and no code is looked up")

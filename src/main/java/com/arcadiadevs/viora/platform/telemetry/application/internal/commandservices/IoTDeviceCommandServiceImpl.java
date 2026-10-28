@@ -104,7 +104,7 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("device-registration", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("device-registration", ex));
         }
     }
 
@@ -152,7 +152,7 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("device-calibration", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("device-calibration", ex));
         }
     }
 
@@ -189,7 +189,7 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         } catch (IllegalArgumentException ex) {
             return Result.failure(ApplicationError.validationError("argument", ex.getMessage()));
         } catch (Exception ex) {
-            return Result.failure(ApplicationError.unexpected("device-deactivation", ex.getMessage()));
+            return Result.failure(ApplicationError.unexpected("device-deactivation", ex));
         }
     }
 }
