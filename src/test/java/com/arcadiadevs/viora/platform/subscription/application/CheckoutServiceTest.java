@@ -171,7 +171,8 @@ class CheckoutServiceTest {
             new SubscriptionCatalog() {
                 public List<PlanOffer> plans() { return List.of(); }
                 public SubscriptionPrice quote(String plan, IndividualHectaresQuota q) { return pricing.quote(q); }
-                public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int months) { throw new UnsupportedOperationException(); }
+                public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int days, int periodDays) { throw new UnsupportedOperationException(); }
+                public java.math.BigDecimal extensionRatePerHa(String plan, int days, int periodDays) { throw new UnsupportedOperationException(); }
             }, owner -> true, Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
     private Result<SubscriptionCommandService.CreatedSubscription, ApplicationError> buy(String hectares, String key) {
         return purchases.handle(new CreateSubscriptionCommand(producer, "PRODUCER_ANNUAL", new BigDecimal(hectares), key));

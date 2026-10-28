@@ -64,15 +64,25 @@ public class ConfiguredSubscriptionCatalog implements SubscriptionCatalog {
      * Calculates the price of hectares added to a plan of the configured offer.
      * @param planCode the plan's offer identifier
      * @param addedQuota validated hectares to add
-     * @param months complete months left of the plan
+     * @param days days left of the plan
+     * @param periodDays days of the whole plan
      * @return immutable extension terms
-     * @throws IllegalArgumentException if the plan, hectares or months are invalid
+     * @throws IllegalArgumentException if the plan, hectares or days are invalid
      */
     @Override
-    public SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int months) {
+    public SubscriptionPrice quoteExtension(String planCode, IndividualHectaresQuota addedQuota, int days,
+            int periodDays) {
         if (!offer.code().equals(planCode)) {
             throw new IllegalArgumentException("subscription.plan.invalid");
         }
-        return pricing.quoteExtension(addedQuota, months);
+        return pricing.quoteExtension(addedQuota, days, periodDays);
+    }
+
+    @Override
+    public BigDecimal extensionRatePerHa(String planCode, int days, int periodDays) {
+        if (!offer.code().equals(planCode)) {
+            throw new IllegalArgumentException("subscription.plan.invalid");
+        }
+        return pricing.extensionRatePerHa(days, periodDays);
     }
 }

@@ -124,7 +124,8 @@ public class QuotaExtensionCommandServiceImpl implements QuotaExtensionCommandSe
                 return conflict("subscription.extension.renewal_window");
             }
             var months = PlanExtensionPolicy.billableMonths(current.period(), now);
-            var price = catalog.quoteExtension(current.planCode(), added, months);
+            var price = catalog.quoteExtension(current.planCode(), added,
+                    PlanExtensionPolicy.billableDays(current.period(), now), PlanExtensionPolicy.periodDays(current.period()));
             var extension = extensions.save(QuotaExtension.requestPaid(plan.get(), added, months, price, now));
             work.recordOperation(owner.producerId(), command.operationId(), OPERATION, fingerprint,
                     java.util.UUID.fromString(extension.snapshot().id().quotaExtensionId()));
