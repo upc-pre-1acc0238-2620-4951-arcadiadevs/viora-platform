@@ -4,6 +4,9 @@ import java.util.Collection;
 
 import com.arcadiadevs.viora.platform.telemetry.infrastructure.persistence.jpa.entities.HourlyTelemetryReadingPersistenceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -48,4 +51,9 @@ public interface HourlyTelemetryReadingPersistenceRepository extends JpaReposito
 
     /** Everything of a deleted account, for the account purge. */
     List<HourlyTelemetryReadingPersistenceEntity> findAllByPlotIdIn(Collection<UUID> plotIds);
+
+    /** Deletes the readings older than a cutoff, for the retention job. */
+    @Modifying
+    @Query("delete from HourlyTelemetryReadingPersistenceEntity r where r.readingTimestamp < :cutoff")
+    int deleteByReadingTimestampBefore(@Param("cutoff") Instant cutoff);
 }
