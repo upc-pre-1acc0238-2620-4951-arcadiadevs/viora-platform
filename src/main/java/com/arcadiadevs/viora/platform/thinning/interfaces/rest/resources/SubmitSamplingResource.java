@@ -44,6 +44,7 @@ import java.util.List;
 @NullMarked
 public record SubmitSamplingResource(
         @NotBlank(message = "thinning.client_batch.id.null_or_empty")
+        @Size(max = 64, message = "thinning.client_batch.id.too_long")
         @Schema(description = "Client-generated idempotency UUID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", requiredMode = Schema.RequiredMode.REQUIRED)
         String clientBatchId,
 
@@ -55,6 +56,7 @@ public record SubmitSamplingResource(
 
         @NotNull(message = "thinning.samples.empty")
         @NotEmpty(message = "thinning.samples.empty")
+        @Size(max = 200, message = "thinning.samples.too_many")
         @ArraySchema(
                 schema = @Schema(implementation = TreeSampleResourceItem.class),
                 arraySchema = @Schema(description = "List of evaluated tree observations (minimum 5 for statistical representativeness)", requiredMode = Schema.RequiredMode.REQUIRED)

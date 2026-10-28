@@ -112,13 +112,13 @@ public final class SamplingCoverageEvaluator {
         if (rounds == null || rounds.isEmpty()) {
             return 0;
         }
-        int totalShoots = 0;
+        long totalShoots = 0;
         for (SamplingRound round : rounds) {
             for (TreeSamplingRecord record : round.samplingRecords()) {
                 totalShoots += record.shootFruitCount().shootCount();
             }
         }
-        return totalShoots;
+        return saturated(totalShoots);
     }
 
     /**
@@ -131,13 +131,13 @@ public final class SamplingCoverageEvaluator {
         if (roundSnapshots == null || roundSnapshots.isEmpty()) {
             return 0;
         }
-        int totalShoots = 0;
+        long totalShoots = 0;
         for (var round : roundSnapshots) {
             for (var record : round.samplingRecords()) {
                 totalShoots += record.shootFruitCount().shootCount();
             }
         }
-        return totalShoots;
+        return saturated(totalShoots);
     }
 
     /**
@@ -153,8 +153,8 @@ public final class SamplingCoverageEvaluator {
         if (rounds == null || rounds.isEmpty()) {
             return 0.0;
         }
-        int totalFruits = 0;
-        int totalShoots = 0;
+        long totalFruits = 0;
+        long totalShoots = 0;
         for (SamplingRound round : rounds) {
             for (TreeSamplingRecord record : round.samplingRecords()) {
                 totalFruits += record.shootFruitCount().fruitSetCount();
@@ -174,8 +174,8 @@ public final class SamplingCoverageEvaluator {
         if (roundSnapshots == null || roundSnapshots.isEmpty()) {
             return 0.0;
         }
-        int totalFruits = 0;
-        int totalShoots = 0;
+        long totalFruits = 0;
+        long totalShoots = 0;
         for (var round : roundSnapshots) {
             for (var record : round.samplingRecords()) {
                 totalFruits += record.shootFruitCount().fruitSetCount();
@@ -195,13 +195,13 @@ public final class SamplingCoverageEvaluator {
         if (rounds == null || rounds.isEmpty()) {
             return 0;
         }
-        int totalFruits = 0;
+        long totalFruits = 0;
         for (SamplingRound round : rounds) {
             for (TreeSamplingRecord record : round.samplingRecords()) {
                 totalFruits += record.shootFruitCount().fruitSetCount();
             }
         }
-        return totalFruits;
+        return saturated(totalFruits);
     }
 
     /**
@@ -214,12 +214,17 @@ public final class SamplingCoverageEvaluator {
         if (roundSnapshots == null || roundSnapshots.isEmpty()) {
             return 0;
         }
-        int totalFruits = 0;
+        long totalFruits = 0;
         for (var round : roundSnapshots) {
             for (var record : round.samplingRecords()) {
                 totalFruits += record.shootFruitCount().fruitSetCount();
             }
         }
-        return totalFruits;
+        return saturated(totalFruits);
+    }
+
+    /** Sums are kept in a long so they never wrap around; a total beyond an int is reported as its largest value. */
+    private static int saturated(long total) {
+        return (int) Math.min(total, Integer.MAX_VALUE);
     }
 }
