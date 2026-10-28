@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.telemetry.infrastructure.adapters.meteo;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.meteo.WeatherForecastProvider;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.WeatherForecastDay;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.AmbientTemperature;
@@ -119,7 +120,7 @@ public class OpenMeteoWeatherClientAdapter implements WeatherForecastProvider {
 
     private List<WeatherForecastDay> generateDeterministicForecast(double latitude, double longitude) {
         List<WeatherForecastDay> list = new ArrayList<>();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ProducerTimeZone.ZONE);
         Instant now = Instant.now();
         double baseTemp = 18.0 + (Math.abs(latitude) % 5.0);
 

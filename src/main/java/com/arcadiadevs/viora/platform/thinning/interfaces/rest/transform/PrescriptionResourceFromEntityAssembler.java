@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.transform;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescriptionSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionBlocker;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
@@ -9,7 +10,6 @@ import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.Current
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.PrescriptionResource;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -50,7 +50,7 @@ public final class PrescriptionResourceFromEntityAssembler {
             return null;
         }
         SustainableCropLoad load = snapshot.sustainableLoad();
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = LocalDate.now(ProducerTimeZone.ZONE);
         LocalDate opensOn = load == null ? null : load.windowOpensOn();
         LocalDate closesOn = load == null ? null : load.windowClosesOn();
         boolean windowOpen = closesOn != null && !today.isAfter(closesOn)

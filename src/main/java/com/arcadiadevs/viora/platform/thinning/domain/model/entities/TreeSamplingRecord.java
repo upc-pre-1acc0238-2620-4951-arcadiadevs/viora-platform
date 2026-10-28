@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.entities;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.TreeSamplingRecordSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingRecordId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.ShootFruitCount;
@@ -38,7 +39,7 @@ public class TreeSamplingRecord {
         if (samplingDate == null) {
             throw new IllegalArgumentException("thinning.sampling_date.null");
         }
-        if (samplingDate.isAfter(LocalDate.now())) {
+        if (samplingDate.isAfter(LocalDate.now(ProducerTimeZone.ZONE))) {
             throw new IllegalArgumentException("thinning.sampling_date.future");
         }
         this.id = id;

@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 import jakarta.validation.Valid;
@@ -42,7 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 import java.util.Locale;
 
 /**
@@ -162,7 +162,7 @@ public class ThinningPrescriptionController {
         try {
             targetPlotId = new PlotId(plotId);
             targetCampaignYear = campaignYear == null
-                    ? new CampaignYear(Year.now(ZoneOffset.UTC).getValue())
+                    ? new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue())
                     : new CampaignYear(campaignYear);
             statusFilter = parseStatus(status);
         } catch (IllegalArgumentException exception) {

@@ -1,9 +1,9 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.queries;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 
 import java.time.Year;
-import java.time.ZoneOffset;
 
 /**
  * Domain query requesting the sampling statuses of all active plots belonging to a producer for a campaign.
@@ -24,7 +24,7 @@ public record GetPlotSamplingStatesQuery(
             throw new IllegalArgumentException("thinning.producer.null_or_empty");
         }
         if (campaignYear == null) {
-            campaignYear = new CampaignYear(Year.now(ZoneOffset.UTC).getValue());
+            campaignYear = new CampaignYear(Year.now(ProducerTimeZone.ZONE).getValue());
         }
     }
 
