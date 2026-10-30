@@ -158,6 +158,47 @@ El dueño eligió "completo": HOME responde para un lote o, sin `plotId`, para t
 - **Total de kilos del campo.** Si el dueño quiere un total, decidir qué superficie usar (polígono o plantada) y si se suma kg/ha × ha.
 - **Lotes sin muestreo en "esta semana".** Decidir con el agrónomo si un lote sin ningún muestreo en temporada debe aparecer como pendiente.
 
+## Pantalla Sensores (SENSORS)
+
+Preguntas del contrato: `sensors.what_say` (2 nodos activos, 27,4 °C), `sensors.why_paused`, `sensors.reliability` y `sensors.how_link`. Todo sale de Telemetría por la fachada (`findPlotSensors` y `findTelemetryCoverage`, ambas de solo lectura y ya existentes); no se agregó nada a Telemetría.
+
+### `sensors.why_paused`: se ofrece siempre deshabilitada (decisión del dueño, 2026-10-30)
+
+**Por qué.** El contrato pide explicar por qué un nodo está en pausa, pero hoy ningún nodo puede estarlo:
+
+- `DeviceStatus.PAUSED` existe en el enum, pero ningún método de `IoTDevice`, comando, endpoint ni proceso automático lo asigna. Los nodos solo pasan de `ACTIVE` (al registrarse) a `UNLINKED` (al desvincularse).
+- No se guarda ni el motivo ni la fecha de una pausa.
+- `findPlotSensors` devuelve solo los nodos activos.
+
+Responder "por qué está en pausa" obligaría al asistente a inventar un motivo, y la regla del asistente es no inventar nunca una cifra ni una causa. Se evaluaron dos caminos:
+
+- **A (elegido):** mostrar la pregunta deshabilitada con un motivo.
+- **B:** implementar la pausa en Telemetría, con un comando que guarde el motivo y la fecha. Se descartó por ahora porque es una decisión de negocio (quién pausa, con qué motivos, qué pasa con las lecturas y las alertas del nodo pausado) y un cambio grande en otro contexto.
+
+**Cómo.**
+
+- `QuestionCatalog.sensors` ofrece la pregunta con `enabled: false` y `disabledReason` "Ningún nodo de este lote está pausado" (`assistant.reason.no_paused_nodes`).
+- No hay ensamblador registrado para ella. Si la app la pide igual, la API responde 409 con ese mismo motivo, como cualquier pregunta deshabilitada.
+- Lo fijan `SensorsQuestionCatalogTest`, `SensorsFactsAssemblersTest.registered` y `AssistantSensorsScreenIntegrationTest`.
+
+**Para qué.**
+
+- La app muestra el catálogo completo del contrato, con la pregunta en su lugar, sin una respuesta falsa.
+- El equipo ve en un solo lugar qué falta para activarla.
+
+**Cuándo activarla.** Cuando Telemetría tenga la pausa:
+
+1. un comando y un endpoint que pasen el nodo a `PAUSED` guardando el motivo y la fecha;
+2. un método de solo lectura en `TelemetryContextFacade` que devuelva también los nodos pausados con esos datos;
+3. en el asistente, habilitar la pregunta solo cuando haya un nodo pausado (si no, mantener el mismo motivo) y agregar su ensamblador con el motivo y la fecha.
+
+### Resto de la pantalla (2026-10-30)
+
+- **`sensors.what_say`.** Es la misma respuesta que `climate.sensors_say` (`SensorsSayFactsAssembler` ahora recibe la pregunta) con sus propios textos. Se deshabilita igual: sin nodos ("Vincula un nodo al lote para ver sus lecturas") o sin lectura en las últimas 24 horas ("Sin lecturas recientes de los nodos"). Con lecturas simuladas lo dice ("dato simulado"), como pide el contrato.
+- **`sensors.reliability`.** Dice de dónde salen las lecturas y en cuántos de los últimos 7 días (hoy incluido, zona de Lima) hubo al menos una lectura, con el día de la última. Hoy todos los nodos se reportan simulados (`NODES_SIMULATED = true` en `TelemetryContextFacadeImpl`), así que la respuesta pide usarlas como referencia. Se deshabilita sin nodos.
+- **`sensors.how_link`.** Siempre se ofrece. Cuenta los nodos de microclima y las sondas de suelo del lote y explica lo que Telemetría pide para vincular uno: nombre único en el lote, tipo y, para la sonda, la profundidad de 1 a 200 cm. No tiene botón (DEEPLINK) porque no hay una ruta acordada con la app móvil hacia el formulario de nodos; cuando exista, se agrega la acción.
+- **Lecturas por lote.** Telemetría guarda las lecturas por lote, no por nodo, y `lastReadingTimestamp` del nodo nunca se actualiza. Por eso la confiabilidad se mide por lote, no por nodo.
+
 ## Pantalla Detalle de lote (PLOT_DETAIL)
 
 Preguntas del contrato: `plot.how_is` (vecería 0,51 + 12 días), `plot.today`, `plot.last_sampling` y `plot.next_year_harvest` (deshabilitada sin calibre). La pantalla lee el lote igual que HOME lo lee para un solo lote (`HomeDataReader`: plan de aclareo, árboles que faltan, alertas, cosechas, índice de vecería y pronóstico); no se agregó ningún método a las fachadas de otros contextos.

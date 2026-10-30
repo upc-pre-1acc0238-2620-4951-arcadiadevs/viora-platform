@@ -232,6 +232,8 @@ Implementado (2026-10-30): la pantalla lee el lote como HOME lo lee para un solo
 ### SENSORS (P85, P139–P141)
 `sensors.what_say` (2 nodos activos, 27,4 °C), `sensors.why_paused`, `sensors.reliability`, `sensors.how_link`. Datos de nodos virtuales etiquetados como simulados.
 
+Implementado (2026-10-30): `sensors.what_say` responde como `climate.sensors_say`, con "dato simulado" para nodos virtuales. `sensors.reliability` dice el origen de las lecturas y los días con lecturas de los últimos 7. `sensors.how_link` explica cómo vincular un nodo, sin botón hasta que la app tenga la ruta. `sensors.why_paused` se ofrece siempre deshabilitada ("Ningún nodo de este lote está pausado") porque Telemetría todavía no permite pausar nodos. Por qué, cómo y qué falta para activarla: `asistente-decisiones.md` (Pantalla Sensores).
+
 ### SAMPLING_SUMMARY (P54, P142–P144)
 `sampling.enough_trees` (5/5 y 0,59 frutos por brote vs objetivo 0,40; mínimo 5 árboles), `sampling.meaning`, `sampling.next`, `sampling.correct_tree`.
 
