@@ -2,6 +2,8 @@ package com.arcadiadevs.viora.platform.assistant.infrastructure.ai;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerWriter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.TemplateAnswerWriter;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.metrics.AssistantMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
@@ -30,5 +32,12 @@ class AssistantWriterSelectionTest {
         assertThat(writer).isInstanceOf(TemplateAnswerWriter.class);
         assertThat(context.getBeanProvider(ChatModel.class).getIfAvailable()).isNull();
         assertThat(context.getBeansOfType(SpringAiAnswerWriter.class)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("There is no MeterRegistry bean (no actuator): the assistant meters go to the global registry")
+    void noMeterRegistryYet() {
+        assertThat(context.getBeanProvider(MeterRegistry.class).getIfAvailable()).isNull();
+        assertThat(context.getBean(AssistantMetrics.class)).isNotNull();
     }
 }

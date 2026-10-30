@@ -4,9 +4,11 @@ import com.arcadiadevs.viora.platform.assistant.application.commandservices.Assi
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerAssessment;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerDraft;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerFactsEvaluator;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerMetrics;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerRenderer;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerWriter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
+import com.arcadiadevs.viora.platform.assistant.application.limits.AssistantRateLimits;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.AskQuestionCommand;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerView;
@@ -20,14 +22,17 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * Answers the closed questions. Order: active plan, replay of the same {@code clientRequestId}, availability from
- * the catalog (409 when disabled, before any facts are built), answer cached with the same facts and language, and
- * only then a new answer. Only a new answer calls the writer, so a model is called at most once per answer; the
- * cards, sources and actions always come from the templates.
+ * Answers the closed questions. Order: active plan, replay of the same {@code clientRequestId}, rate limit of the
+ * producer (429; a replay never spends it), availability from the catalog (409 when disabled, before any facts are
+ * built), answer cached with the same facts and language, and only then a new answer. Only a new answer calls the
+ * writer, so a model is called at most once per answer; the cards, sources and actions always come from the
+ * templates. With a model writer, a cached template answer (a fallback) is only served for the shorter
+ * {@code fallback-cache-ttl}, so a model failure does not stick for the whole TTL.
  */
 @Service
 public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommandService {
@@ -40,8 +45,11 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
     private final AnswerRenderer renderer;
     private final AnswerWriter writer;
     private final AssistantAnswerRepository repository;
+    private final AssistantRateLimits rateLimits;
+    private final AnswerMetrics metrics;
     private final Clock clock;
     private final Duration cacheTtl;
+    private final Duration fallbackCacheTtl;
 
     /**
      * Constructs the command service.
@@ -52,19 +60,27 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
      * @param writer                      writes the answer text: the template, or a model with the template as
      *                                    fallback
      * @param repository                  stores the answers
+     * @param rateLimits                  the limits of each producer
+     * @param metrics                     counts how each question ends
      * @param clock                       the application clock
      * @param cacheTtl                    how long an answer with the same facts is served again
+     * @param fallbackCacheTtl            how long a template answer is served again when a model writes the texts
      */
     public AssistantAnswerCommandServiceImpl(ExternalSubscriptionService externalSubscriptionService,
-            AnswerFactsEvaluator factsEvaluator, AnswerRenderer renderer, AnswerWriter writer, AssistantAnswerRepository repository,
-            Clock clock, @Value("${viora.assistant.cache-ttl:PT6H}") Duration cacheTtl) {
+            AnswerFactsEvaluator factsEvaluator, AnswerRenderer renderer, AnswerWriter writer,
+            AssistantAnswerRepository repository, AssistantRateLimits rateLimits, AnswerMetrics metrics, Clock clock,
+            @Value("${viora.assistant.cache-ttl:PT6H}") Duration cacheTtl,
+            @Value("${viora.assistant.fallback-cache-ttl:PT10M}") Duration fallbackCacheTtl) {
         this.externalSubscriptionService = externalSubscriptionService;
         this.factsEvaluator = factsEvaluator;
         this.renderer = renderer;
         this.writer = writer;
         this.repository = repository;
+        this.rateLimits = rateLimits;
+        this.metrics = metrics;
         this.clock = clock;
         this.cacheTtl = cacheTtl;
+        this.fallbackCacheTtl = fallbackCacheTtl;
     }
 
     @Override
@@ -79,13 +95,22 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
         if (replayed.isPresent()) {
             return replay(replayed.get(), command);
         }
+        var wait = rateLimits.tryAnswer(command.producerId(), command.forceRefresh());
+        if (wait.isPresent()) {
+            metrics.answer(command.questionId(), AnswerMetrics.Outcome.RATE_LIMITED);
+            return Result.failure(ApplicationError.tooManyRequests("assistant", "assistant.rate_limited",
+                    wait.getAsLong()));
+        }
         String language = languageOf(command.locale());
         return factsEvaluator.assess(command.producerId(), command.questionId(), command.plotId())
                 .flatMap(assessment -> switch (assessment) {
-                    case AnswerAssessment.Unavailable unavailable -> Result.failure(ApplicationError.conflict(
-                            "assistant_question",
-                            renderer.resolve(unavailable.reason(), Locale.forLanguageTag(language)),
-                            Map.of("reason", "assistant.question.unavailable")));
+                    case AnswerAssessment.Unavailable unavailable -> {
+                        metrics.answer(command.questionId(), AnswerMetrics.Outcome.UNAVAILABLE);
+                        yield Result.failure(ApplicationError.conflict(
+                                "assistant_question",
+                                renderer.resolve(unavailable.reason(), Locale.forLanguageTag(language)),
+                                Map.of("reason", "assistant.question.unavailable")));
+                    }
                     case AnswerAssessment.Available available -> answer(command, available, language);
                 });
     }
@@ -97,7 +122,8 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
         var now = clock.instant();
         if (!command.forceRefresh()) {
             var cached = repository.findLatestCached(command.producerId(), command.questionId(), command.plotId(),
-                    language, version, now.minus(cacheTtl));
+                    language, version, now.minus(cacheTtl))
+                    .filter(answer -> !isExpiredFallback(answer, now));
             if (cached.isPresent()) {
                 return served(cached.get(), command);
             }
@@ -111,6 +137,7 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
                 rendered.actions(), written.model(), written.inputTokens(), written.outputTokens(), now);
         try {
             var saved = repository.save(answer);
+            metrics.answer(command.questionId(), AnswerMetrics.Outcome.CREATED);
             return Result.success(new AnswerOutcome(new AnswerView(saved, Freshness.UP_TO_DATE), true));
         } catch (DataIntegrityViolationException exception) {
             // Two requests with the same key raced; the first one stored is the answer of both
@@ -124,6 +151,7 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
     private Result<AnswerOutcome, ApplicationError> served(AssistantAnswer cached, AskQuestionCommand command) {
         try {
             repository.bindRequest(command.producerId(), command.clientRequestId(), cached.id());
+            metrics.answer(command.questionId(), AnswerMetrics.Outcome.CACHE);
             return Result.success(new AnswerOutcome(new AnswerView(cached, Freshness.UP_TO_DATE), false));
         } catch (DataIntegrityViolationException exception) {
             // Another request with the same key got there first; its answer is the answer of both
@@ -138,7 +166,18 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
             return Result.failure(ApplicationError.conflict("assistant_request", "assistant.request.reused"));
         }
         // Idempotent replay: the same response as the first request, without building the facts again
+        metrics.answer(command.questionId(), AnswerMetrics.Outcome.REPLAY);
         return Result.success(new AnswerOutcome(new AnswerView(stored, Freshness.UP_TO_DATE), false));
+    }
+
+    /**
+     * A template answer while a model writes the texts: the model failed, its text was rejected, the breaker was
+     * open, or the answer predates the model. It is served again only within the shorter fallback TTL (same
+     * exclusive bound as the cache).
+     */
+    private boolean isExpiredFallback(AssistantAnswer answer, Instant now) {
+        return writer.usesModel() && answer.model().fallback()
+                && !answer.createdAt().isAfter(now.minus(fallbackCacheTtl));
     }
 
     /** Spanish, or English for any other language, as the message bundles do. */

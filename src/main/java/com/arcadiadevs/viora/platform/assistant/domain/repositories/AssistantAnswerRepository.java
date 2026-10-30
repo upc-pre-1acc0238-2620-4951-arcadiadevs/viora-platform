@@ -21,7 +21,7 @@ public interface AssistantAnswerRepository {
      * @param answer the answer
      * @return the stored answer
      * @throws org.springframework.dao.DataIntegrityViolationException when the producer already used its
-     *         client request id
+     *         client request id, for an answer of its own or one served from the cache
      */
     AssistantAnswer save(AssistantAnswer answer);
 
@@ -84,9 +84,17 @@ public interface AssistantAnswerRepository {
             Instant since);
 
     /**
-     * Removes every answer of a producer, when the account is deleted.
+     * Removes every answer of a producer and every idempotency key it used, when the account is deleted.
      *
      * @param producerId the producer
      */
     void deleteAllByProducerId(String producerId);
+
+    /**
+     * Removes the answers created before an instant, the keys bound to them and the keys created before it.
+     *
+     * @param cutoff the oldest creation instant kept
+     * @return the answers removed
+     */
+    int deleteCreatedBefore(Instant cutoff);
 }

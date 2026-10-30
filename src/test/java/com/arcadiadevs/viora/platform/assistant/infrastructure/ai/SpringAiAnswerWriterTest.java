@@ -1,11 +1,14 @@
 package com.arcadiadevs.viora.platform.assistant.infrastructure.ai;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.AssistantServiceFixture;
+import com.arcadiadevs.viora.platform.assistant.application.internal.MutableClock;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerDraft;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerModel;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextRejection;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyPercentFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.metrics.AssistantMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.MessageType;
 
 import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.Locale;
 
 import static com.arcadiadevs.viora.platform.assistant.application.internal.AssistantServiceFixture.PRODUCER;
@@ -28,8 +32,11 @@ class SpringAiAnswerWriterTest {
     private static final AnswerModel GROQ = new AnswerModel("groq", "test-model", false);
 
     private final FakeChatModel chatModel = new FakeChatModel();
+    private final MutableClock clock = new MutableClock(AssistantServiceFixture.T0);
+    private final ModelCircuitBreaker breaker = new ModelCircuitBreaker(5, Duration.ofMinutes(2), clock);
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final SpringAiAnswerWriter writer = new SpringAiAnswerWriter(ChatClient.create(chatModel), "groq",
-            "test-model");
+            "test-model", breaker, new AssistantMetrics(meters));
     private AnswerDraft draft;
 
     @BeforeEach
@@ -159,5 +166,105 @@ class SpringAiAnswerWriterTest {
         assertThat(written.model()).isEqualTo(GROQ);
         assertThat(chatModel.prompts().getFirst().getInstructions().getFirst().getText())
                 .contains("plain English", "decimals with a point", "simulated data");
+    }
+
+    @Test
+    @DisplayName("An exception inside the validation falls back to the template as VALIDATION_ERROR, never a 5xx")
+    void validationErrorFallsBack() {
+        var failingCheck = new SpringAiAnswerWriter(ChatClient.create(chatModel), "groq", "test-model", breaker,
+                new AssistantMetrics(meters), (text, locale, facts) -> {
+                    throw new IllegalStateException("validator bug");
+                });
+        chatModel.replyText("Tu carga está en 0,57 frutos por brote.");
+
+        var written = failingCheck.write(draft);
+
+        assertThat(written.rejection()).isEqualTo(TextRejection.VALIDATION_ERROR);
+        assertThat(written.model()).isEqualTo(AnswerModel.TEMPLATE);
+        assertThat(written.text()).isEqualTo(draft.templateText());
+        assertThat(written.inputTokens()).isEqualTo(210);
+        assertThat(model("error", "validation_error")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Five model failures in a row open the breaker: the template is used and the model is not called")
+    void openBreakerSkipsTheModel() {
+        chatModel.fail(new IllegalStateException("503 from the provider"));
+        for (int i = 0; i < 5; i++) {
+            writer.write(draft);
+        }
+        chatModel.replyText("Tu carga está en 0,57 frutos por brote.");
+
+        var skipped = writer.write(draft);
+
+        assertThat(skipped.rejection()).isEqualTo(TextRejection.BREAKER_OPEN);
+        assertThat(skipped.model()).isEqualTo(AnswerModel.TEMPLATE);
+        assertThat(skipped.text()).isEqualTo(draft.templateText());
+        assertThat(chatModel.prompts()).hasSize(5);
+        assertThat(model("error", "model_error")).isEqualTo(5);
+        assertThat(model("breaker_open", "breaker_open")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Once the breaker time passes, one trial call goes through and a success closes it again")
+    void halfOpenRecovers() {
+        chatModel.fail(new IllegalStateException("503 from the provider"));
+        for (int i = 0; i < 5; i++) {
+            writer.write(draft);
+        }
+        clock.advance(Duration.ofMinutes(2));
+        chatModel.replyText("Tu carga está en 0,57 frutos por brote.");
+
+        var trial = writer.write(draft);
+        var next = writer.write(draft);
+
+        assertThat(trial.model()).isEqualTo(GROQ);
+        assertThat(next.model()).isEqualTo(GROQ);
+        assertThat(breaker.state()).isEqualTo(ModelCircuitBreaker.State.CLOSED);
+        assertThat(chatModel.prompts()).hasSize(7);
+    }
+
+    @Test
+    @DisplayName("Validator rejections are a working model: they never open the breaker")
+    void rejectionsDoNotOpenTheBreaker() {
+        chatModel.replyText("Tu carga está en 0,6 frutos por brote.");
+        for (int i = 0; i < 6; i++) {
+            assertThat(writer.write(draft).rejection()).isEqualTo(TextRejection.UNBACKED_NUMBER);
+        }
+
+        assertThat(breaker.state()).isEqualTo(ModelCircuitBreaker.State.CLOSED);
+        assertThat(chatModel.prompts()).hasSize(6);
+        assertThat(model("rejected", "unbacked_number")).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("Malformed output counts as a model failure for the breaker")
+    void malformedOutputOpensTheBreaker() {
+        chatModel.reply("not json", 200, 5);
+        for (int i = 0; i < 5; i++) {
+            writer.write(draft);
+        }
+
+        assertThat(breaker.state()).isEqualTo(ModelCircuitBreaker.State.OPEN);
+        assertThat(writer.write(draft).rejection()).isEqualTo(TextRejection.BREAKER_OPEN);
+    }
+
+    @Test
+    @DisplayName("Records the accepted attempt and its tokens, tagged only by outcome, reason and type")
+    void recordsTheModelMetrics() {
+        chatModel.replyText("Tu carga está en 0,57 frutos por brote.");
+
+        writer.write(draft);
+
+        assertThat(model("accepted", "none")).isEqualTo(1);
+        assertThat(meters.get(AssistantMetrics.TOKENS).tag("type", "input").summary().totalAmount()).isEqualTo(210);
+        assertThat(meters.get(AssistantMetrics.TOKENS).tag("type", "output").summary().totalAmount()).isEqualTo(38);
+        assertThat(meters.getMeters()).allSatisfy(meter -> assertThat(meter.getId().getTags().toString())
+                .doesNotContain(PRODUCER, PLOT.plotId()));
+    }
+
+    private long model(String outcome, String reason) {
+        var timer = meters.find(AssistantMetrics.MODEL).tag("outcome", outcome).tag("reason", reason).timer();
+        return timer == null ? 0 : timer.count();
     }
 }
