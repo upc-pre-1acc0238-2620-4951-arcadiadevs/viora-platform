@@ -167,7 +167,7 @@ Respuesta (JSON completo; sin SSE, ver sección 0):
 
 ### 4.3 Historial y respuesta guardada
 
-- `GET /assistant/answers?limit=10` → últimas 10 respuestas **no vencidas (10 días)** del productor, más recientes primero. Cada una trae `freshness`.
+- `GET /assistant/answers?limit=10` → `{ "answers": [ … ] }` con las últimas 10 respuestas **no vencidas (10 días)** del productor, más recientes primero. Cada una trae `freshness`.
 - `GET /assistant/answers/{answerId}` → respuesta completa (para reabrir desde Recientes).
 - `GET /assistant/answers/latest?screen=…&plotId=…` → la última respuesta del contexto actual (para que la entrada abra directo en ella hasta "Otra pregunta").
 - **`freshness`:** `UP_TO_DATE` si el `dataVersion` guardado coincide con el actual; `STALE` si cambió (nuevo muestreo, aclareo, cosecha, alerta, clima relevante). La app atenúa la respuesta y ofrece "Volver a preguntar".
