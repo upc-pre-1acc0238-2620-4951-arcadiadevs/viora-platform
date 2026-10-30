@@ -268,7 +268,7 @@ Tabla `assistant_answers` (nombres a ajustar a la convención de tablas del repo
 **Backend (ramas `feature/*`, una a la vez, un endpoint por rama):**
 1. `feature/assistant-question-catalog`: `GET /questions` con ensambladores de disponibilidad (sin LLM).
 2. `feature/assistant-template-answers`: `POST /answers` con **plantillas deterministas** + persistencia + historial + `freshness` + caché. Con esto la app ya puede integrarse de punta a punta.
-3. `feature/assistant-spring-ai`: `ChatClient` con Groq, salida estructurada, validador numérico con sus refuerzos, fallback a plantilla, propiedades de modelo, pruebas con `ChatModel` falso.
+3. `feature/assistant-spring-ai`: `ChatClient` con Groq (Spring AI 2.0.2, `openai/gpt-oss-20b` por defecto (medido contra el 120b: conserva mejor el sentido y la cautela y tarda la mitad), razonamiento bajo, 8 s y un reintento), validador de cifras y de prácticas (`AnswerTextValidator`), fallback a plantilla, propiedades de modelo, pruebas con `ChatModel` falso y una evaluación en vivo opcional (`-Dviora.assistant.live=true`). Salida en texto plano: las tarjetas ya vienen del servidor, así que no hace falta salida estructurada. Una respuesta que cayó a la plantilla no se reutiliza de la caché, para reintentar con el modelo.
 4. `feature/assistant-daily-summary`: job diario + `GET /daily-summary`.
 5. `feature/assistant-limits-metrics`: rate limits, circuit breaker, métricas, retención.
 
