@@ -127,3 +127,13 @@ La revisión nativa aprobó `28d6c47` sin bloqueos; el verificador independiente
 - **Cuota con claves concurrentes.** Pedidos simultáneos con la misma clave nueva consumen cuota cada uno antes de la deduplicación.
 - **Menores.** Nombre del helper de rechazo en `SpringAiAnswerWriter`, la retención del repositorio en memoria de las pruebas difiere de la de JPA.
 
+
+### Seguimiento de la revisión de alertas y clima (2026-10-30)
+
+Rama `feature/assistant-alert-climate` (pantallas ALERT y CLIMATE). El rango completo superó el presupuesto de contexto de la revisión nativa, así que se revisó solo el commit de Telemetría `76f76f3` (lentes risk, resilience, reliability): aprobado sin bloqueos. El commit del asistente `bdfcbd4` quedó sin revisión nativa por decisión del dueño (partirlo exigía reescribir `develop`). Pendiente para un parche, sin verificar todavía contra el repositorio:
+
+- **Pronóstico caído sin degradación.** Vencido el TTL de 30 min, si Open-Meteo falla se devuelve vacío en lugar del último pronóstico bueno, y no se guarda el fallo: cada pedido vuelve a llamar al proveedor. Tampoco se capturan excepciones de `fetchSevenDayForecast`/`findPlotCentroid`.
+- **Caché del pronóstico.** `get` + `put` sin `computeIfAbsent` (estampida al vencer) y sin desalojo de entradas.
+- **`countPlotsWithOpenIncident`.** Si todos los ids son inválidos pasa una lista vacía a `findAllByPlotIds` (comprobar que no lance ni ignore el filtro; devolver 0 antes). Además carga todo el historial de incidentes y filtra en memoria.
+- **Última lectura.** `findPlotSensors` toma `readings.getLast()` asumiendo orden ascendente del repositorio; fijarlo o ordenar.
+- **Prueba del TTL.** Falta el caso en que el reloj pasa los 30 min y se vuelve a pedir el pronóstico.
