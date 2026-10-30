@@ -1,10 +1,29 @@
 # Asistente Viora · contrato para implementar Spring AI
 
-> Documento de traspaso para la próxima sesión (Claude Code). Se escribió el 2026-10-28 al cerrar el diseño de la sección **23 · Asistente Viora** en Figma. Léelo completo antes de tocar código. Lo que está marcado **DECISIÓN PENDIENTE** debe confirmarlo Victor antes de implementarlo.
+> Documento de traspaso para la próxima sesión (Claude Code). Se escribió el 2026-10-28 al cerrar el diseño de la sección **23 · Asistente Viora** en Figma. Léelo completo antes de tocar código. La revisión del 2026-10-29 (sección 0) cerró la mayoría de decisiones; lo que sigue abierto está en la sección 10.
 
 - Figma: `https://www.figma.com/design/Hg6RBFx6HAqYACFcGwDtjU/Viora202602_Mobile_App`, página **Mobile Prototipo**, sección **"23 · Asistente Viora"** (id `1288:105225`, dentro de "App Productor · Kotlin"). Pantallas P110–P150 conectadas por prototipo.
 - Repos: backend `D:\mov-viora-platform` (Spring Boot 4.1.1, Java 21, Maven, DDD por bounded context, paquete base `com.arcadiadevs.viora.platform`) y app `D:\mov-viora-mobile-android` (Kotlin/Compose, solo experiencia Productor).
 - Estado de partida: backend 0.59.0 y app 1.16.0 publicados y probados. Piero hace el refactor DDD de la app en `feature/ddd-refactor`; coordina con él antes de crear el módulo del asistente en la app.
+- **Responsables (desde 2026-10-29):** Jahat lleva el backend del asistente y decide sus puntos abiertos; Victor lleva las pantallas de la app. Las decisiones de la sección 0 reemplazan a las del resto del documento donde se contradigan.
+
+---
+
+## 0. Revisión del 2026-10-29 (backend)
+
+| Tema | Decisión |
+|---|---|
+| Proveedor | **Groq** para desarrollo y pruebas (nivel gratuito, modelos abiertos pequeños y rápidos). Se usa con el starter OpenAI de Spring AI apuntando a la URL compatible de Groq. Producción se decide después de medir latencia, calidad y costo. Spring AI **2.0.2** (última estable en Maven Central, compatible con Boot 4.0/4.1). |
+| Plan activo | **Obligatorio.** Todo usuario tiene plan, pero puede vencer: se valida con `SubscriptionContextFacade` y se responde 403. |
+| Push del resumen | **Descartado** por ahora. |
+| Streaming SSE | **Eliminado.** Enviar fragmentos antes de validar mostraría cifras que el validador puede rechazar después. El servidor valida el texto completo y responde JSON; la app muestra "pensando" y escribe el texto localmente con `VioraVoice`. Se elimina la rama `feature/assistant-streaming`. |
+| Validador | Los hechos reales van en el prompt. El validador rechaza cualquier número del texto que no esté en los hechos. Refuerzos: reglas en el prompt (no redondear ni calcular), hechos interpretados (por ejemplo `irrigationAdvisable: false`) y frases prohibidas según el contexto. Si rechaza, se usa la plantilla. |
+| Riego | `climate.irrigate` se **deshabilita** con `disabledReason` cuando el lote no tiene sondas reales. |
+| Validación agronómica | Las plantillas y umbrales del asistente reutilizan el patrón de estado de los perfiles de aclareo (`SYNTHETIC_DEMO` / `AGRONOMIST_APPROVED`). No bloquea el desarrollo; sí bloquea producción. |
+| Umbral de calor | **En consulta con el equipo.** Figma y la US18 usan 32 °C (los "Umbral 30" de Frío y Clima son porciones de frío, no grados). La app usa 30 °C en Inicio (`HomePhaseRules.BLOOM_HEAT_CELSIUS`) y 32 °C en el pronóstico (`ForecastDay.EXTREME_HEAT_CELSIUS`). Mientras tanto se usa 32 °C desde una única propiedad de `telemetry`. |
+| Resumen del día | Se mantiene el job diario (Render pasará a plan pago) con generación bajo demanda como respaldo. |
+| Modelo vs plantillas | Se mantiene la etapa con modelo aunque las plantillas cubran la función: deja abierta la puerta a RAG u otras funciones. |
+| Segunda vuelta de pantallas | Responsabilidad de Victor (frontend). |
 
 ---
 
@@ -70,8 +89,8 @@ platform/assistant/
 
 - Boot 4.1.1 / Java 21. **Verifica en Maven Central qué tren de Spring AI es compatible con Boot 4.1.x** (la línea 2.x) antes de añadir el BOM. No asumas el número de versión.
 - Usa `ChatClient` + salida estructurada (JSON schema) y un `ChatModel` falso en pruebas (sin red).
-- **DECISIÓN PENDIENTE (proveedor/modelo):** recomendación por defecto Claude vía el starter de Anthropic: `claude-haiku-5-5` (latencia baja, suficiente para redactar 2–3 frases con hechos ya calculados) y `claude-sonnet-5-5` solo si hace falta más razonamiento. Dejar el modelo en propiedades (`viora.assistant.model`, `viora.assistant.provider`) para poder cambiarlo a un SML propio sin tocar el dominio.
-- La clave va **solo** en variable de entorno de Render (`ANTHROPIC_API_KEY`). Los repos son **públicos**: nunca commitear claves, prompts con datos reales ni respuestas de ejemplo con datos de producción.
+- **Proveedor (decidido, sección 0):** Groq con el starter OpenAI de Spring AI y su URL compatible. Dejar el modelo en propiedades (`viora.assistant.model`, `viora.assistant.provider`) para poder cambiarlo a otro proveedor o a un SML propio sin tocar el dominio.
+- La clave va **solo** en variable de entorno (`GROQ_API_KEY`, en Render y en local). Los repos son **públicos**: nunca commitear claves, prompts con datos reales ni respuestas de ejemplo con datos de producción.
 
 ### 3.3 Principio de diseño: el modelo redacta, el servidor calcula
 
@@ -120,7 +139,7 @@ Errores: `ProblemDetail` (RFC 7807) con las claves i18n habituales. Todas las ru
 { "questionId": "plan.why_percent", "plotId": "…", "clientRequestId": "uuid", "forceRefresh": false }
 ```
 
-Respuesta (JSON completo) **o** SSE si `Accept: text/event-stream`:
+Respuesta (JSON completo; sin SSE, ver sección 0):
 
 ```json
 {
@@ -143,7 +162,6 @@ Respuesta (JSON completo) **o** SSE si `Accept: text/event-stream`:
 
 - `facts` son **exactamente 2** (la UI exige tarjetas bento iguales). `tone`: `PRIMARY` (verde bosque) o `HIGHLIGHT` (amarillo claro).
 - `fallback: true` cuando el texto salió de la plantilla (modelo caído o validador rechazó).
-- **SSE:** eventos `status` (`thinking`), `delta` (`{"text":"…"}` fragmentos para `VioraVoiceState.Streaming`), `facts`, `sources`, `done` (con el objeto final). Si el cliente no soporta SSE, devuelve el JSON completo. En ambos casos el texto final es el mismo.
 - Idempotencia: `clientRequestId` (UUID). Mismo id → misma respuesta, sin segunda llamada al modelo.
 - `forceRefresh=true` = "Volver a preguntar con datos nuevos" (limitado más estrictamente).
 
@@ -156,7 +174,7 @@ Respuesta (JSON completo) **o** SSE si `Accept: text/event-stream`:
 
 ### 4.4 Resumen del día (Inicio)
 
-`GET /assistant/daily-summary?plotId={uuid?}` → mismo formato que una respuesta, con `questionId: "home.daily_summary"` y 3 hechos para el bento de 3 tarjetas (los tres del mismo tamaño). Se **precalcula una vez al día** (zona `America/Lima`, p. ej. 06:30) con un job, y se genera bajo demanda si falta. Cache por `dataVersion`. **DECISIÓN PENDIENTE:** push de "tu resumen está listo".
+`GET /assistant/daily-summary?plotId={uuid?}` → mismo formato que una respuesta, con `questionId: "home.daily_summary"` y 3 hechos para el bento de 3 tarjetas (los tres del mismo tamaño). Se **precalcula una vez al día** (zona `America/Lima`, p. ej. 06:30) con un job, y se genera bajo demanda si falta. Cache por `dataVersion`. El push de "tu resumen está listo" quedó descartado por ahora.
 
 ### 4.5 Códigos de error
 
@@ -196,7 +214,7 @@ Si el modelo falla pero existe plantilla, se responde 200 con `fallback: true` (
 `alert.what_to_do` (¿Qué hago ante este golpe de calor?: máxima 34 °C, umbral 32 °C, 5 h), `alert.fruitset_effect`, `alert.when_ends`, `alert.plots_at_risk`. **Unificar el umbral de calor antes de implementar:** hoy hay 30 °C en Home y 32 °C en Alertas (decisión abierta de Victor); el catálogo y las respuestas deben leer el mismo valor.
 
 ### CLIMATE (P90, P130–P132)
-`climate.irrigate` (¿Debo regar esta semana?), `climate.fruitset_effect`, `climate.heat_ends`, `climate.sensors_say`. Con humedad **virtual** el texto debe decir "dato simulado" y **no** recomendar riego firme; riego solo con sondas reales (decisión abierta).
+`climate.irrigate` (¿Debo regar esta semana?), `climate.fruitset_effect`, `climate.heat_ends`, `climate.sensors_say`. `climate.irrigate` se deshabilita con `disabledReason` si el lote no tiene sondas reales; el resto de respuestas con humedad **virtual** dice "dato simulado".
 
 ### WINTER_CHILL (P80, P133–P135)
 `chill.missing` (24/30, faltan 6), `chill.reach_30` (fecha estimada 4 ago vs brotación 31 ago), `chill.vs_last_winter`, `chill.if_incomplete`. Fuente: estación de frío EREZ. Pendiente validar con agrónomo la regla de >24 °C y las 30 porciones.
@@ -239,7 +257,7 @@ Tabla `assistant_answers` (nombres a ajustar a la convención de tablas del repo
 - **Rate limit** con `SlidingWindowCounter` (`shared/infrastructure/ratelimit`) y `ClientAddress`: propuesta inicial **20 respuestas/hora por productor**, **5 `forceRefresh`/hora**, 60 consultas de catálogo/hora. Ajustar con datos reales. Respuesta 429 con `Retry-After`.
 - **Timeouts:** 8 s hasta el primer token, 20 s totales; reintento una vez; **circuit breaker** (Resilience4j o equivalente) que abre tras N fallos y fuerza la plantilla.
 - **Presupuesto de tokens:** entrada ≤ ~600 tokens (JSON de hechos + instrucciones), salida ≤ 150. Registrar tokens por respuesta para vigilar el costo.
-- **Cuota/plan:** **DECISIÓN PENDIENTE** si el asistente exige plan activo (`SubscriptionContextFacade`) o es libre durante la fase de validación. Recomendación: exigir sesión y acceso al lote, no plan, hasta medir costo.
+- **Cuota/plan:** el asistente exige sesión, acceso al lote y **plan activo** (`SubscriptionContextFacade`); con el plan vencido responde 403.
 - **Observabilidad:** métricas Micrometer por pregunta (latencia, tasa de fallback, tasa de rechazo del validador, 429/503) y log sin datos personales.
 - Render gratuito: arranque en frío puede pasar de 100 s. El resumen del día precalculado evita que Inicio dependa del modelo.
 
@@ -250,10 +268,11 @@ Tabla `assistant_answers` (nombres a ajustar a la convención de tablas del repo
 **Backend (ramas `feature/*`, una a la vez, un endpoint por rama):**
 1. `feature/assistant-question-catalog`: `GET /questions` con ensambladores de disponibilidad (sin LLM).
 2. `feature/assistant-template-answers`: `POST /answers` con **plantillas deterministas** + persistencia + historial + `freshness` + caché. Con esto la app ya puede integrarse de punta a punta.
-3. `feature/assistant-spring-ai`: `ChatClient`, salida estructurada, validador numérico, fallback a plantilla, propiedades de modelo, pruebas con `ChatModel` falso.
-4. `feature/assistant-streaming`: SSE (`status/delta/facts/sources/done`).
-5. `feature/assistant-daily-summary`: job diario + `GET /daily-summary`.
-6. `feature/assistant-limits-metrics`: rate limits, circuit breaker, métricas, retención.
+3. `feature/assistant-spring-ai`: `ChatClient` con Groq, salida estructurada, validador numérico con sus refuerzos, fallback a plantilla, propiedades de modelo, pruebas con `ChatModel` falso.
+4. `feature/assistant-daily-summary`: job diario + `GET /daily-summary`.
+5. `feature/assistant-limits-metrics`: rate limits, circuit breaker, métricas, retención.
+
+(La rama de streaming SSE se eliminó; ver sección 0.)
 
 Cada rama: pruebas unitarias de cada ensamblador, prueba de arquitectura de autorización, `mvn test` verde (ver recetas locales abajo). Lanzar el backend y publicarlo en Render **antes** de usar la versión de la app que lo consuma.
 
@@ -277,19 +296,18 @@ Cada rama: pruebas unitarias de cada ensamblador, prueba de arquitectura de auto
 - Pruebas de contrato del JSON (exactamente 2 hechos, `tone` válido, `freshness`).
 - Prueba de arquitectura: toda ruta del asistente exige autenticación y acceso al lote (extender `PlotRouteAuthorizationTest`).
 - Pruebas de límite de uso (429) y de caché (misma `clientRequestId` no llama al modelo dos veces).
+- En Linux: JDK 21 y Maven 3.9.16 (`mvn test`; el repo no trae el script `mvnw`). Entre las 19:00 y las 00:00 de Lima fallan 6 pruebas que mezclan la fecha UTC con la de Lima; es un problema previo, no del asistente.
 - E2E local: `spring-boot:run` en 8080 con H2, o jar con JDK 25 y archivo H2 + Shell (ver memoria de despliegue). Con JDK 25 el JIT C2 falla en esta PC: ejecutar maven con `MAVEN_OPTS` y `-DargLine="-XX:TieredStopAtLevel=1"`. Sin `mvn` en el PATH: usar el wrapper de `.m2` (`mvn.cmd -o test`) desde PowerShell.
 
 ---
 
-## 10. Decisiones pendientes para Victor
+## 10. Decisiones pendientes
 
-1. Proveedor y modelo (recomendación: Claude Haiku 5.5 vía Spring AI; SML propio más adelante).
-2. ¿Exigir plan activo para usar el asistente o dejarlo libre en la fase de validación?
-3. Push de "tu resumen del día está listo".
-4. Umbral de calor en floración: 30 °C (Home) vs 32 °C (Alertas); debe unificarse antes de las respuestas de alerta y clima.
-5. Pregunta de riego/hídrica: solo con sondas reales; mientras haya nodos virtuales, la respuesta es informativa y marcada como simulada.
-6. Validación de la redacción agronómica (por ejemplo la regla de frío >24 °C y las 30 porciones) con un agrónomo.
-7. Alcance de la segunda vuelta de pantallas: Plan P60, Bitácora P50, Expediente P76, Lotes P20, Mi cuenta.
+Las decisiones 1, 2, 3, 5 y 7 de la versión anterior se cerraron en la sección 0. Quedan abiertas:
+
+1. Umbral de calor en floración: ¿30 °C preventivo y 32 °C crítico, o un único valor de 32 °C? En consulta con el equipo; debe cerrarse antes de las respuestas de alerta y clima.
+2. Validación de la redacción agronómica (por ejemplo la regla de frío >24 °C y las 30 porciones) con un agrónomo.
+3. Proveedor y modelo para producción, después de medir con Groq.
 
 ---
 
