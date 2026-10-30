@@ -20,8 +20,20 @@ Rutas relativas a `src/main/java/com/arcadiadevs/viora/platform/` (código) y `s
 - **Por qué no se corrigió:** cambiar los umbrales cambia cuándo se abren las alertas que ya ven los productores. Es una decisión agronómica y de negocio, no técnica.
 - **Parche propuesto:** que el equipo y el agrónomo decidan los valores; después, llevarlos a propiedades con estado `SYNTHETIC_DEMO` / `AGRONOMIST_APPROVED` y alinear informe y código. El asistente lee siempre los umbrales de Telemetría, así que no necesita cambios.
 
+## 6. La fecha de muestreo se valida con la zona del servidor
+
+- **Encontrado en:** `feature/pending-patches` (2026-10-30), al corregir las pruebas del punto 4.
+- **Qué pasa:** `@PastOrPresent` en `TreeSampleResourceItem.samplingDate` (contexto `thinning`) compara con la zona horaria de la JVM, no con `America/Lima`. Con un servidor en una zona atrasada respecto de Lima, la fecha de hoy en Lima se rechaza como futura (400). En Render (UTC) no ocurre, porque UTC va adelante de Lima.
+- **Parche propuesto:** validar la fecha en el dominio con `ProducerTimeZone.ZONE` (o el `Clock` inyectado) en lugar de `@PastOrPresent`, o fijar la zona de la JVM en el despliegue.
+
+## 7. Otras pruebas siguen calculando la fecha en UTC
+
+- **Encontrado en:** `feature/pending-patches` (2026-10-30).
+- **Qué pasa:** `AgronomicDossierControllerIntegrationTest`, `AgronomicReportCertificationControllerIntegrationTest`, `HarvestSettlementControllerIntegrationTest` y `ThinningExecutionControllerIntegrationTest` usan `LocalDate.now(ZoneOffset.UTC)`. No fallaron en las corridas hechas, pero no se probaron en la franja de 19:00 a 00:00 de Lima.
+- **Parche propuesto:** el mismo del punto 4 (`ffba942`): calcular la fecha con `ProducerTimeZone.ZONE`.
+
 ## Resueltos
 
 - 1\. El 401 no responde con ProblemDetail — `5f3aad8`.
-- 2\. Respuesta distinta ante un lote ajeno en las listas filtradas por `plotId` — `6981e45` (ahora ambas responden 403).
+- 2\. Respuesta distinta ante un lote ajeno en las listas filtradas por `plotId` — `6981e45` (ahora ambas responden 403). Efecto aceptado: el 403 de `/agroclimatic-incidents` pasa de `PLOT_FORBIDDEN` ("Solo el productor titular del lote puede ver sus alertas.") a `USER_FORBIDDEN` ("Acceso denegado"), igual que todas las rutas `/plots/{plotId}/…`. La app solo lee los campos estándar del ProblemDetail (`ApiErrorMapper.kt`), así que no se rompe nada; también cambia el orden: un lote ajeno con un filtro inválido responde 403 antes que 400.
 - 4\. Seis pruebas fallan entre las 19:00 y las 00:00 de Lima — `ffba942`.
