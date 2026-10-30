@@ -1,6 +1,8 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.commandservices;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
+import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerTextChooser;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.ai.AnswerTextWriter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.queryservices.AnswerFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
@@ -65,6 +67,9 @@ class AskQuestionCommandServiceImplTest {
     private AnswerFactsAssembler factsAssembler;
     @Mock
     private AssistantAnswerRepository repository;
+    /** Off by default, as a mock answers false: every answer is its template. */
+    @Mock
+    private AnswerTextWriter writer;
 
     private AskQuestionCommandServiceImpl service;
 
@@ -80,7 +85,7 @@ class AskQuestionCommandServiceImplTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         service = new AskQuestionCommandServiceImpl(catalogQueryService, factsAssembler, repository,
-                new AnswerLocalizer(messages), CLOCK, TTL);
+                new AnswerLocalizer(messages), new AnswerTextChooser(writer), CLOCK, TTL);
     }
 
     private AskQuestionCommand command(boolean forceRefresh) {
@@ -99,10 +104,14 @@ class AskQuestionCommandServiceImplTest {
     }
 
     private AssistantAnswer savedAnswer() {
+        return savedAnswer(false);
+    }
+
+    private AssistantAnswer savedAnswer(boolean fallback) {
         return new AssistantAnswer(AnswerId.generate(), producerId, plotId, question, AnswerLanguage.SPANISH,
                 new DataVersion("sha256:abc"), "Respuesta guardada",
                 List.of(new AnswerFact("1", "a", "b", FactTone.PRIMARY), new AnswerFact("2", "c", "d", FactTone.HIGHLIGHT)),
-                List.of(), List.of(), requestId, AssistantAnswer.TEMPLATE, null, false, null, null, NOW.minusSeconds(60));
+                List.of(), List.of(), requestId, AssistantAnswer.TEMPLATE, null, fallback, null, null, NOW.minusSeconds(60));
     }
 
     @Test
@@ -185,6 +194,22 @@ class AskQuestionCommandServiceImplTest {
         verify(repository).findReusable(producerId, plotId, question, AnswerLanguage.SPANISH,
                 AnswerComposer.dataVersionOf(ScreenKey.PLAN, prescription()), NOW.minus(TTL));
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("an answer that fell back to its template is not reused, so the model is tried again")
+    void doesNotReuseAFallback() {
+        givenCatalog(true);
+        when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
+        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(repository.findReusable(anyString(), any(), any(), any(), any(), any()))
+                .thenReturn(Optional.of(savedAnswer(true)));
+
+        var result = service.handle(command(false));
+
+        assertThat(((Result.Success<AnswerView, ApplicationError>) result).value().answer().text())
+                .startsWith("Sin aclarear te quedas en 0,60 frutos por brote");
+        verify(repository).save(any());
     }
 
     @Test
