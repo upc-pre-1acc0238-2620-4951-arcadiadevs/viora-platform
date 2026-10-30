@@ -222,6 +222,8 @@ Sin `plotId` (todo el campo) las respuestas cuentan los lotes activos del produc
 ### WINTER_CHILL (P80, P133–P135)
 `chill.missing` (24/30, faltan 6), `chill.reach_30` (fecha estimada 4 ago vs brotación 31 ago), `chill.vs_last_winter`, `chill.if_incomplete`. Fuente: estación de frío EREZ. Pendiente validar con agrónomo la regla de >24 °C y las 30 porciones.
 
+Implementado (2026-10-30): del 1 de junio al 31 de agosto responde sobre el invierno en curso y el resto del año sobre el último invierno terminado, con su año en las etiquetas. Sin datos de frío se deshabilitan las cuatro ("Sin datos de frío para este lote todavía"); `chill.reach_30` se deshabilita con menos de 14 días evaluados y `chill.vs_last_winter` sin datos del invierno pasado. La fuente se muestra como "Modelo de frío de Erez con el clima horario de Open-Meteo". Detalle en `asistente-decisiones.md` (Pantalla Frío).
+
 ### PLOT_DETAIL (P26, P136–P138)
 `plot.how_is` (vecería 0,51 + 12 días), `plot.today`, `plot.last_sampling`, `plot.next_year_harvest` (deshabilitada sin calibre).
 
