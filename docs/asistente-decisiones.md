@@ -172,3 +172,12 @@ Preguntas del contrato: `chill.missing`, `chill.reach_30`, `chill.vs_last_winter
 - **2026-10-30 · Fuente.** "Modelo de frío de Erez con el clima horario de Open-Meteo, hasta el {día}". El contrato dice "estación de frío EREZ", pero el dato no sale de una estación en el lote sino del clima horario del punto central del lote; la fuente lo dice así para no inducir a error.
 - **2026-10-30 · Identificador `chill.reach_30`.** Se mantiene el del contrato; el formato de `QuestionId` ahora admite dígitos en las palabras después de la primera.
 - **2026-10-30 · Caché de Fenología.** `findChillSeason` lee el clima (segundos), así que guarda cada temporada por lote y año: 30 minutos un invierno en curso y 24 horas uno terminado (Open-Meteo corrige días recientes). Un fallo del clima o de Orchard devuelve vacío y no se guarda. Un candado por lote y temporada evita que pedidos simultáneos llamen varias veces al proveedor; solo se guardan lotes con ubicación y las entradas vencidas se borran al guardar. Corre fuera de transacción. La métrica de frío y la fachada comparten la lectura en `ChillSeasonReader`; `WinterWarmthMonitor` queda igual.
+
+### Seguimiento de la verificación de frío (2026-10-30)
+
+El verificador independiente aprobó la rama `feature/assistant-winter-chill` sin bloqueos (la fachada coincide con la métrica CHILLING campo por campo; 300 pedidos concurrentes sobre 3 lotes × 2 temporadas hicieron 6 lecturas del clima). La revisión nativa se omitió por decisión del dueño. Pendiente para un parche:
+
+- **Redondeo justo debajo del umbral.** Con 29,96 porciones sin completar, el redondeo a un decimal muestra "30 de 30 … le faltan 0" (`ChillFactsAssembler`). Mostrar "le falta menos de 0,1" o no redondear hacia el umbral.
+- **Mapa de locks sin limpieza.** `seasonLocks` en `PhenologyContextFacadeImpl` guarda un lock por lote y temporada consultada durante toda la vida del proceso (acotado por lotes reales, unas 2 por lote al año).
+- **Desfase por la caché.** Hasta 30 minutos después de medianoche o del 31 de agosto la fachada puede mostrar un día menos evaluado o el estado anterior que la métrica.
+- **Temporadas antiguas.** `findChillSeason` acepta cualquier temporada pasada de un lote real y la guarda; hoy solo se piden la actual y la anterior.
