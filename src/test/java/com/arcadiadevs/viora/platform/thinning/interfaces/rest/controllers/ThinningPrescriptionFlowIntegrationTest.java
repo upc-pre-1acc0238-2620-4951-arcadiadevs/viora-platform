@@ -16,6 +16,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.UUID;
@@ -80,7 +81,7 @@ class ThinningPrescriptionFlowIntegrationTest {
     }
 
     private MockMvc mvc;
-    private final int campaign = Year.now().getValue();
+    private final int campaign = Year.now(ProducerTimeZone.ZONE).getValue();
     private final LocalDate bloom = LocalDate.of(campaign, 1, 1);
 
     @BeforeEach
@@ -113,7 +114,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         for (int tree = 1; tree <= 5; tree++) {
             samples.append("""
                     {"treeTag":"T-%d","shootCount":20,"fruitSetCount":12,"trunkDiameterMm":150.0,"samplingDate":"%s"}%s
-                    """.formatted(tree, LocalDate.now(), tree < 5 ? "," : ""));
+                    """.formatted(tree, LocalDate.now(ProducerTimeZone.ZONE), tree < 5 ? "," : ""));
         }
         var body = """
                 {"clientBatchId":"%s","campaignYear":%d,"samples":[%s]}
@@ -227,7 +228,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         var plotId = createPlot("SEVILLANA");
 
         mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
-                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(2))))
+                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(LocalDate.now(ProducerTimeZone.ZONE).plusDays(2))))
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -256,7 +257,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         mvc.perform(get("/api/v1/plots/{id}/thinning-prescriptions", plotId).param("status", "ACTIVE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blockers", empty()));
-        assertEquals(campaign, Year.now().getValue());
+        assertEquals(campaign, Year.now(ProducerTimeZone.ZONE).getValue());
     }
 
     private void recordHarvest(String plotId, int year, double kg) throws Exception {
@@ -287,7 +288,7 @@ class ThinningPrescriptionFlowIntegrationTest {
                 .andExpect(jsonPath("$.currentLoad.loadState").value("SEVERE_OVERLOAD"))
                 .andExpect(jsonPath("$.sampledTrees").value(5))
                 .andExpect(jsonPath("$.treesNeeded").value(0))
-                .andExpect(jsonPath("$.lastSampledOn").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.lastSampledOn").value(LocalDate.now(ProducerTimeZone.ZONE).toString()))
                 .andExpect(jsonPath("$.windowOpensDaysAfterBloom").value(14))
                 .andExpect(jsonPath("$.windowClosesDaysAfterBloom").value(49))
                 .andExpect(jsonPath("$.yieldEstimate.status").value("INSUFFICIENT_HISTORY"))
@@ -378,7 +379,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         double sustainable = 8000.0 / areaOf(plotId);
         var body = """
                 {"executedDate":"%s","actualRemovalPercentage":50.0,"removedKg":100.0,"laborCrewSize":2}
-                """.formatted(LocalDate.now(java.time.ZoneOffset.UTC));
+                """.formatted(LocalDate.now(ProducerTimeZone.ZONE));
 
         mvc.perform(post("/api/v1/thinning-prescriptions/{id}/execution-confirmations", id)
                         .contentType(MediaType.APPLICATION_JSON).content(body))

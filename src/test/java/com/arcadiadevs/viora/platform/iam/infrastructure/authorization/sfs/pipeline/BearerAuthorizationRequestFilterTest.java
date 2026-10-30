@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 
 import java.util.List;
 
@@ -28,7 +29,7 @@ class BearerAuthorizationRequestFilterTest {
     private final UserDetailsService userDetailsService = mock(UserDetailsService.class);
     private final FilterChain chain = mock(FilterChain.class);
     private final BearerAuthorizationRequestFilter filter = new BearerAuthorizationRequestFilter(
-            tokenService, userDetailsService, new UnauthorizedRequestHandlerEntryPoint(), "/password-resets");
+            tokenService, userDetailsService, new UnauthorizedRequestHandlerEntryPoint(new AcceptHeaderLocaleResolver()), "/password-resets");
 
     @BeforeEach
     @AfterEach
