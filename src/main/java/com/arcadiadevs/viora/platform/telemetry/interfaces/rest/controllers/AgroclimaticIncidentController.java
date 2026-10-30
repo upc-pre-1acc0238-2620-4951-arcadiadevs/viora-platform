@@ -99,6 +99,7 @@ public class AgroclimaticIncidentController {
      * @return 200 OK with summary and incident list
      */
     @GetMapping("/api/v1/agroclimatic-incidents")
+    @PreAuthorize("@plotAccess.isAccessible(#plotId)")
     @Operation(summary = "List all agroclimatic incidents", description = "Retrieves the summarized incidents of the authenticated producer's active plots with counter metrics, filterable by plot, status, and severity. A plot of another producer answers 403.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Incidents summary successfully retrieved",
