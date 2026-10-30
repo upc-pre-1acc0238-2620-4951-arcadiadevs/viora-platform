@@ -64,6 +64,21 @@ class PhenologyContextFacadeImplTest {
     }
 
     @Test
+    @DisplayName("Returns nothing when the tracker has not computed an index yet")
+    void returnsNothingWithoutAComputedIndex() {
+        var tracker = mock(ChillAccumulationTracker.class);
+        List<HistoricalHarvestEntrySnapshot> history = List.of(
+                mock(HistoricalHarvestEntrySnapshot.class), mock(HistoricalHarvestEntrySnapshot.class),
+                mock(HistoricalHarvestEntrySnapshot.class));
+        when(tracker.snapshot()).thenReturn(new ChillAccumulationTrackerSnapshot(
+                null, null, null, history, null, 0L));
+        when(harvestRecordQueryService.handle(any(GetChillAccumulationTrackerByPlotIdQuery.class)))
+                .thenReturn(Optional.of(tracker));
+
+        assertThat(facade.findBiennialBearingIndex(plotId)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Returns nothing when the plot has no tracker")
     void returnsNothingWithoutTracker() {
         when(harvestRecordQueryService.handle(any(GetChillAccumulationTrackerByPlotIdQuery.class)))

@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Year;
 import java.util.List;
 import java.util.Optional;
@@ -42,9 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AssistantQuestionControllerIntegrationTest {
 
     private static final String ROUTE = "/api/v1/assistant/questions";
-    private static final int NEXT_YEAR = Year.now(ProducerTimeZone.ZONE).getValue() + 1;
 
     @Autowired WebApplicationContext context;
+    @Autowired Clock clock;
     @MockitoBean SubscriptionContextFacade subscriptionContextFacade;
     private MockMvc mvc;
     private final String producer = UUID.randomUUID().toString();
@@ -83,7 +84,7 @@ class AssistantQuestionControllerIntegrationTest {
                 .andExpect(jsonPath("$.questions[2].icon").value("history"))
                 .andExpect(jsonPath("$.questions[2].enabled").value(true))
                 .andExpect(jsonPath("$.questions[3].questionId").value("alternation.next_year"))
-                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé en " + NEXT_YEAR + "?"))
+                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé en " + nextYear() + "?"))
                 .andExpect(jsonPath("$.questions[3].icon").value("harvest"))
                 .andExpect(jsonPath("$.questions[3].enabled").value(false))
                 .andExpect(jsonPath("$.questions[3].disabledReason")
@@ -218,5 +219,10 @@ class AssistantQuestionControllerIntegrationTest {
         var response = mvc.perform(post("/api/v1/plots").contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return JsonPath.read(response, "$.id");
+    }
+
+    /** Same clock and zone the catalog reads, so the expected year cannot drift from the served one. */
+    private int nextYear() {
+        return Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue() + 1;
     }
 }

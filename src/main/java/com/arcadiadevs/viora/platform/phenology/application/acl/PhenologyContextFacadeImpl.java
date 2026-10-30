@@ -87,6 +87,9 @@ public class PhenologyContextFacadeImpl implements PhenologyContextFacade {
         // Same classification the BBI metric answers, so both read the same band
         return harvestRecordQueryService.handle(query).flatMap(tracker -> {
             var snapshot = tracker.snapshot();
+            if (snapshot.calculatedBbi() == null || snapshot.calculatedBbi().value() == null) {
+                return Optional.<PlotBearingIndex>empty();
+            }
             var category = HoblynBbiCalculatorService.classifyAlternation(
                     snapshot.calculatedBbi(), snapshot.harvestHistory().size());
             if (category == BbiAlternationCategory.INSUFFICIENT_DATA) {
