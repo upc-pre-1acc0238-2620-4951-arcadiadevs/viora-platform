@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.servlet.ModelAndView;
 
 import java.util.List;
 
@@ -27,8 +28,14 @@ class BearerAuthorizationRequestFilterTest {
     private final BearerTokenService tokenService = mock(BearerTokenService.class);
     private final UserDetailsService userDetailsService = mock(UserDetailsService.class);
     private final FilterChain chain = mock(FilterChain.class);
+    /** Stands for the exception resolver of the app, which turns the missing authentication into the 401 problem. */
+    private final UnauthorizedRequestHandlerEntryPoint entryPoint = new UnauthorizedRequestHandlerEntryPoint(
+            (request, response, handler, exception) -> {
+                response.setStatus(401);
+                return new ModelAndView();
+            });
     private final BearerAuthorizationRequestFilter filter = new BearerAuthorizationRequestFilter(
-            tokenService, userDetailsService, new UnauthorizedRequestHandlerEntryPoint(), "/password-resets");
+            tokenService, userDetailsService, entryPoint, "/password-resets");
 
     @BeforeEach
     @AfterEach
