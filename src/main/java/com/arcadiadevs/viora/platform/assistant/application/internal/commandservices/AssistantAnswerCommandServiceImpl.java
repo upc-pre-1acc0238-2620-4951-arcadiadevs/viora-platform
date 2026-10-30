@@ -2,12 +2,13 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.commandser
 
 import com.arcadiadevs.viora.platform.assistant.application.commandservices.AssistantAnswerCommandService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerAssessment;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerDraft;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerFactsEvaluator;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerRenderer;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerWriter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.AskQuestionCommand;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerModel;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerView;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Freshness;
 import com.arcadiadevs.viora.platform.assistant.domain.repositories.AssistantAnswerRepository;
@@ -23,9 +24,10 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Answers the closed questions with the deterministic templates. Order: active plan, replay of the same
- * {@code clientRequestId}, availability from the catalog (409 when disabled, before any facts are built), answer
- * cached with the same facts and language, and only then a new answer.
+ * Answers the closed questions. Order: active plan, replay of the same {@code clientRequestId}, availability from
+ * the catalog (409 when disabled, before any facts are built), answer cached with the same facts and language, and
+ * only then a new answer. Only a new answer calls the writer, so a model is called at most once per answer; the
+ * cards, sources and actions always come from the templates.
  */
 @Service
 public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommandService {
@@ -36,6 +38,7 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
     private final ExternalSubscriptionService externalSubscriptionService;
     private final AnswerFactsEvaluator factsEvaluator;
     private final AnswerRenderer renderer;
+    private final AnswerWriter writer;
     private final AssistantAnswerRepository repository;
     private final Clock clock;
     private final Duration cacheTtl;
@@ -46,16 +49,19 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
      * @param externalSubscriptionService tells whether the producer's plan is active
      * @param factsEvaluator              decides availability and builds the facts
      * @param renderer                    writes the texts from the templates
+     * @param writer                      writes the answer text: the template, or a model with the template as
+     *                                    fallback
      * @param repository                  stores the answers
      * @param clock                       the application clock
      * @param cacheTtl                    how long an answer with the same facts is served again
      */
     public AssistantAnswerCommandServiceImpl(ExternalSubscriptionService externalSubscriptionService,
-            AnswerFactsEvaluator factsEvaluator, AnswerRenderer renderer, AssistantAnswerRepository repository,
+            AnswerFactsEvaluator factsEvaluator, AnswerRenderer renderer, AnswerWriter writer, AssistantAnswerRepository repository,
             Clock clock, @Value("${viora.assistant.cache-ttl:PT6H}") Duration cacheTtl) {
         this.externalSubscriptionService = externalSubscriptionService;
         this.factsEvaluator = factsEvaluator;
         this.renderer = renderer;
+        this.writer = writer;
         this.repository = repository;
         this.clock = clock;
         this.cacheTtl = cacheTtl;
@@ -96,10 +102,13 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
                 return served(cached.get(), command);
             }
         }
-        var rendered = renderer.render(facts, Locale.forLanguageTag(language));
+        var locale = Locale.forLanguageTag(language);
+        var rendered = renderer.render(facts, locale);
+        var written = writer.write(new AnswerDraft(command.questionId(), locale, facts.facts(), rendered.text(),
+                rendered.actions()));
         var answer = AssistantAnswer.create(command.clientRequestId(), command.producerId(), command.plotId(),
-                command.questionId(), language, version, rendered.text(), rendered.facts(), rendered.sources(),
-                rendered.actions(), AnswerModel.TEMPLATE, now);
+                command.questionId(), language, version, written.text(), rendered.facts(), rendered.sources(),
+                rendered.actions(), written.model(), written.inputTokens(), written.outputTokens(), now);
         try {
             var saved = repository.save(answer);
             return Result.success(new AnswerOutcome(new AnswerView(saved, Freshness.UP_TO_DATE), true));

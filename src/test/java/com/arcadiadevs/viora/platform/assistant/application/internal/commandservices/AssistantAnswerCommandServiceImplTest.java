@@ -2,6 +2,8 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.commandser
 
 import com.arcadiadevs.viora.platform.assistant.application.commandservices.AssistantAnswerCommandService.AnswerOutcome;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AssistantServiceFixture;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerDraft;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.WrittenText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.AskQuestionCommand;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerModel;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Freshness;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -40,7 +43,7 @@ class AssistantAnswerCommandServiceImplTest {
     void setUp() {
         fixture = new AssistantServiceFixture();
         service = new AssistantAnswerCommandServiceImpl(fixture.subscription, fixture.evaluator, fixture.renderer,
-                fixture.repository, fixture.clock, Duration.ofHours(6));
+                fixture.writer, fixture.repository, fixture.clock, Duration.ofHours(6));
     }
 
     @Test
@@ -184,6 +187,50 @@ class AssistantAnswerCommandServiceImplTest {
         assertThat(result.failure().map(ApplicationError::code)).contains("ASSISTANT_FORBIDDEN");
         assertThat(result.failure().map(ApplicationError::details)).contains("assistant.subscription.inactive");
         verifyNoInteractions(fixture.catalog, fixture.dataReader);
+    }
+
+    @Test
+    @DisplayName("Stores the text, model and tokens the writer returns; cards, sources and actions stay the server's")
+    void storesTheWrittenText() {
+        var model = new AnswerModel("groq", "test-model", false);
+        doReturn(new WrittenText("Tu carga está en 0,57 y el objetivo en 0,40.", model, 210, 38, null))
+                .when(fixture.writer).write(any());
+
+        var answer = ask(UUID.randomUUID(), false, ES).success().orElseThrow().view().answer();
+
+        assertThat(answer.text()).isEqualTo("Tu carga está en 0,57 y el objetivo en 0,40.");
+        assertThat(answer.model()).isEqualTo(model);
+        assertThat(answer.inputTokens()).isEqualTo(210);
+        assertThat(answer.outputTokens()).isEqualTo(38);
+        assertThat(answer.facts()).hasSize(2);
+        assertThat(answer.sources()).hasSize(1);
+        assertThat(answer.actions()).hasSize(1);
+        assertThat(fixture.repository.all().getFirst().inputTokens()).isEqualTo(210);
+    }
+
+    @Test
+    @DisplayName("The writer receives the facts, the language, the template text and the localized actions")
+    void passesTheDraftToTheWriter() {
+        ask(UUID.randomUUID(), false, ES);
+
+        var draft = org.mockito.ArgumentCaptor.forClass(AnswerDraft.class);
+        verify(fixture.writer).write(draft.capture());
+        assertThat(draft.getValue().questionId()).isEqualTo(QuestionId.PLAN_WHY_PERCENT);
+        assertThat(draft.getValue().locale().getLanguage()).isEqualTo("es");
+        assertThat(draft.getValue().facts()).containsEntry("percentToRemove", 30);
+        assertThat(draft.getValue().templateText()).startsWith("Tu carga está en 0,57 frutos por brote");
+        assertThat(draft.getValue().actions()).extracting("label").containsExactly("Registrar aclareo");
+    }
+
+    @Test
+    @DisplayName("The writer (the model) is called once per new answer: never on a replay or a cache hit")
+    void replayAndCacheNeverCallTheWriter() {
+        var key = UUID.randomUUID();
+        ask(key, false, ES);
+        ask(key, false, ES);
+        ask(UUID.randomUUID(), false, ES);
+
+        verify(fixture.writer, times(1)).write(any());
     }
 
     private Result<AnswerOutcome, ApplicationError> ask(UUID key, boolean forceRefresh, Locale locale) {

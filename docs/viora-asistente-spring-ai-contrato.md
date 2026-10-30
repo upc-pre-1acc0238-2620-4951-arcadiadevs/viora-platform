@@ -90,6 +90,7 @@ platform/assistant/
 - Boot 4.1.1 / Java 21. **Verifica en Maven Central qué tren de Spring AI es compatible con Boot 4.1.x** (la línea 2.x) antes de añadir el BOM. No asumas el número de versión.
 - Usa `ChatClient` + salida estructurada (JSON schema) y un `ChatModel` falso en pruebas (sin red).
 - **Proveedor (decidido, sección 0):** Groq con el starter OpenAI de Spring AI y su URL compatible. Dejar el modelo en propiedades (`viora.assistant.model`, `viora.assistant.provider`) para poder cambiarlo a otro proveedor o a un SML propio sin tocar el dominio.
+- **Implementado (2026-10-30):** BOM `org.springframework.ai:spring-ai-bom:2.0.2` y starter `spring-ai-starter-model-openai` (usa el SDK oficial `openai-java`). `viora.assistant.provider=template` (por defecto, sin modelo) o `groq`; `viora.assistant.model=qwen/qwen3.8-27b`. Con `groq` también hace falta `SPRING_AI_MODEL_CHAT=openai` (la autoconfiguración de chat está en `none` por defecto). URL base `https://api.groq.com/openai/v1` (el SDK la espera con `/v1`), `spring.ai.openai.timeout=20s`, `max-retries=1`, temperatura 0,2 y 150 tokens de salida. Detalle en `asistente-decisiones.md`.
 - La clave va **solo** en variable de entorno (`GROQ_API_KEY`, en Render y en local). Los repos son **públicos**: nunca commitear claves, prompts con datos reales ni respuestas de ejemplo con datos de producción.
 
 ### 3.3 Principio de diseño: el modelo redacta, el servidor calcula
