@@ -34,3 +34,12 @@ Rutas relativas a `src/main/java/com/arcadiadevs/viora/platform/` (código) y `s
   - `thinning/interfaces/rest/controllers/ThinningPrescriptionFlowIntegrationTest.confirmationEstimatesTheYieldAfterThinning`
   - `thinning/interfaces/rest/transform/PrescriptionResourceFromEntityAssemblerTest.windowIsOpenOnlyBetweenItsDates`
 - **Parche propuesto:** que las pruebas calculen la fecha con `ProducerTimeZone.ZONE`, o mejor, que usen el `Clock` inyectado con una fecha fija, como hace el catálogo del asistente.
+
+## 5. Umbrales agroclimáticos distintos a los del informe
+
+- **Encontrado en:** la revisión del informe del proyecto (`ma-viora-report`, especificación de requisitos), 2026-10-30.
+- **Qué pasa:** `telemetry/domain/services/AgroclimaticThresholdEvaluator.java` usa valores que no coinciden con los criterios de aceptación:
+  - **Calor en floración (US18):** el informe pide más de 32 °C con humedad relativa menor a 20 % durante más de 3 horas seguidas. El código avisa con ≥ 32 °C de máxima diaria, sin humedad ni duración, y marca crítico con ≥ 36 °C (ver ADR-006, sección 5).
+  - **Helada:** el informe (diseño táctico, `isFrostRisk`) define riesgo con mínima pronosticada menor a 2,0 °C. El código avisa con ≤ 1,5 °C (`FROST_WARNING_CELSIUS`) y marca crítico con ≤ −2,0 °C.
+- **Por qué no se corrigió:** cambiar los umbrales cambia cuándo se abren las alertas que ya ven los productores. Es una decisión agronómica y de negocio, no técnica.
+- **Parche propuesto:** que el equipo y el agrónomo decidan los valores; después, llevarlos a propiedades con estado `SYNTHETIC_DEMO` / `AGRONOMIST_APPROVED` y alinear informe y código. El asistente lee siempre los umbrales de Telemetría, así que no necesita cambios.

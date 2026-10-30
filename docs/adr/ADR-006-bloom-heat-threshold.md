@@ -41,3 +41,9 @@ El problema: con una máxima de 30 a 31 °C, Inicio le pide al productor que rie
 - Inicio, el pronóstico, la T15 y el asistente avisan a partir del mismo valor.
 - Inicio deja de avisar entre 30 y 32 °C. Si el equipo quiere un aviso más temprano, se agrega como un nivel nuevo en Telemetría, no como una constante en la app.
 - Los valores 32 °C y 36 °C siguen **sin validar por un agrónomo** para la Sevillana. Cuando se validen, o si cambian, se ajustan en un solo lugar. Pasarlos a propiedades de configuración con estado `SYNTHETIC_DEMO` / `AGRONOMIST_APPROVED`, como los perfiles de aclareo, queda como mejora posterior.
+
+## 5. Nota del 2026-10-30: diferencia con el informe
+
+El informe del proyecto (`ma-viora-report`, especificación de requisitos, US18) define el calor crítico en floración como **más de 32 °C con humedad relativa menor a 20 % durante más de 3 horas seguidas**. El evaluador actual solo mira la temperatura (≥ 32 °C aviso, ≥ 36 °C crítico): no usa la humedad ni la duración, porque el pronóstico diario no trae humedad (`evaluateHeatRisk`).
+
+Esta decisión no cambia: el valor de 32 °C sigue siendo la fuente única. Agregar humedad y duración cambia cuándo se abren las alertas y es una decisión agronómica; queda registrada como pendiente en `docs/parches-pendientes.md` (punto 5) junto con la validación del agrónomo.
