@@ -20,7 +20,7 @@
 | Validador | Los hechos reales van en el prompt. El validador rechaza cualquier número del texto que no esté en los hechos. Refuerzos: reglas en el prompt (no redondear ni calcular), hechos interpretados (por ejemplo `irrigationAdvisable: false`) y frases prohibidas según el contexto. Si rechaza, se usa la plantilla. |
 | Riego | `climate.irrigate` se **deshabilita** con `disabledReason` cuando el lote no tiene sondas reales. |
 | Validación agronómica | Las plantillas y umbrales del asistente reutilizan el patrón de estado de los perfiles de aclareo (`SYNTHETIC_DEMO` / `AGRONOMIST_APPROVED`). No bloquea el desarrollo; sí bloquea producción. |
-| Umbral de calor | **En consulta con el equipo.** Figma y la US18 usan 32 °C (los "Umbral 30" de Frío y Clima son porciones de frío, no grados). La app usa 30 °C en Inicio (`HomePhaseRules.BLOOM_HEAT_CELSIUS`) y 32 °C en el pronóstico (`ForecastDay.EXTREME_HEAT_CELSIUS`). Mientras tanto se usa 32 °C desde una única propiedad de `telemetry`. |
+| Umbral de calor | **Decidido en [ADR-006](adr/ADR-006-bloom-heat-threshold.md).** Fuente única en Telemetría (`AgroclimaticThresholdEvaluator`): 32 °C abre el aviso (`WARNING`) y 36 °C lo eleva a crítico (`CRITICAL`), igual que Figma y la US18. Inicio de la app deja su 30 °C propio. El asistente lee los umbrales por `TelemetryContextFacade`. |
 | Resumen del día | Se mantiene el job diario (Render pasará a plan pago) con generación bajo demanda como respaldo. |
 | Modelo vs plantillas | Se mantiene la etapa con modelo aunque las plantillas cubran la función: deja abierta la puerta a RAG u otras funciones. |
 | Segunda vuelta de pantallas | Responsabilidad de Victor (frontend). |
@@ -211,7 +211,7 @@ Si el modelo falla pero existe plantilla, se responde 200 con `fallback: true` (
 `plan.why_percent` (¿Por qué 30 %?: carga 0,57 vs 0,40 y −30 % con ventana), `plan.if_less` (¿Y si aclaro solo 20 %?), `plan.if_none` (¿Y si no aclaro?: efecto OFF en 2027), `plan.best_time` (¿Cuándo es mejor aclarear?). Deshabilitadas sin prescripción activa o con muestra incompleta (`Faltan N árboles`).
 
 ### ALERT (T15, P123–P125)
-`alert.what_to_do` (¿Qué hago ante este golpe de calor?: máxima 34 °C, umbral 32 °C, 5 h), `alert.fruitset_effect`, `alert.when_ends`, `alert.plots_at_risk`. **Unificar el umbral de calor antes de implementar:** hoy hay 30 °C en Home y 32 °C en Alertas (decisión abierta de Victor); el catálogo y las respuestas deben leer el mismo valor.
+`alert.what_to_do` (¿Qué hago ante este golpe de calor?: máxima 34 °C, umbral 32 °C, 5 h), `alert.fruitset_effect`, `alert.when_ends`, `alert.plots_at_risk`. El umbral de calor sale de Telemetría (ADR-006: 32 °C aviso, 36 °C crítico); el catálogo y las respuestas lo leen de `TelemetryContextFacade`, nunca de un literal.
 
 ### CLIMATE (P90, P130–P132)
 `climate.irrigate` (¿Debo regar esta semana?), `climate.fruitset_effect`, `climate.heat_ends`, `climate.sensors_say`. `climate.irrigate` se deshabilita con `disabledReason` si el lote no tiene sondas reales; el resto de respuestas con humedad **virtual** dice "dato simulado".
@@ -303,11 +303,10 @@ Cada rama: pruebas unitarias de cada ensamblador, prueba de arquitectura de auto
 
 ## 10. Decisiones pendientes
 
-Las decisiones 1, 2, 3, 5 y 7 de la versión anterior se cerraron en la sección 0. Quedan abiertas:
+Las decisiones 1, 2, 3, 4, 5 y 7 de la versión anterior se cerraron en la sección 0. Quedan abiertas:
 
-1. Umbral de calor en floración: ¿30 °C preventivo y 32 °C crítico, o un único valor de 32 °C? En consulta con el equipo; debe cerrarse antes de las respuestas de alerta y clima.
-2. Validación de la redacción agronómica (por ejemplo la regla de frío >24 °C y las 30 porciones) con un agrónomo.
-3. Proveedor y modelo para producción, después de medir con Groq.
+1. Validación con un agrónomo de la redacción agronómica y de sus reglas: los umbrales de calor de 32 °C y 36 °C, la regla de frío >24 °C y las 30 porciones.
+2. Proveedor y modelo para producción, después de medir con Groq.
 
 ---
 
