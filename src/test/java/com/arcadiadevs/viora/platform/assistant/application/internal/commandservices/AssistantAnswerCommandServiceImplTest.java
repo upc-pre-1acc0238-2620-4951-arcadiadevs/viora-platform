@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.commands.AskQuestio
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerModel;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Freshness;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.ratelimit.SlidingWindowAssistantRateLimits;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,12 +19,17 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.arcadiadevs.viora.platform.assistant.application.internal.AssistantServiceFixture.PRODUCER;
 import static com.arcadiadevs.viora.platform.assistant.application.internal.AssistantServiceFixture.T0;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AnswerDataSamples.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -42,8 +48,13 @@ class AssistantAnswerCommandServiceImplTest {
     @BeforeEach
     void setUp() {
         fixture = new AssistantServiceFixture();
-        service = new AssistantAnswerCommandServiceImpl(fixture.subscription, fixture.evaluator, fixture.renderer,
-                fixture.writer, fixture.repository, fixture.clock, Duration.ofHours(6));
+        service = serviceWith(fixture.rateLimits(1000, 1000));
+    }
+
+    private AssistantAnswerCommandServiceImpl serviceWith(SlidingWindowAssistantRateLimits rateLimits) {
+        return new AssistantAnswerCommandServiceImpl(fixture.subscription, fixture.evaluator, fixture.renderer,
+                fixture.writer, fixture.repository, rateLimits, fixture.metrics, fixture.clock, Duration.ofHours(6),
+                Duration.ofMinutes(10));
     }
 
     @Test
@@ -231,6 +242,147 @@ class AssistantAnswerCommandServiceImplTest {
         ask(UUID.randomUUID(), false, ES);
 
         verify(fixture.writer, times(1)).write(any());
+    }
+
+    @Test
+    @DisplayName("Over the answers limit answers 429 with the seconds to wait; a replay never spends the limit")
+    void limitsTheAnswersPerProducer() {
+        service = serviceWith(fixture.rateLimits(2, 5));
+        var key = UUID.randomUUID();
+        ask(key, false, ES);
+        ask(key, false, ES);
+        ask(key, false, ES);
+        ask(UUID.randomUUID(), false, ES);
+        fixture.clock.advance(Duration.ofMinutes(15));
+
+        var limited = ask(UUID.randomUUID(), false, ES);
+        var replayed = ask(key, false, ES);
+
+        assertThat(limited.failure().map(ApplicationError::code)).contains("ASSISTANT_TOO_MANY_REQUESTS");
+        assertThat(limited.failure().map(ApplicationError::details)).contains("assistant.rate_limited");
+        assertThat(limited.failure().map(error -> error.properties().get("retryAfterSeconds")))
+                .contains(45L * 60);
+        assertThat(replayed.success()).isPresent();
+        assertThat(fixture.answers("plan.why_percent", "rate_limited")).isEqualTo(1);
+        assertThat(fixture.answers("plan.why_percent", "replay")).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("forceRefresh has its own limit on top of the answers limit, and a refused one spends no answer")
+    void limitsTheRefreshes() {
+        service = serviceWith(fixture.rateLimits(4, 1));
+        ask(UUID.randomUUID(), true, ES);
+
+        var refused = ask(UUID.randomUUID(), true, ES);
+        var plain = ask(UUID.randomUUID(), false, ES);
+        var plainAgain = ask(UUID.randomUUID(), false, ES);
+        var plainLast = ask(UUID.randomUUID(), false, ES);
+        var overAnswers = ask(UUID.randomUUID(), false, ES);
+
+        assertThat(refused.failure().map(ApplicationError::code)).contains("ASSISTANT_TOO_MANY_REQUESTS");
+        assertThat(plain.success()).isPresent();
+        assertThat(plainAgain.success()).isPresent();
+        assertThat(plainLast.success()).isPresent();
+        assertThat(overAnswers.failure().map(ApplicationError::code)).contains("ASSISTANT_TOO_MANY_REQUESTS");
+    }
+
+    @Test
+    @DisplayName("Without an active plan the limit is not spent")
+    void inactivePlanSpendsNoLimit() {
+        service = serviceWith(fixture.rateLimits(1, 1));
+        when(fixture.subscription.hasActivePlan(PRODUCER)).thenReturn(false);
+        ask(UUID.randomUUID(), false, ES);
+        when(fixture.subscription.hasActivePlan(PRODUCER)).thenReturn(true);
+
+        assertThat(ask(UUID.randomUUID(), false, ES).success()).isPresent();
+    }
+
+    @Test
+    @DisplayName("With a model writer, a template answer is served from cache only for the fallback TTL")
+    void fallbackAnswersExpireSooner() {
+        doReturn(true).when(fixture.writer).usesModel();
+        var fallback = ask(UUID.randomUUID(), false, ES).success().orElseThrow();
+        fixture.clock.advance(Duration.ofMinutes(10).minusSeconds(1));
+        var cached = ask(UUID.randomUUID(), false, ES).success().orElseThrow();
+        fixture.clock.advance(Duration.ofSeconds(1));
+
+        var retried = ask(UUID.randomUUID(), false, ES).success().orElseThrow();
+
+        assertThat(fallback.view().answer().model().fallback()).isTrue();
+        assertThat(cached.created()).isFalse();
+        assertThat(retried.created()).isTrue();
+        verify(fixture.writer, times(2)).write(any());
+    }
+
+    @Test
+    @DisplayName("A model answer keeps the normal TTL, and so do template answers when no model writes the texts")
+    void modelAndTemplateAnswersKeepTheTtl() {
+        doReturn(true).when(fixture.writer).usesModel();
+        doReturn(new WrittenText("Tu carga está en 0,57 y el objetivo en 0,40.",
+                new AnswerModel("groq", "test-model", false), 210, 38, null)).when(fixture.writer).write(any());
+        ask(UUID.randomUUID(), false, ES);
+        fixture.clock.advance(Duration.ofHours(1));
+        var modelCached = ask(UUID.randomUUID(), false, ES).success().orElseThrow();
+        var templateService = serviceWith(fixture.rateLimits(1000, 1000));
+        doReturn(false).when(fixture.writer).usesModel();
+        fixture.givenData(plan(plan(LocalDate.of(2026, 10, 20), LocalDate.of(2026, 11, 20), null)));
+        doReturn(WrittenText.template("Plantilla.")).when(fixture.writer).write(any());
+        templateService.handle(new AskQuestionCommand(PRODUCER, QuestionId.PLAN_WHY_PERCENT, PLOT, UUID.randomUUID(),
+                false, ES));
+        fixture.clock.advance(Duration.ofHours(1));
+
+        var templateCached = templateService.handle(new AskQuestionCommand(PRODUCER, QuestionId.PLAN_WHY_PERCENT,
+                PLOT, UUID.randomUUID(), false, ES)).success().orElseThrow();
+
+        assertThat(modelCached.created()).isFalse();
+        assertThat(templateCached.created()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Counts each outcome by question: created, cache, replay and unavailable")
+    void countsTheOutcomes() {
+        var key = UUID.randomUUID();
+        ask(key, false, ES);
+        ask(key, false, ES);
+        ask(UUID.randomUUID(), false, ES);
+        fixture.givenCatalogFacts(AssistantServiceFixture.withoutPlan());
+        ask(UUID.randomUUID(), false, ES);
+
+        assertThat(fixture.answers("plan.why_percent", "created")).isEqualTo(1);
+        assertThat(fixture.answers("plan.why_percent", "replay")).isEqualTo(1);
+        assertThat(fixture.answers("plan.why_percent", "cache")).isEqualTo(1);
+        assertThat(fixture.answers("plan.why_percent", "unavailable")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Two requests with one key, one creating and one served from cache, end with a single answer")
+    void racingRequestsShareOneAnswer() throws Exception {
+        var cachedId = ask(UUID.randomUUID(), false, ES).success().orElseThrow().view().answer().id();
+        var key = UUID.randomUUID();
+        var writing = new CountDownLatch(1);
+        var bound = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            writing.countDown();
+            assertThat(bound.await(5, TimeUnit.SECONDS)).isTrue();
+            return invocation.callRealMethod();
+        }).when(fixture.writer).write(any());
+
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            // The refresh skips the cache and stops inside the writer
+            Future<Result<AnswerOutcome, ApplicationError>> creating = pool.submit(() -> ask(key, true, ES));
+            assertThat(writing.await(5, TimeUnit.SECONDS)).isTrue();
+            // Meanwhile the same key is served from the cache and bound to the cached answer
+            var served = ask(key, false, ES).success().orElseThrow();
+            bound.countDown();
+            var created = creating.get(5, TimeUnit.SECONDS).success().orElseThrow();
+
+            assertThat(served.view().answer().id()).isEqualTo(cachedId);
+            assertThat(created.view().answer().id()).isEqualTo(cachedId);
+            assertThat(created.created()).isFalse();
+        }
+        assertThat(fixture.repository.findByClientRequestId(PRODUCER, key).map(answer -> answer.id()))
+                .contains(cachedId);
+        assertThat(fixture.repository.all()).hasSize(1);
     }
 
     private Result<AnswerOutcome, ApplicationError> ask(UUID key, boolean forceRefresh, Locale locale) {

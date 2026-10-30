@@ -14,6 +14,9 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.FactsAssemblerRe
 import com.arcadiadevs.viora.platform.assistant.domain.services.QuestionCatalog;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyIndexFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyPercentFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.metrics.AssistantMetrics;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.ratelimit.SlidingWindowAssistantRateLimits;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
@@ -50,6 +53,21 @@ public class AssistantServiceFixture {
     public final TemplateAnswerWriter writer = spy(new TemplateAnswerWriter());
     public final AnswerFactsEvaluator evaluator = new AnswerFactsEvaluator(catalog, dataReader,
             new FactsAssemblerRegistry(List.of(whyPercent, whyIndex)));
+    /** The meters of the services, readable by the tests. */
+    public final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    public final AssistantMetrics metrics = new AssistantMetrics(meters);
+
+    /** Limits of the producer; high enough to stay out of the way unless a test builds its own. */
+    public SlidingWindowAssistantRateLimits rateLimits(int answers, int refreshes) {
+        return new SlidingWindowAssistantRateLimits(answers, refreshes, 1000, clock);
+    }
+
+    /** Questions counted with this question id and outcome. */
+    public double answers(String questionId, String outcome) {
+        var counter = meters.find(AssistantMetrics.ANSWERS).tag("questionId", questionId).tag("outcome", outcome)
+                .counter();
+        return counter == null ? 0 : counter.count();
+    }
 
     public AssistantServiceFixture() {
         when(subscription.hasActivePlan(anyString())).thenReturn(true);

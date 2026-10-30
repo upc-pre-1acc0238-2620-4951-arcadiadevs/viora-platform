@@ -85,10 +85,12 @@ public class AssistantAnswerController {
             summary = "Ask the assistant a closed question",
             description = "Answers a question of the ALTERNATION or PLAN catalog with the real facts of the plot: a "
                     + "localized text (Accept-Language es/en), exactly two fact cards, the sources and, while the "
-                    + "thinning window is open, a link to record it. In this version every text comes from a "
-                    + "deterministic template (model.fallback = true). The same clientRequestId returns the same "
+                    + "thinning window is open, a link to record it. The text is worded by the configured model when "
+                    + "enabled and validated against the facts; otherwise, or when it is rejected or fails, it comes "
+                    + "from a deterministic template (model.fallback = true). The same clientRequestId returns the same "
                     + "answer (200); an answer with the same facts and language younger than the cache TTL is served "
-                    + "again (200) unless forceRefresh is true. Requires an active plan."
+                    + "again (200) unless forceRefresh is true. Requires an active plan. Limited per producer per "
+                    + "hour (429 with Retry-After); replays are not counted."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "New answer",
@@ -104,6 +106,9 @@ public class AssistantAnswerController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "409", description = "The question is disabled (detail = its disabledReason), "
                     + "or the clientRequestId was used for another question",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "429", description = "Too many questions by the producer (forceRefresh has "
+                    + "its own, smaller limit); see Retry-After. A replay of a clientRequestId is never limited",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<?> ask(@RequestBody(required = false) @Nullable AskQuestionResource resource) {

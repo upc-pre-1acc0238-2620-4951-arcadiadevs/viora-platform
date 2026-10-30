@@ -14,4 +14,14 @@ public interface AnswerWriter {
      * @return the text and what wrote it
      */
     WrittenText write(AnswerDraft draft);
+
+    /**
+     * Whether this writer calls a model. With a model, a stored template answer is a fallback (the model failed or
+     * its text was rejected, or it predates the model) and the cache keeps it only for a short time.
+     *
+     * @return true for a model writer; false for the templates
+     */
+    default boolean usesModel() {
+        return false;
+    }
 }

@@ -19,5 +19,9 @@ public enum TextRejection {
     /** The model call took too long. */
     TIMEOUT,
     /** The model call failed. */
-    MODEL_ERROR
+    MODEL_ERROR,
+    /** The validation of the model text failed unexpectedly. */
+    VALIDATION_ERROR,
+    /** The circuit breaker is open after repeated model failures: the model was not called. */
+    BREAKER_OPEN
 }

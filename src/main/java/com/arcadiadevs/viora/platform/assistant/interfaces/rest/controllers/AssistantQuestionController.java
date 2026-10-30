@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.assistant.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.assistant.application.limits.AssistantRateLimits;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
@@ -10,6 +11,7 @@ import com.arcadiadevs.viora.platform.assistant.interfaces.rest.transform.Questi
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,6 +45,7 @@ public class AssistantQuestionController {
     private final QuestionCatalogQueryService queryService;
     private final CurrentUserProvider currentUserProvider;
     private final MessageSource messageSource;
+    private final AssistantRateLimits rateLimits;
 
     /**
      * Constructs the controller.
@@ -50,12 +53,15 @@ public class AssistantQuestionController {
      * @param queryService        evaluates the catalog of a screen
      * @param currentUserProvider resolves the producer asking
      * @param messageSource       the i18n message source for the labels and reasons
+     * @param rateLimits          the catalog reads allowed per producer; counted here because answering a question
+     *                            also evaluates the catalog, and that must not spend this limit
      */
     public AssistantQuestionController(QuestionCatalogQueryService queryService,
-            CurrentUserProvider currentUserProvider, MessageSource messageSource) {
+            CurrentUserProvider currentUserProvider, MessageSource messageSource, AssistantRateLimits rateLimits) {
         this.queryService = queryService;
         this.currentUserProvider = currentUserProvider;
         this.messageSource = messageSource;
+        this.rateLimits = rateLimits;
     }
 
     /**
@@ -77,7 +83,8 @@ public class AssistantQuestionController {
             @ApiResponse(responseCode = "400", description = "Unknown or missing screen, missing plotId for a plot screen, or malformed plot UUID"),
             @ApiResponse(responseCode = "401", description = "No authenticated user"),
             @ApiResponse(responseCode = "403", description = "Plot of another producer, or no active plan"),
-            @ApiResponse(responseCode = "404", description = "Plot does not exist or is inactive")
+            @ApiResponse(responseCode = "404", description = "Plot does not exist or is inactive"),
+            @ApiResponse(responseCode = "429", description = "Too many catalog reads by the producer; see Retry-After")
     })
     public ResponseEntity<?> listQuestions(
             @Parameter(description = "Screen key", example = "ALTERNATION") @RequestParam(required = false) @Nullable String screen,
@@ -94,6 +101,11 @@ public class AssistantQuestionController {
                             ApplicationError.validationError("request", exception.getMessage())),
                     this::toResource,
                     HttpStatus.OK);
+        }
+        var wait = rateLimits.tryCatalog(query.producerId());
+        if (wait.isPresent()) {
+            return ErrorResponseAssembler.toErrorResponseFromApplicationError(
+                    ApplicationError.tooManyRequests("assistant", "assistant.rate_limited", wait.getAsLong()));
         }
         return ResponseEntityAssembler.toResponseEntityFromResult(queryService.handle(query), this::toResource,
                 HttpStatus.OK);

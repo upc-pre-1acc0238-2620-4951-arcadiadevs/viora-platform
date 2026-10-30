@@ -13,8 +13,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * An idempotency key bound to an answer that another request created (a cache hit). Keys of answers created by
- * their own request live on the answer row itself.
+ * An idempotency key and the answer it returns: the answer the request created (its key is also on the answer row)
+ * or one that another request created (a cache hit). One unique key for both, so two racing requests with the same
+ * key end with one answer.
  */
 @Entity
 @Table(name = "assistant_answer_requests",

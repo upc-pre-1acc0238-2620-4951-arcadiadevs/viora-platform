@@ -16,6 +16,7 @@ import com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.r
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,7 +26,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** JPA adapter of the assistant answers. */
+/**
+ * JPA adapter of the assistant answers.
+ *
+ * <p>Every idempotency key gets a row in {@code assistant_answer_requests}, the key of a new answer too (besides the
+ * column of the answer row): the unique key of that table is then the one place where a request creating an answer
+ * and a request served from the cache with the same key collide, so only one of them wins.</p>
+ */
 @Repository
 public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository {
 
@@ -43,8 +50,12 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
     }
 
     @Override
+    @Transactional
     public AssistantAnswer save(AssistantAnswer answer) {
-        return toDomain(answers.saveAndFlush(toEntity(answer)));
+        var saved = toDomain(answers.saveAndFlush(toEntity(answer)));
+        // Same unique key as a key served from the cache: a race between both rolls this answer back
+        insertRequest(answer.producerId(), answer.clientRequestId(), answer.id());
+        return saved;
     }
 
     @Override
@@ -66,9 +77,14 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
 
     @Override
     public void bindRequest(String producerId, UUID clientRequestId, UUID answerId) {
+        // Answers stored before every key had its row only carry it in their own column
         if (answers.findByProducerIdAndClientRequestId(producerId, clientRequestId).isPresent()) {
             throw new DataIntegrityViolationException("uk_assistant_answer_client_request");
         }
+        insertRequest(producerId, clientRequestId, answerId);
+    }
+
+    private void insertRequest(String producerId, UUID clientRequestId, UUID answerId) {
         var request = new AssistantAnswerRequestPersistenceEntity();
         request.setId(UUID.randomUUID());
         request.setProducerId(producerId);
@@ -105,9 +121,17 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
     }
 
     @Override
+    @Transactional
     public void deleteAllByProducerId(String producerId) {
-        requests.deleteAll(requests.findAllByProducerId(producerId));
-        answers.deleteAll(answers.findAllByProducerId(producerId));
+        requests.deleteAllByProducerIdInBulk(producerId);
+        answers.deleteAllByProducerIdInBulk(producerId);
+    }
+
+    @Override
+    @Transactional
+    public int deleteCreatedBefore(Instant cutoff) {
+        requests.deleteExpired(cutoff);
+        return answers.deleteCreatedBefore(cutoff);
     }
 
     private static AssistantAnswerPersistenceEntity toEntity(AssistantAnswer answer) {

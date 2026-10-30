@@ -27,7 +27,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.Year;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,6 +60,7 @@ class AccountDeletionIntegrationTest {
     @Autowired PasswordHasher passwordHasher;
     @Autowired ProfileCommandService profiles;
     @Autowired UserSessionCommandService sessions;
+    @Autowired Clock clock;
     private MockMvc mvc;
 
     @BeforeEach
@@ -87,7 +90,8 @@ class AccountDeletionIntegrationTest {
                 .content("{\"code\":\"" + SubscriptionTestCodesSeeder.CODES.firstEntry().getKey() + "\"}"))
                 .andExpect(status().isCreated());
         // Two harvests enable an assistant question, so the producer keeps one answer
-        for (var harvest : List.of(List.of(2024, 1000), List.of(2025, 3000))) {
+        int year = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
+        for (var harvest : List.of(List.of(year - 2, 1000), List.of(year - 1, 3000))) {
             mvc.perform(post("/api/v1/plots/" + plotId + "/harvest-records").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"campaignYear\":%d,\"totalYieldKg\":%d}".formatted(harvest.get(0),
                                     harvest.get(1))))
@@ -98,11 +102,17 @@ class AccountDeletionIntegrationTest {
                                 {"questionId":"alternation.vs_campaigns","plotId":"%s","clientRequestId":"%s"}
                                 """.formatted(plotId, UUID.randomUUID())))
                 .andExpect(status().isCreated());
+        // The same question again is served from the cache: its key is bound to that answer
+        mvc.perform(post("/api/v1/assistant/answers").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"questionId":"alternation.vs_campaigns","plotId":"%s","clientRequestId":"%s"}
+                                """.formatted(plotId, UUID.randomUUID())))
+                .andExpect(status().isOk());
 
         delete("Wrong-password-1")
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.reason").value("user.password.current_invalid"));
-        assertThat(owned(producer)).containsOnly(1);
+        assertThat(owned(producer)).containsExactly(1, 1, 1, 1, 1, 1, 1, 2);
 
         delete(PASSWORD).andExpect(status().isNoContent());
 
@@ -141,7 +151,8 @@ class AccountDeletionIntegrationTest {
                 count("select count(*) from plots where producer_id = ?", producer),
                 count("select count(*) from field_notes where producer_id = ?", producer),
                 count("select count(*) from subscriptions where producer_id = ?", id),
-                count("select count(*) from assistant_answers where producer_id = ?", producer));
+                count("select count(*) from assistant_answers where producer_id = ?", producer),
+                count("select count(*) from assistant_answer_requests where producer_id = ?", producer));
     }
 
     private int count(String sql, Object arg) {
