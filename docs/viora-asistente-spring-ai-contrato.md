@@ -205,6 +205,8 @@ Si el modelo falla pero existe plantilla, se responde 200 con `fallback: true` (
 | `home.harvest_estimate` | ¿Cuánto cosecharé este año? | proyección de calibre (US28) | calibre no estimado ("Faltan datos de calibre") |
 | `home.daily_summary` | (resumen precalculado) | todo lo anterior, 3 hechos: días de ventana, máxima de la semana, alertas activas | — |
 
+Sin `plotId` (todo el campo) las respuestas cuentan los lotes activos del productor sin nombrarlos y se guardan con `plot_id` nulo, aparte de las de cada lote. Diferencias con la tabla: la etiqueta de alertas pasa a "¿Qué alertas afectan a mis lotes?"; la campaña suma solo los lotes con cosecha en los dos últimos años y muestra el BBI solo con un lote; la cosecha estimada del campo es un rango de kg/ha entre los lotes con calibre estimado, no un total. Detalle en `asistente-decisiones.md` (Pantalla Inicio).
+
 ### ALTERNATION (P40, P114–P119)
 `alternation.why_index` (¿Por qué mi índice es 0,51?: BBI y banda, hechos 0,51 y ⅓ con 9,6 → 3,1 t/ha), `alternation.break_cycle` (¿Qué hago para romper la vecería?), `alternation.vs_campaigns` (¿Cómo va este lote frente a mis campañas?), `alternation.next_year` (¿Cuánto cosecharé en 2027?, deshabilitada sin calibre).
 
