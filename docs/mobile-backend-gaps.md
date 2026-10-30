@@ -94,6 +94,7 @@ Qué endpoints necesita cada quien para sus historias. ✅ listo para consumir �
 | `POST /plots/{id}/harvest-settlements` | US29 | ✅ devuelve `receiptNumber`, `weighedOn`, `millTicketNumber` y `commercialSizeGrade`; el cuerpo exige `weighedOn` y acepta `millTicketNumber`, y la cabecera opcional `Idempotency-Key` hace seguro el reintento |
 | Consultar liquidaciones hechas (`GET /plots/{id}/harvest-settlements` y `GET /plots/{id}/harvest-settlements/{campaignYear}`) | US29 | ✅ los dos endpoints, con los mismos campos de recibo, pesaje, ticket y grado de calibre; queda pendiente la asignación dentro del equipo mobile |
 | `POST /plots/{id}/certifications` (dossier) | fuera de las 4 pestañas del productor | ✅ |
+| `GET /assistant/questions?screen={ALTERNATION\|PLAN}&plotId={id}` (asistente, catálogo de preguntas) | P114, P120 | ✅ preguntas en el orden del contrato con `questionId`, `label` localizado por `Accept-Language` y con cifras reales, `icon`, `enabled` y `disabledReason` (null si está habilitada). 400 pantalla desconocida, sin `plotId` o UUID inválido; 403 lote ajeno o sin plan activo (`assistant.subscription.inactive`); 404 lote inexistente. Las demás pantallas siguen pendientes |
 
 ## 4. Cambios del backend desde la 0.21.0 (para actualizar el reporte)
 

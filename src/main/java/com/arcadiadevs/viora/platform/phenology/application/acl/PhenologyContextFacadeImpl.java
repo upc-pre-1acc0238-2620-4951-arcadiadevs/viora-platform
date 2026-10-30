@@ -3,8 +3,11 @@ package com.arcadiadevs.viora.platform.phenology.application.acl;
 import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.weather.HourlyTemperatureProvider;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.HarvestRecordQueryService;
+import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetChillAccumulationTrackerByPlotIdQuery;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetHarvestRecordsByPlotIdQuery;
+import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.BbiAlternationCategory;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.phenology.domain.services.HoblynBbiCalculatorService;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -67,5 +71,28 @@ public class PhenologyContextFacadeImpl implements PhenologyContextFacade {
         } catch (IllegalArgumentException ex) {
             return Collections.emptySortedMap();
         }
+    }
+
+    @Override
+    public Optional<PlotBearingIndex> findBiennialBearingIndex(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        final GetChillAccumulationTrackerByPlotIdQuery query;
+        try {
+            query = new GetChillAccumulationTrackerByPlotIdQuery(plotId);
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+        // Same classification the BBI metric answers, so both read the same band
+        return harvestRecordQueryService.handle(query).flatMap(tracker -> {
+            var snapshot = tracker.snapshot();
+            var category = HoblynBbiCalculatorService.classifyAlternation(
+                    snapshot.calculatedBbi(), snapshot.harvestHistory().size());
+            if (category == BbiAlternationCategory.INSUFFICIENT_DATA) {
+                return Optional.empty();
+            }
+            return Optional.of(new PlotBearingIndex(snapshot.calculatedBbi().value(), category.name()));
+        });
     }
 }
