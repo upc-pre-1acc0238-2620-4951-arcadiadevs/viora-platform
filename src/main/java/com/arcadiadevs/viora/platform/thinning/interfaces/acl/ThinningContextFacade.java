@@ -48,4 +48,33 @@ public interface ThinningContextFacade {
             LocalDate windowClosesOn
     ) {
     }
+
+    /**
+     * Retrieves how far the thinning prescription of a plot campaign got: whether it was issued, the sampling
+     * still missing and the caliber projection of its confirmed execution.
+     *
+     * @param plotId       the plot identifier string (UUID)
+     * @param campaignYear the campaign year
+     * @return the availability, or empty when the plot was never sampled that campaign
+     */
+    Optional<PrescriptionAvailability> findPrescriptionAvailability(String plotId, int campaignYear);
+
+    /**
+     * Availability of a campaign prescription.
+     *
+     * @param issued                  whether the prescription was issued (prescribed, confirmed or executed)
+     * @param percentageToRemove      prescribed percentage of fruits to remove; null while not issued
+     * @param sampledTrees            distinct trees sampled so far
+     * @param treesNeeded             trees still missing for a representative sampling; 0 once representative
+     * @param caliberProjectionStatus status of the caliber projection of the confirmed execution (for example
+     *                                {@code ESTIMATED}); null while the thinning is not confirmed
+     */
+    record PrescriptionAvailability(
+            boolean issued,
+            Double percentageToRemove,
+            int sampledTrees,
+            int treesNeeded,
+            String caliberProjectionStatus
+    ) {
+    }
 }

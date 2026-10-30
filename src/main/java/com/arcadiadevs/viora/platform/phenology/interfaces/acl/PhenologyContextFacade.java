@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.phenology.interfaces.acl;
 
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.SortedMap;
 
 /**
@@ -29,4 +30,22 @@ public interface PhenologyContextFacade {
      * @return maximum in degrees Celsius per local day (America/Lima), ascending; empty without location or weather
      */
     SortedMap<LocalDate, Double> findDailyMaxTemperatures(String plotId, LocalDate from, LocalDate to);
+
+    /**
+     * Retrieves the latest Hoblyn Biennial Bearing Index of a plot, as kept by its harvest history tracker.
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @return the index and its alternation band; empty when the plot has no tracker or too few campaigns to
+     *         classify the index
+     */
+    Optional<PlotBearingIndex> findBiennialBearingIndex(String plotId);
+
+    /**
+     * Biennial Bearing Index of a plot.
+     *
+     * @param value    index value between 0 and 1
+     * @param category alternation band: {@code REGULAR}, {@code MODERATE_ALTERNATION} or {@code SEVERE_ALTERNATION}
+     */
+    record PlotBearingIndex(double value, String category) {
+    }
 }

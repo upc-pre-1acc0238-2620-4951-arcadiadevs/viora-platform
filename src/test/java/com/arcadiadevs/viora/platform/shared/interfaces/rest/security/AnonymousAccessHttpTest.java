@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Deny by default through the real filter chain: without a token only the public routes answer, and no body larger
@@ -66,6 +67,18 @@ class AnonymousAccessHttpTest {
     }
 
     @Test
+    void anUnauthorizedRequestAnswersAProblemDetailInTheLanguageOfTheRequest() throws Exception {
+        var spanish = request("GET", PLOT + "/samplings", "es");
+        assertEquals(401, spanish.statusCode());
+        assertTrue(spanish.headers().firstValue("Content-Type").orElse("").startsWith("application/problem+json"));
+        assertTrue(spanish.body().contains("\"code\":\"USER_UNAUTHORIZED\""), spanish.body());
+        assertTrue(spanish.body().contains("Se requiere autenticación para acceder a este recurso"), spanish.body());
+
+        var english = request("GET", PLOT + "/samplings", "en");
+        assertTrue(english.body().contains("Authentication is required to access this resource"), english.body());
+    }
+
+    @Test
     void aBodyAboveTheLimitIsRejectedBeforeAnythingReadsIt() throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + PLOT
                         + "/field-notes/7c9e6679-7425-40de-944b-e07fc1f90ae7/photo"))
@@ -73,6 +86,14 @@ class AnonymousAccessHttpTest {
                 .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[3 * 1024 * 1024]))
                 .build();
         assertEquals(413, CLIENT.send(request, HttpResponse.BodyHandlers.discarding()).statusCode());
+    }
+
+    private HttpResponse<String> request(String method, String path, String language) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Accept-Language", language)
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build();
+        return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private int send(String method, String path) throws Exception {

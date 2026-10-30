@@ -37,8 +37,10 @@ public class PlotAccessPolicy {
      * Whether the current user may reach the plot.
      *
      * @param plotId the plot identifier from the path
-     * @return {@code false} only for a plot owned by another producer; an unknown plot passes, so the
-     *         endpoint keeps answering its own 404 or 400
+     * @return {@code false} only for a plot owned by another producer. A missing, malformed or unknown id passes on
+     *         purpose: there is no owner to protect, and the endpoint answers its own 400 or 404 (the app tells them
+     *         apart from a 403). That each route does answer 404 for an unknown plot is not left to trust: see
+     *         {@code UnknownPlotRoutesIntegrationTest}
      */
     public boolean isAccessible(String plotId) {
         return orchardContextFacade.findPlotOwnerId(plotId)

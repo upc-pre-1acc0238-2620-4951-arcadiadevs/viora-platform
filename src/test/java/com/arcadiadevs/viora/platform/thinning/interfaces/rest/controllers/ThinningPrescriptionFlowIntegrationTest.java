@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -227,7 +228,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         var plotId = createPlot("SEVILLANA");
 
         mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
-                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(2))))
+                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(LocalDate.now(ProducerTimeZone.ZONE).plusDays(2))))
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -378,7 +379,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         double sustainable = 8000.0 / areaOf(plotId);
         var body = """
                 {"executedDate":"%s","actualRemovalPercentage":50.0,"removedKg":100.0,"laborCrewSize":2}
-                """.formatted(LocalDate.now(java.time.ZoneOffset.UTC));
+                """.formatted(LocalDate.now(ProducerTimeZone.ZONE));
 
         mvc.perform(post("/api/v1/thinning-prescriptions/{id}/execution-confirmations", id)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
