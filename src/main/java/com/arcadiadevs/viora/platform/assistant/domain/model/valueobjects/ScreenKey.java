@@ -22,7 +22,10 @@ public enum ScreenKey {
     CLIMATE,
 
     /** Winter chill of a plot: Erez chill portions of the season (P80, P133-P135). */
-    WINTER_CHILL;
+    WINTER_CHILL,
+
+    /** Detail of a plot: its state, today's tasks, the last sampling and the harvest estimate (P26, P136-P138). */
+    PLOT_DETAIL;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -54,13 +57,17 @@ public enum ScreenKey {
     }
 
     /**
-     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL questions use the
-     * shorter {@code chill.} of the contract.
+     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL and PLOT_DETAIL
+     * questions use the shorter {@code chill.} and {@code plot.} of the contract.
      *
      * @return the prefix
      */
     public String questionPrefix() {
-        return this == WINTER_CHILL ? "chill." : name().toLowerCase(Locale.ROOT) + ".";
+        return switch (this) {
+            case WINTER_CHILL -> "chill.";
+            case PLOT_DETAIL -> "plot.";
+            default -> name().toLowerCase(Locale.ROOT) + ".";
+        };
     }
 
     /**

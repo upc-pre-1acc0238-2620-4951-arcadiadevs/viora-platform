@@ -36,6 +36,10 @@ public record QuestionId(String value) {
     public static final QuestionId CHILL_REACH_30 = new QuestionId("chill.reach_30");
     public static final QuestionId CHILL_VS_LAST_WINTER = new QuestionId("chill.vs_last_winter");
     public static final QuestionId CHILL_IF_INCOMPLETE = new QuestionId("chill.if_incomplete");
+    public static final QuestionId PLOT_HOW_IS = new QuestionId("plot.how_is");
+    public static final QuestionId PLOT_TODAY = new QuestionId("plot.today");
+    public static final QuestionId PLOT_LAST_SAMPLING = new QuestionId("plot.last_sampling");
+    public static final QuestionId PLOT_NEXT_YEAR_HARVEST = new QuestionId("plot.next_year_harvest");
 
     /**
      * Compact constructor validating the {@code screen.question} format.

@@ -13,7 +13,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
  * @param sampledTrees        distinct trees sampled in the current campaign
  * @param treesNeeded         trees still missing for a representative sampling
  * @param climate             climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
- * @param home                data of the HOME screen; {@link HomeData#NONE} otherwise
+ * @param home                data of the HOME screen, and of the plot on PLOT_DETAIL; {@link HomeData#NONE} otherwise
  * @param chill               winter chill data of the WINTER_CHILL screen; {@link ChillData#NONE} otherwise
  */
 public record PlotFacts(
@@ -97,5 +97,18 @@ public record PlotFacts(
     public static PlotFacts ofChill(int campaignYear, ChillData chill) {
         return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, ClimateData.NONE, HomeData.NONE,
                 chill);
+    }
+
+    /**
+     * Facts of the PLOT_DETAIL screen: the plan and harvests of the plot, read as HOME reads one plot, and its
+     * bearing index.
+     *
+     * @param campaignYear current campaign year
+     * @param bearingIndex latest Biennial Bearing Index; null when it cannot be calculated yet
+     * @param plot         the plot, as HOME reads it
+     * @return the facts
+     */
+    public static PlotFacts ofPlotDetail(int campaignYear, Double bearingIndex, HomeData plot) {
+        return new PlotFacts(campaignYear, bearingIndex, 0, false, false, null, 0, 0, ClimateData.NONE, plot);
     }
 }

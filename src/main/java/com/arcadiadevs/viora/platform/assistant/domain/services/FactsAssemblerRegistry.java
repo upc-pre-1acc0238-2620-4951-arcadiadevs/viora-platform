@@ -22,6 +22,9 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.Break
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfLessFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfNoneFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.NextYearFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotHowIsFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotLastSamplingFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotTodayFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.VsCampaignsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyIndexFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyPercentFactsAssembler;
@@ -55,7 +58,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE and WINTER_CHILL questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL and PLOT_DETAIL questions.
      *
      * @return the registry
      */
@@ -70,7 +73,9 @@ public final class FactsAssemblerRegistry {
                 new AlertPlotsAtRiskFactsAssembler(), new IrrigateFactsAssembler(),
                 new ClimateFruitsetEffectFactsAssembler(), new HeatEndsFactsAssembler(),
                 new SensorsSayFactsAssembler(), new ChillMissingFactsAssembler(), new ChillReachFactsAssembler(),
-                new ChillVsLastWinterFactsAssembler(), new ChillIfIncompleteFactsAssembler()));
+                new ChillVsLastWinterFactsAssembler(), new ChillIfIncompleteFactsAssembler(),
+                new PlotHowIsFactsAssembler(), new PlotTodayFactsAssembler(), new PlotLastSamplingFactsAssembler(),
+                new NextYearFactsAssembler(QuestionId.PLOT_NEXT_YEAR_HARVEST)));
     }
 
     /**

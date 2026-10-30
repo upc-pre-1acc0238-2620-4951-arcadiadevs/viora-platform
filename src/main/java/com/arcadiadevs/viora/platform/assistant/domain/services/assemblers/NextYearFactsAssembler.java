@@ -19,14 +19,31 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.assembler
 /**
  * "¿Cuánto cosecharé en 2027?": the yield and the caliber the thinning context projected with the load the
  * confirmed thinning left. It speaks of the harvest of the current campaign; there is no projection beyond it.
+ * ALTERNATION and PLOT_DETAIL ask it with their own question and texts.
  */
 public final class NextYearFactsAssembler implements FactsAssembler {
 
     private static final String ESTIMATED = "ESTIMATED";
 
+    private final QuestionId questionId;
+
+    /** The {@code alternation.next_year} question. */
+    public NextYearFactsAssembler() {
+        this(QuestionId.ALTERNATION_NEXT_YEAR);
+    }
+
+    /**
+     * The same answer for another question.
+     *
+     * @param questionId the question, such as {@code plot.next_year_harvest}
+     */
+    public NextYearFactsAssembler(QuestionId questionId) {
+        this.questionId = questionId;
+    }
+
     @Override
     public QuestionId questionId() {
-        return QuestionId.ALTERNATION_NEXT_YEAR;
+        return questionId;
     }
 
     @Override

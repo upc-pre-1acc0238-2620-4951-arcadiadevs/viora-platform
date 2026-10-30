@@ -50,6 +50,10 @@ public class PlotAnswerDataReader {
             return PlotAnswerData.ofHome(plotId, today, campaignYear,
                     homeDataReader.readForAnswer(producerId, plotId, campaignYear));
         }
+        if (screen == ScreenKey.PLOT_DETAIL) {
+            return PlotAnswerData.ofPlotDetail(plotId, today, campaignYear,
+                    homeDataReader.readForAnswer(producerId, plotId, campaignYear));
+        }
         if (screen.readsChill()) {
             return PlotAnswerData.ofChill(plotId, today, campaignYear, externalPhenologyService.findChillData(plotId));
         }
