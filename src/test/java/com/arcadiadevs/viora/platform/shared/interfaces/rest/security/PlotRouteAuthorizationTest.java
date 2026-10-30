@@ -7,6 +7,7 @@ import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
@@ -15,6 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Every endpoint reaching the data hanging from a plot, or a prescription by its id, checks the owner with method
@@ -25,15 +27,65 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class PlotRouteAuthorizationTest {
 
     private static final String BASE_PACKAGE = "com.arcadiadevs.viora.platform";
+    private static final String PLOT_ACCESS = "@plotAccess.isAccessible(#plotId)";
 
     @Test
     void everyRouteUnderAPlotChecksItsOwner() throws Exception {
-        assertEquals(List.of(), routesMissing("/plots/{plotId}/", "@plotAccess.isAccessible(#plotId)"));
+        assertEquals(List.of(), routesMissing("/plots/{plotId}/", PLOT_ACCESS));
     }
 
     @Test
     void everyRouteUnderAPrescriptionChecksItsOwner() throws Exception {
         assertEquals(List.of(), routesMissing("/thinning-prescriptions/{id}", "@prescriptionAccess.isAccessible(#id)"));
+    }
+
+    /**
+     * A route can also take the plot as a query parameter, as the assistant does. The rule is scoped to the
+     * assistant: older controllers filtering by an optional {@code plotId} check the owner in their services.
+     */
+    @Test
+    void everyAssistantRouteTakingAPlotParameterChecksItsOwner() throws Exception {
+        var routes = new ArrayList<String>();
+        var missing = new ArrayList<String>();
+        for (var controller : controllers(BASE_PACKAGE + ".assistant")) {
+            var classRule = AnnotatedElementUtils.findMergedAnnotation(controller, PreAuthorize.class);
+            for (Method method : controller.getDeclaredMethods()) {
+                if (AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class) == null
+                        || !takesPlotIdParameter(method)) {
+                    continue;
+                }
+                var route = controller.getSimpleName() + "." + method.getName();
+                routes.add(route);
+                var methodRule = AnnotatedElementUtils.findMergedAnnotation(method, PreAuthorize.class);
+                var rule = methodRule != null ? methodRule : classRule;
+                if (rule == null || !rule.value().contains(PLOT_ACCESS)) {
+                    missing.add(route);
+                }
+            }
+        }
+        assertFalse(routes.isEmpty(), "the assistant exposes no route taking a plotId parameter");
+        assertEquals(List.of(), missing);
+    }
+
+    private static boolean takesPlotIdParameter(Method method) {
+        return Arrays.stream(method.getParameters()).anyMatch(parameter -> {
+            var param = AnnotatedElementUtils.findMergedAnnotation(parameter, RequestParam.class);
+            if (param == null) {
+                return false;
+            }
+            var name = !param.name().isEmpty() ? param.name() : parameter.getName();
+            return name.equals("plotId");
+        });
+    }
+
+    private List<Class<?>> controllers(String basePackage) throws Exception {
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        var controllers = new ArrayList<Class<?>>();
+        for (var candidate : scanner.findCandidateComponents(basePackage)) {
+            controllers.add(ClassUtils.forName(candidate.getBeanClassName(), getClass().getClassLoader()));
+        }
+        return controllers;
     }
 
     private List<String> routesMissing(String pathFragment, String expression) throws Exception {
