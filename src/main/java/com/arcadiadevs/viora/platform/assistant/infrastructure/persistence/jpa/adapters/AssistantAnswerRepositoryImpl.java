@@ -1,0 +1,153 @@
+package com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.adapters;
+
+import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerAction;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFact;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerModel;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerSource;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.DataVersion;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.domain.repositories.AssistantAnswerRepository;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.entities.AssistantAnswerPersistenceEntity;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.entities.AssistantAnswerRequestPersistenceEntity;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.repositories.AssistantAnswerPersistenceRepository;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.repositories.AssistantAnswerRequestPersistenceRepository;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Repository;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/** JPA adapter of the assistant answers. */
+@Repository
+public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository {
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    private final AssistantAnswerPersistenceRepository answers;
+    private final AssistantAnswerRequestPersistenceRepository requests;
+    private final Clock clock;
+
+    public AssistantAnswerRepositoryImpl(AssistantAnswerPersistenceRepository answers,
+            AssistantAnswerRequestPersistenceRepository requests, Clock clock) {
+        this.answers = answers;
+        this.requests = requests;
+        this.clock = clock;
+    }
+
+    @Override
+    public AssistantAnswer save(AssistantAnswer answer) {
+        return toDomain(answers.saveAndFlush(toEntity(answer)));
+    }
+
+    @Override
+    public Optional<AssistantAnswer> findById(UUID answerId) {
+        return answers.findById(answerId).map(AssistantAnswerRepositoryImpl::toDomain);
+    }
+
+    @Override
+    public Optional<AssistantAnswer> findByClientRequestId(String producerId, UUID clientRequestId) {
+        var own = answers.findByProducerIdAndClientRequestId(producerId, clientRequestId);
+        if (own.isPresent()) {
+            return own.map(AssistantAnswerRepositoryImpl::toDomain);
+        }
+        return requests.findByProducerIdAndClientRequestId(producerId, clientRequestId)
+                .flatMap(request -> answers.findById(request.getAnswerId()))
+                .filter(answer -> answer.getProducerId().equals(producerId))
+                .map(AssistantAnswerRepositoryImpl::toDomain);
+    }
+
+    @Override
+    public void bindRequest(String producerId, UUID clientRequestId, UUID answerId) {
+        if (answers.findByProducerIdAndClientRequestId(producerId, clientRequestId).isPresent()) {
+            throw new DataIntegrityViolationException("uk_assistant_answer_client_request");
+        }
+        var request = new AssistantAnswerRequestPersistenceEntity();
+        request.setId(UUID.randomUUID());
+        request.setProducerId(producerId);
+        request.setClientRequestId(clientRequestId);
+        request.setAnswerId(answerId);
+        request.setCreatedAt(clock.instant());
+        requests.saveAndFlush(request);
+    }
+
+    @Override
+    public Optional<AssistantAnswer> findLatestCached(String producerId, QuestionId questionId, PlotId plotId,
+            String locale, DataVersion dataVersion, Instant since) {
+        return answers
+                .findFirstByProducerIdAndQuestionIdAndPlotIdAndLocaleAndDataVersionAndCreatedAtGreaterThanOrderByCreatedAtDesc(
+                        producerId, questionId.value(), plotId.plotId(), locale, dataVersion.value(), since)
+                .map(AssistantAnswerRepositoryImpl::toDomain);
+    }
+
+    @Override
+    public List<AssistantAnswer> findRecent(String producerId, Instant since, int limit) {
+        return answers.findByProducerIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(producerId, since,
+                        PageRequest.of(0, limit)).stream()
+                .map(AssistantAnswerRepositoryImpl::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Optional<AssistantAnswer> findLatestOfScreen(String producerId, PlotId plotId, String questionPrefix,
+            Instant since) {
+        return answers
+                .findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        producerId, plotId.plotId(), questionPrefix, since)
+                .map(AssistantAnswerRepositoryImpl::toDomain);
+    }
+
+    @Override
+    public void deleteAllByProducerId(String producerId) {
+        requests.deleteAll(requests.findAllByProducerId(producerId));
+        answers.deleteAll(answers.findAllByProducerId(producerId));
+    }
+
+    private static AssistantAnswerPersistenceEntity toEntity(AssistantAnswer answer) {
+        var entity = new AssistantAnswerPersistenceEntity();
+        entity.setId(answer.id());
+        entity.setClientRequestId(answer.clientRequestId());
+        entity.setProducerId(answer.producerId());
+        entity.setPlotId(answer.plotId().plotId());
+        entity.setQuestionId(answer.questionId().value());
+        entity.setLocale(answer.locale());
+        entity.setDataVersion(answer.dataVersion().value());
+        entity.setText(answer.text());
+        entity.setFactsJson(JSON.writeValueAsString(answer.facts()));
+        entity.setSourcesJson(JSON.writeValueAsString(answer.sources()));
+        entity.setActionsJson(JSON.writeValueAsString(answer.actions()));
+        entity.setFallback(answer.model().fallback());
+        entity.setModelProvider(answer.model().provider());
+        entity.setModelName(answer.model().name());
+        entity.setInputTokens(answer.inputTokens());
+        entity.setOutputTokens(answer.outputTokens());
+        entity.setCreatedAt(answer.createdAt());
+        return entity;
+    }
+
+    private static AssistantAnswer toDomain(AssistantAnswerPersistenceEntity entity) {
+        return new AssistantAnswer(
+                entity.getId(),
+                entity.getClientRequestId(),
+                entity.getProducerId(),
+                new PlotId(entity.getPlotId()),
+                new QuestionId(entity.getQuestionId()),
+                entity.getLocale(),
+                new DataVersion(entity.getDataVersion()),
+                entity.getText(),
+                JSON.readValue(entity.getFactsJson(), new TypeReference<List<AnswerFact>>() { }),
+                JSON.readValue(entity.getSourcesJson(), new TypeReference<List<AnswerSource>>() { }),
+                JSON.readValue(entity.getActionsJson(), new TypeReference<List<AnswerAction>>() { }),
+                new AnswerModel(entity.getModelProvider(), entity.getModelName(), entity.isFallback()),
+                entity.getInputTokens(),
+                entity.getOutputTokens(),
+                entity.getCreatedAt());
+    }
+}

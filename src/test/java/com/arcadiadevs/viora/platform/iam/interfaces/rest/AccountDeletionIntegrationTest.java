@@ -37,8 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Account deletion (P100) against the whole application: a producer with a plot, a logbook note, a plan, a profile
- * and a session deletes the account, and nothing of it is left.
+ * Account deletion (P100) against the whole application: a producer with a plot, a logbook note, a plan, a profile,
+ * a session and an assistant answer deletes the account, and nothing of it is left.
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:accountdeletion;DB_CLOSE_DELAY=-1",
@@ -86,6 +86,18 @@ class AccountDeletionIntegrationTest {
         mvc.perform(post("/api/v1/cooperative-code-redemptions").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"code\":\"" + SubscriptionTestCodesSeeder.CODES.firstEntry().getKey() + "\"}"))
                 .andExpect(status().isCreated());
+        // Two harvests enable an assistant question, so the producer keeps one answer
+        for (var harvest : List.of(List.of(2024, 1000), List.of(2025, 3000))) {
+            mvc.perform(post("/api/v1/plots/" + plotId + "/harvest-records").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"campaignYear\":%d,\"totalYieldKg\":%d}".formatted(harvest.get(0),
+                                    harvest.get(1))))
+                    .andExpect(status().isCreated());
+        }
+        mvc.perform(post("/api/v1/assistant/answers").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"questionId":"alternation.vs_campaigns","plotId":"%s","clientRequestId":"%s"}
+                                """.formatted(plotId, UUID.randomUUID())))
+                .andExpect(status().isCreated());
 
         delete("Wrong-password-1")
                 .andExpect(status().isUnprocessableContent())
@@ -128,7 +140,8 @@ class AccountDeletionIntegrationTest {
                 count("select count(*) from profiles where user_id = ?", id),
                 count("select count(*) from plots where producer_id = ?", producer),
                 count("select count(*) from field_notes where producer_id = ?", producer),
-                count("select count(*) from subscriptions where producer_id = ?", id));
+                count("select count(*) from subscriptions where producer_id = ?", id),
+                count("select count(*) from assistant_answers where producer_id = ?", producer));
     }
 
     private int count(String sql, Object arg) {
