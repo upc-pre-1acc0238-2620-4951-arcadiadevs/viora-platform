@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.commandser
 
 import com.arcadiadevs.viora.platform.assistant.application.commandservices.AskQuestionCommandService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
+import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerTextChooser;
 import com.arcadiadevs.viora.platform.assistant.application.internal.queryservices.AnswerFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
@@ -37,6 +38,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
     private final AnswerFactsAssembler factsAssembler;
     private final AssistantAnswerRepository repository;
     private final AnswerLocalizer localizer;
+    private final AnswerTextChooser textChooser;
     private final Clock clock;
     private final Duration cacheTtl;
 
@@ -47,6 +49,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
      * @param factsAssembler      reads the figures of the plot
      * @param repository          the saved answers
      * @param localizer           writes the answer in a language
+     * @param textChooser         keeps the text of the model or the template
      * @param clock               the application clock
      * @param cacheTtl            how long a saved answer is reused for the same data
      */
@@ -55,6 +58,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
             AnswerFactsAssembler factsAssembler,
             AssistantAnswerRepository repository,
             AnswerLocalizer localizer,
+            AnswerTextChooser textChooser,
             Clock clock,
             @Value("${viora.assistant.answer-cache-ttl:PT6H}") Duration cacheTtl
     ) {
@@ -62,6 +66,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
         this.factsAssembler = factsAssembler;
         this.repository = repository;
         this.localizer = localizer;
+        this.textChooser = textChooser;
         this.clock = clock;
         this.cacheTtl = cacheTtl;
     }
@@ -100,7 +105,9 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
         var now = clock.instant();
         if (!command.forceRefresh()) {
             var reusable = repository.findReusable(command.producerId(), command.plotId(), command.questionId(),
-                    command.language(), version, now.minus(cacheTtl));
+                    command.language(), version, now.minus(cacheTtl))
+                    // An answer that fell back to its template is not reused, so the next ask tries the model again
+                    .filter(saved -> !saved.fallback());
             if (reusable.isPresent()) {
                 return Result.success(new AnswerView(reusable.get(), Freshness.UP_TO_DATE));
             }
@@ -111,10 +118,13 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
             return unavailable();
         }
         var written = localizer.localize(draft.get(), command.language());
+        var question = localizer.resolve(offered.get().label(), command.language().locale());
+        var text = textChooser.choose(command.questionId(), question, command.language(), written.text(),
+                written.facts());
         var answer = new AssistantAnswer(AnswerId.generate(), command.producerId(), command.plotId(),
-                command.questionId(), command.language(), version, written.text(), written.facts(),
-                written.sources(), written.actions(), command.clientRequestId(), AssistantAnswer.TEMPLATE, null,
-                false, null, null, now);
+                command.questionId(), command.language(), version, text.text(), written.facts(),
+                written.sources(), written.actions(), command.clientRequestId(), text.provider(), text.model(),
+                text.fallback(), text.inputTokens(), text.outputTokens(), now);
         try {
             repository.save(answer);
         } catch (DataIntegrityViolationException e) {
