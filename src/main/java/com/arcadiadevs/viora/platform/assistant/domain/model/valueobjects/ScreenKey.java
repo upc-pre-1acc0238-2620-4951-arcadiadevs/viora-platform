@@ -25,7 +25,10 @@ public enum ScreenKey {
     WINTER_CHILL,
 
     /** Detail of a plot: its state, today's tasks, the last sampling and the harvest estimate (P26, P136-P138). */
-    PLOT_DETAIL;
+    PLOT_DETAIL,
+
+    /** Nodes of a plot: what they read, how reliable it is and how to link one (P85, P139-P141). */
+    SENSORS;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -41,10 +44,10 @@ public enum ScreenKey {
      * Whether the questions of the screen answer from Telemetry (alerts, forecast, nodes) instead of the harvest and
      * thinning data.
      *
-     * @return true for ALERT and CLIMATE
+     * @return true for ALERT, CLIMATE and SENSORS
      */
     public boolean readsClimate() {
-        return this == ALERT || this == CLIMATE;
+        return this == ALERT || this == CLIMATE || this == SENSORS;
     }
 
     /**

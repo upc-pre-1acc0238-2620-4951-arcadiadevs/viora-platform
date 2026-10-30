@@ -45,7 +45,11 @@ final class FactGlossary {
             Map.entry("plot.how_is", "the bearing index of the plot and where its thinning stands"),
             Map.entry("plot.today", "what the producer can do in the plot today: thinning, today's weather, alerts"),
             Map.entry("plot.last_sampling", "what the sampling of the campaign measured and what it leads to"),
-            Map.entry("plot.next_year_harvest", "the harvest estimated after the thinning, with its caliber"));
+            Map.entry("plot.next_year_harvest", "the harvest estimated after the thinning, with its caliber"),
+            Map.entry("sensors.what_say", "what the latest reading of the plot says"),
+            Map.entry("sensors.why_paused", "why a node is paused; Telemetry cannot pause nodes yet"),
+            Map.entry("sensors.reliability", "where the readings come from and how many recent days had readings"),
+            Map.entry("sensors.how_link", "what is needed to link a node to the plot"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -147,7 +151,12 @@ final class FactGlossary {
             Map.entry("todayMax", "forecast maximum of today, °C"),
             Map.entry("todayMin", "forecast minimum of today, °C"),
             Map.entry("frostThreshold", "minimum that opens a frost warning, °C"),
-            Map.entry("frostReached", "true when today's minimum reaches frostThreshold"));
+            Map.entry("frostReached", "true when today's minimum reaches frostThreshold"),
+            Map.entry("daysWithReadings", "days of the window with at least one reading"),
+            Map.entry("windowDays", "days counted, today included"),
+            Map.entry("lastReadingOn", "day of the latest reading"),
+            Map.entry("microclimateNodes", "linked microclimate (air) nodes"),
+            Map.entry("soilProbes", "linked soil moisture probes"));
 
     private FactGlossary() {
     }

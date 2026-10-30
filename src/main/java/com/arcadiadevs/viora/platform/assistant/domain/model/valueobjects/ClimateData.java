@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Climate data of a plot the ALERT and CLIMATE questions answer from, already judged by Telemetry: its thresholds,
+ * Climate data of a plot the ALERT, CLIMATE and SENSORS questions answer from, already judged by Telemetry: its thresholds,
  * the alert the screen is about, the forecast and the nodes. The assistant never evaluates a threshold itself.
  *
  * @param thresholds     the alert thresholds; null when not read (screens without climate questions)
@@ -16,6 +16,7 @@ import java.util.Optional;
  * @param forecast       the seven-day forecast; null when unavailable or not read
  * @param nodes          nodes linked to the plot
  * @param latestReading  latest reading of the plot, only when recent; null otherwise
+ * @param coverage       readings of the plot over the last days, read only by the SENSORS screen; null otherwise
  */
 public record ClimateData(
         Thresholds thresholds,
@@ -24,7 +25,8 @@ public record ClimateData(
         int activePlots,
         Forecast forecast,
         List<SensorNode> nodes,
-        Reading latestReading
+        Reading latestReading,
+        Coverage coverage
 ) {
 
     /** No climate data: the screens that do not read Telemetry. */
@@ -39,6 +41,14 @@ public record ClimateData(
 
     public ClimateData {
         nodes = nodes == null ? List.of() : List.copyOf(nodes);
+    }
+
+    /**
+     * Climate data of a screen that reads no coverage.
+     */
+    public ClimateData(Thresholds thresholds, Incident incident, int plotsAtRisk, int activePlots, Forecast forecast,
+            List<SensorNode> nodes, Reading latestReading) {
+        this(thresholds, incident, plotsAtRisk, activePlots, forecast, nodes, latestReading, null);
     }
 
     /**
@@ -139,5 +149,15 @@ public record ClimateData(
      * @param soilMoisture soil moisture, %
      */
     public record Reading(double temperature, double humidity, double soilMoisture) {
+    }
+
+    /**
+     * Readings of the plot over the last days, as Telemetry counts them.
+     *
+     * @param lastReadingOn    day of the latest reading in the producers' time zone; null without one in the window
+     * @param daysWithReadings days of the window with at least one hourly reading
+     * @param windowDays       days of the window, today included
+     */
+    public record Coverage(LocalDate lastReadingOn, int daysWithReadings, int windowDays) {
     }
 }

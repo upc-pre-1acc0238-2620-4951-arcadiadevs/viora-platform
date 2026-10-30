@@ -40,6 +40,10 @@ public record QuestionId(String value) {
     public static final QuestionId PLOT_TODAY = new QuestionId("plot.today");
     public static final QuestionId PLOT_LAST_SAMPLING = new QuestionId("plot.last_sampling");
     public static final QuestionId PLOT_NEXT_YEAR_HARVEST = new QuestionId("plot.next_year_harvest");
+    public static final QuestionId SENSORS_WHAT_SAY = new QuestionId("sensors.what_say");
+    public static final QuestionId SENSORS_WHY_PAUSED = new QuestionId("sensors.why_paused");
+    public static final QuestionId SENSORS_RELIABILITY = new QuestionId("sensors.reliability");
+    public static final QuestionId SENSORS_HOW_LINK = new QuestionId("sensors.how_link");
 
     /**
      * Compact constructor validating the {@code screen.question} format.

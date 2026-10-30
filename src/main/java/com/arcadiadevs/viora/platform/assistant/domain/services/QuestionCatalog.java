@@ -40,7 +40,9 @@ public final class QuestionCatalog {
             ScreenKey.WINTER_CHILL, List.of(QuestionId.CHILL_MISSING, QuestionId.CHILL_REACH_30,
                     QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE),
             ScreenKey.PLOT_DETAIL, List.of(QuestionId.PLOT_HOW_IS, QuestionId.PLOT_TODAY,
-                    QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST));
+                    QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST),
+            ScreenKey.SENSORS, List.of(QuestionId.SENSORS_WHAT_SAY, QuestionId.SENSORS_WHY_PAUSED,
+                    QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK));
 
     private QuestionCatalog() {
     }
@@ -74,6 +76,7 @@ public final class QuestionCatalog {
             case CLIMATE -> climate(facts.climate());
             case WINTER_CHILL -> chill(facts.chill());
             case PLOT_DETAIL -> plotDetail(facts);
+            case SENSORS -> sensors(facts.climate());
         };
     }
 
@@ -266,6 +269,28 @@ public final class QuestionCatalog {
                         label(QuestionId.PLOT_NEXT_YEAR_HARVEST, "label", String.valueOf(facts.campaignYear() + 1)),
                         "harvest", home.caliberEstimates().isEmpty()
                                 ? CatalogText.of("assistant.reason.caliber_missing") : null));
+    }
+
+    /**
+     * The SENSORS screen: what the nodes say needs a linked node reading recently, as {@code climate.sensors_say};
+     * the reliability needs a linked node; how to link one is always offered. {@code why_paused} is always disabled:
+     * Telemetry has no way to pause a node yet, so no node can be paused (docs/asistente-decisiones.md, Pantalla
+     * Sensores).
+     */
+    private static List<CatalogQuestion> sensors(ClimateData climate) {
+        var nodesMissing = climate.nodes().isEmpty() ? CatalogText.of("assistant.reason.nodes_missing") : null;
+        CatalogText whatSayMissing = nodesMissing;
+        if (whatSayMissing == null && climate.latestReading() == null) {
+            whatSayMissing = CatalogText.of("assistant.reason.readings_missing");
+        }
+        return List.of(
+                question(QuestionId.SENSORS_WHAT_SAY, label(QuestionId.SENSORS_WHAT_SAY, "label"), "sensor",
+                        whatSayMissing),
+                question(QuestionId.SENSORS_WHY_PAUSED, label(QuestionId.SENSORS_WHY_PAUSED, "label"), "alert",
+                        CatalogText.of("assistant.reason.no_paused_nodes")),
+                question(QuestionId.SENSORS_RELIABILITY, label(QuestionId.SENSORS_RELIABILITY, "label"), "history",
+                        nodesMissing),
+                question(QuestionId.SENSORS_HOW_LINK, label(QuestionId.SENSORS_HOW_LINK, "label"), "lote", null));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

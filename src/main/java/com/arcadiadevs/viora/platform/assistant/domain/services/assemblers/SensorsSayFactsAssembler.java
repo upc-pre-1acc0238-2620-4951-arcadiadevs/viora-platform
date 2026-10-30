@@ -15,16 +15,32 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.assembler
 
 /**
  * "¿Qué dicen mis sensores?": the latest reading of the plot. Unless every linked node is measured, the reading is
- * labeled "dato simulado" (contract, section 3.3).
+ * labeled "dato simulado" (contract, section 3.3). CLIMATE and SENSORS ask it with their own question and texts.
  */
 public final class SensorsSayFactsAssembler implements FactsAssembler {
 
     /** Fact the model reads to say "dato simulado". */
     static final String SIMULATED = "simulated";
 
+    private final QuestionId questionId;
+
+    /** The {@code climate.sensors_say} question. */
+    public SensorsSayFactsAssembler() {
+        this(QuestionId.CLIMATE_SENSORS_SAY);
+    }
+
+    /**
+     * The same answer for another question.
+     *
+     * @param questionId the question, such as {@code sensors.what_say}
+     */
+    public SensorsSayFactsAssembler(QuestionId questionId) {
+        this.questionId = questionId;
+    }
+
     @Override
     public QuestionId questionId() {
-        return QuestionId.CLIMATE_SENSORS_SAY;
+        return questionId;
     }
 
     @Override
