@@ -118,3 +118,12 @@ Rama `feature/assistant-limits-metrics` (paso 5 del contrato) más los seguimien
 - **Llamadas duplicadas en paralelo.** Sigue abierto (ver seguimiento de Spring AI).
 - **Valores de los límites.** 20/5/60 son la propuesta del contrato; ajustar con datos reales.
 
+### Seguimiento de la revisión de límites (2026-10-30)
+
+La revisión nativa aprobó `28d6c47` sin bloqueos; el verificador independiente tampoco encontró bloqueos. Pendiente para un parche:
+
+- **Circuit breaker semiabierto sin salida.** Si la llamada de prueba no informa éxito ni fallo (por ejemplo, lanza un `Error` en lugar de una excepción), el breaker queda semiabierto y rechaza todas las llamadas hasta reiniciar. Arreglo propuesto: liberar el turno de prueba en un `finally` o darle un plazo máximo. Lo señalaron el verificador y dos lentes de la revisión.
+- **Éxito tardío.** Una llamada iniciada antes de abrirse el breaker que termina tarde puede cerrarlo o reabrirlo como si fuera la de prueba; impacto bajo.
+- **Cuota con claves concurrentes.** Pedidos simultáneos con la misma clave nueva consumen cuota cada uno antes de la deduplicación.
+- **Menores.** Nombre del helper de rechazo en `SpringAiAnswerWriter`, la retención del repositorio en memoria de las pruebas difiere de la de JPA.
+
