@@ -50,6 +50,9 @@ public class PlotAnswerDataReader {
             return PlotAnswerData.ofHome(plotId, today, campaignYear,
                     homeDataReader.readForAnswer(producerId, plotId, campaignYear));
         }
+        if (screen.readsChill()) {
+            return PlotAnswerData.ofChill(plotId, today, campaignYear, externalPhenologyService.findChillData(plotId));
+        }
         if (screen.readsClimate()) {
             return new PlotAnswerData(plotId, today, campaignYear, null, null, Collections.emptySortedMap(), null,
                     climateDataReader.read(screen, plotId));

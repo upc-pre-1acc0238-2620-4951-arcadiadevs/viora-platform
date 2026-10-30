@@ -3,13 +3,14 @@ package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
 import java.util.regex.Pattern;
 
 /**
- * Identifier of a closed assistant question, namespaced by its screen (for example {@code plan.if_less}).
+ * Identifier of a closed assistant question, namespaced by its screen (for example {@code plan.if_less}). Words after
+ * the first may carry digits, as in {@code chill.reach_30}.
  *
  * @param value the identifier
  */
 public record QuestionId(String value) {
 
-    private static final Pattern FORMAT = Pattern.compile("[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z]+)*");
+    private static final Pattern FORMAT = Pattern.compile("[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z0-9]+)*");
 
     public static final QuestionId HOME_WEEK_PLAN = new QuestionId("home.week_plan");
     public static final QuestionId HOME_CAMPAIGN_VS_PREVIOUS = new QuestionId("home.campaign_vs_previous");
@@ -31,6 +32,10 @@ public record QuestionId(String value) {
     public static final QuestionId CLIMATE_FRUITSET_EFFECT = new QuestionId("climate.fruitset_effect");
     public static final QuestionId CLIMATE_HEAT_ENDS = new QuestionId("climate.heat_ends");
     public static final QuestionId CLIMATE_SENSORS_SAY = new QuestionId("climate.sensors_say");
+    public static final QuestionId CHILL_MISSING = new QuestionId("chill.missing");
+    public static final QuestionId CHILL_REACH_30 = new QuestionId("chill.reach_30");
+    public static final QuestionId CHILL_VS_LAST_WINTER = new QuestionId("chill.vs_last_winter");
+    public static final QuestionId CHILL_IF_INCOMPLETE = new QuestionId("chill.if_incomplete");
 
     /**
      * Compact constructor validating the {@code screen.question} format.

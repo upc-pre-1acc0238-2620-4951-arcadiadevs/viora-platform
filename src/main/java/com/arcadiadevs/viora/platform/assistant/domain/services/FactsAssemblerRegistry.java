@@ -6,6 +6,10 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.Alert
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhatToDoFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhenEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BestTimeFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillIfIncompleteFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillMissingFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillReachFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillVsLastWinterFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateFruitsetEffectFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HeatEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeAlertsAffectingFactsAssembler;
@@ -51,7 +55,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT and CLIMATE questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE and WINTER_CHILL questions.
      *
      * @return the registry
      */
@@ -65,7 +69,8 @@ public final class FactsAssemblerRegistry {
                 new AlertFruitsetEffectFactsAssembler(), new AlertWhenEndsFactsAssembler(),
                 new AlertPlotsAtRiskFactsAssembler(), new IrrigateFactsAssembler(),
                 new ClimateFruitsetEffectFactsAssembler(), new HeatEndsFactsAssembler(),
-                new SensorsSayFactsAssembler()));
+                new SensorsSayFactsAssembler(), new ChillMissingFactsAssembler(), new ChillReachFactsAssembler(),
+                new ChillVsLastWinterFactsAssembler(), new ChillIfIncompleteFactsAssembler()));
     }
 
     /**

@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 public class AssistantConfiguration {
 
     /**
-     * The facts assembler of each ALTERNATION, PLAN, ALERT and CLIMATE question.
+     * The facts assembler of each HOME, ALTERNATION, PLAN, ALERT, CLIMATE and WINTER_CHILL question.
      *
      * @return the registry
      */

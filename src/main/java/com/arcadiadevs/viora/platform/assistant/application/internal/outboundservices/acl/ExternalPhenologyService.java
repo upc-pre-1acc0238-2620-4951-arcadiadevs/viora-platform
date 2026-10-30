@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl;
 
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ChillData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
 import org.springframework.stereotype.Service;
@@ -8,7 +9,8 @@ import java.util.Optional;
 import java.util.SortedMap;
 
 /**
- * Outbound ACL service used by the assistant to read the harvest history and alternate bearing of a plot.
+ * Outbound ACL service used by the assistant to read the harvest history, alternate bearing and winter chill of a
+ * plot.
  */
 @Service("assistantExternalPhenologyService")
 public class ExternalPhenologyService {
@@ -58,5 +60,29 @@ public class ExternalPhenologyService {
      */
     public SortedMap<Integer, Double> findHistoricalYields(PlotId plotId) {
         return phenologyContextFacade.findHistoricalYields(plotId.plotId());
+    }
+
+    /**
+     * Reads the winter chill of the plot: the season the chill metric describes today and the one before it.
+     *
+     * @param plotId the assistant PlotId value object
+     * @return the chill data; a season Phenology cannot evaluate (no location, weather unavailable) is null
+     */
+    public ChillData findChillData(PlotId plotId) {
+        int seasonYear = phenologyContextFacade.currentChillSeasonYear();
+        var current = phenologyContextFacade.findChillSeason(plotId.plotId(), seasonYear).map(this::toSeason);
+        if (current.isEmpty()) {
+            // Without the current winter the screen has nothing to compare, so last winter is not read
+            return ChillData.NONE;
+        }
+        var lastWinter = phenologyContextFacade.findChillSeason(plotId.plotId(), seasonYear - 1).map(this::toSeason);
+        return new ChillData(current.get(), lastWinter.orElse(null));
+    }
+
+    private ChillData.Season toSeason(PhenologyContextFacade.PlotChillSeason season) {
+        return new ChillData.Season(season.seasonYear(), season.accumulatedPortions(), season.thresholdPortions(),
+                season.seasonState(), season.projectionStatus(), season.projectedCompletionDate(),
+                season.completionDate(), season.seasonEnd(), season.evaluatedThrough(), season.daysAbove24Celsius(),
+                season.warmDayCelsius(), season.dailyPortions());
     }
 }

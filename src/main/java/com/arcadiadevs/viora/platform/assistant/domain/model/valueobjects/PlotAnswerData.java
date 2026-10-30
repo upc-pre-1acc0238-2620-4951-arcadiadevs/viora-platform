@@ -18,6 +18,7 @@ import java.util.TreeMap;
  * @param plan             thinning plan of the current campaign; null when the plot was never sampled
  * @param climate          climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
  * @param home             data of the HOME screen, one plot or the whole field; {@link HomeData#NONE} otherwise
+ * @param chill            winter chill data of the WINTER_CHILL screen; {@link ChillData#NONE} otherwise
  */
 public record PlotAnswerData(
         PlotId plotId,
@@ -28,8 +29,33 @@ public record PlotAnswerData(
         SortedMap<Integer, Double> historicalYields,
         ThinningPlanData plan,
         ClimateData climate,
-        HomeData home
+        HomeData home,
+        ChillData chill
 ) {
+
+    /**
+     * Data of a screen that reads no chill data.
+     */
+    public PlotAnswerData(PlotId plotId, LocalDate today, int campaignYear, Double bearingIndex,
+            String bearingCategory, SortedMap<Integer, Double> historicalYields, ThinningPlanData plan,
+            ClimateData climate, HomeData home) {
+        this(plotId, today, campaignYear, bearingIndex, bearingCategory, historicalYields, plan, climate, home,
+                ChillData.NONE);
+    }
+
+    /**
+     * Data of the WINTER_CHILL screen.
+     *
+     * @param plotId       the plot
+     * @param today        current day in the producers' time zone
+     * @param campaignYear current campaign year
+     * @param chill        the current and last winter of the plot
+     * @return the data
+     */
+    public static PlotAnswerData ofChill(PlotId plotId, LocalDate today, int campaignYear, ChillData chill) {
+        return new PlotAnswerData(plotId, today, campaignYear, null, null, null, null, ClimateData.NONE,
+                HomeData.NONE, chill);
+    }
 
     /**
      * Data of a screen that reads no HOME data.
@@ -72,5 +98,6 @@ public record PlotAnswerData(
                 ? Collections.emptySortedMap()
                 : Collections.unmodifiableSortedMap(new TreeMap<>(historicalYields));
         climate = climate == null ? ClimateData.NONE : climate;
+        chill = chill == null ? ChillData.NONE : chill;
     }
 }
