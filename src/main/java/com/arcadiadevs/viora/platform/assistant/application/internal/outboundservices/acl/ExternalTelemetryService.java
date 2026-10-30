@@ -97,6 +97,18 @@ public class ExternalTelemetryService {
     }
 
     /**
+     * Days with readings of a plot over a period, as Telemetry counts them in the producers' time zone.
+     *
+     * @param plotId the assistant PlotId value object
+     * @param from   start of the period, inclusive
+     * @param to     end of the period, inclusive
+     * @return the days with at least one hourly reading
+     */
+    public int countDaysWithReadings(PlotId plotId, Instant from, Instant to) {
+        return telemetryContextFacade.findTelemetryCoverage(plotId.plotId(), from, to).daysWithReadings();
+    }
+
+    /**
      * Nodes and latest reading of a plot.
      *
      * @param nodes   the linked nodes

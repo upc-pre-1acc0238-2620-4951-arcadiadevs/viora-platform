@@ -17,6 +17,8 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeC
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeHarvestEstimateFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeWeekPlanFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IrrigateFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsHowLinkFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsReliabilityFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsSayFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BreakCycleFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfLessFactsAssembler;
@@ -58,7 +60,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL and PLOT_DETAIL questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL and SENSORS questions.
      *
      * @return the registry
      */
@@ -75,7 +77,9 @@ public final class FactsAssemblerRegistry {
                 new SensorsSayFactsAssembler(), new ChillMissingFactsAssembler(), new ChillReachFactsAssembler(),
                 new ChillVsLastWinterFactsAssembler(), new ChillIfIncompleteFactsAssembler(),
                 new PlotHowIsFactsAssembler(), new PlotTodayFactsAssembler(), new PlotLastSamplingFactsAssembler(),
-                new NextYearFactsAssembler(QuestionId.PLOT_NEXT_YEAR_HARVEST)));
+                new NextYearFactsAssembler(QuestionId.PLOT_NEXT_YEAR_HARVEST),
+                new SensorsSayFactsAssembler(QuestionId.SENSORS_WHAT_SAY), new SensorsReliabilityFactsAssembler(),
+                new SensorsHowLinkFactsAssembler()));
     }
 
     /**
