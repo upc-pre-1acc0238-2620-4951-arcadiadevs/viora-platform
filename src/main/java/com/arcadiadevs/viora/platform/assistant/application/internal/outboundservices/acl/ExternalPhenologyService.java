@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextF
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.SortedMap;
 
 /**
  * Outbound ACL service used by the assistant to read the harvest history and alternate bearing of a plot.
@@ -37,5 +38,25 @@ public class ExternalPhenologyService {
      */
     public int countHistoricalCampaigns(PlotId plotId) {
         return phenologyContextFacade.findHistoricalYields(plotId.plotId()).size();
+    }
+
+    /**
+     * Resolves the latest Biennial Bearing Index of the plot with its alternation band.
+     *
+     * @param plotId the assistant PlotId value object
+     * @return the index and band, or empty while there are too few campaigns to classify it
+     */
+    public Optional<PhenologyContextFacade.PlotBearingIndex> findBearingIndexWithBand(PlotId plotId) {
+        return phenologyContextFacade.findBiennialBearingIndex(plotId.plotId());
+    }
+
+    /**
+     * Reads the registered harvests of the plot.
+     *
+     * @param plotId the assistant PlotId value object
+     * @return total kilograms per campaign year, ascending
+     */
+    public SortedMap<Integer, Double> findHistoricalYields(PlotId plotId) {
+        return phenologyContextFacade.findHistoricalYields(plotId.plotId());
     }
 }
