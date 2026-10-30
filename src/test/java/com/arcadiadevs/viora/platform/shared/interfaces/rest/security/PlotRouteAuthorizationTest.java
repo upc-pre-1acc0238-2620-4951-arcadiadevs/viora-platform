@@ -40,14 +40,15 @@ class PlotRouteAuthorizationTest {
     }
 
     /**
-     * A route can also take the plot as a query parameter, as the assistant does. The rule is scoped to the
-     * assistant: older controllers filtering by an optional {@code plotId} check the owner in their services.
+     * A route can also take the plot as a query parameter, as the assistant and the plot filtered lists do. Method
+     * security answers a foreign plot with the same 403 as the {@code /plots/{plotId}/} routes, even when the
+     * service also checks the owner.
      */
     @Test
-    void everyAssistantRouteTakingAPlotParameterChecksItsOwner() throws Exception {
+    void everyRouteTakingAPlotParameterChecksItsOwner() throws Exception {
         var routes = new ArrayList<String>();
         var missing = new ArrayList<String>();
-        for (var controller : controllers(BASE_PACKAGE + ".assistant")) {
+        for (var controller : controllers(BASE_PACKAGE)) {
             var classRule = AnnotatedElementUtils.findMergedAnnotation(controller, PreAuthorize.class);
             for (Method method : controller.getDeclaredMethods()) {
                 if (AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class) == null
@@ -63,7 +64,7 @@ class PlotRouteAuthorizationTest {
                 }
             }
         }
-        assertFalse(routes.isEmpty(), "the assistant exposes no route taking a plotId parameter");
+        assertFalse(routes.isEmpty(), "no route takes a plotId parameter");
         assertEquals(List.of(), missing);
     }
 

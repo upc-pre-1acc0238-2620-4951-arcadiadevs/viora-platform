@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -61,6 +62,7 @@ public class ThinningEventController {
      * @return 200 OK with ThinningEventsResource, or RFC 7807 error
      */
     @GetMapping
+    @PreAuthorize("@plotAccess.isAccessible(#plotId)")
     @Operation(
             summary = "Get thinning lifecycle events",
             description = "Retrieves completed sampling rounds and executed thinning operations as chronological events for the field logbook."
@@ -72,6 +74,7 @@ public class ThinningEventController {
                     content = @Content(schema = @Schema(implementation = ThinningEventsResource.class))
             ),
             @ApiResponse(responseCode = "400", description = "Invalid UUID format or campaign year"),
+            @ApiResponse(responseCode = "403", description = "The plot belongs to another producer"),
             @ApiResponse(responseCode = "404", description = "Plot not found or not active in orchard context")
     })
     public ResponseEntity<?> getThinningEvents(

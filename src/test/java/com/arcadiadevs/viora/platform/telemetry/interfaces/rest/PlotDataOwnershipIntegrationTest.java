@@ -114,6 +114,36 @@ class PlotDataOwnershipIntegrationTest {
     }
 
     @Test
+    @DisplayName("The lists filtered by plot answer the same 403 problem to another producer and 200 to the owner")
+    void plotFilteredListsAnswerTheSameToAnotherProducer() throws Exception {
+        for (var path : List.of("/api/v1/agroclimatic-incidents", "/api/v1/thinning-events")) {
+            authenticateAs(bruno);
+            mvc.perform(get(path).param("plotId", anaPlot).header("Accept-Language", "en"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value(403))
+                    .andExpect(jsonPath("$.title").value("Forbidden"))
+                    .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"))
+                    .andExpect(jsonPath("$.detail").value("Access denied"))
+                    .andExpect(jsonPath("$.instance").value(path));
+
+            authenticateAs(ana);
+            mvc.perform(get(path).param("plotId", anaPlot))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("The lists filtered by plot still answer 404 for a plot that does not exist")
+    void plotFilteredListsAnswerNotFoundForAnUnknownPlot() throws Exception {
+        authenticateAs(bruno);
+
+        for (var path : List.of("/api/v1/agroclimatic-incidents", "/api/v1/thinning-events")) {
+            mvc.perform(get(path).param("plotId", UUID.randomUUID().toString()))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
     @DisplayName("Another producer can neither open, postpone nor complete a step of the alert, which is left untouched")
     void anotherProducerCannotActOnTheAlert() throws Exception {
         authenticateAs(bruno);
