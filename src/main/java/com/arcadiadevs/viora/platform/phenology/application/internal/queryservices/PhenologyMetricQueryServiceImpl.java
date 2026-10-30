@@ -2,12 +2,12 @@ package com.arcadiadevs.viora.platform.phenology.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.phenology.application.internal.chill.ChillSeasonReader;
 import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.phenology.application.internal.outboundservices.weather.HourlyTemperatureProvider;
 import com.arcadiadevs.viora.platform.phenology.application.queryservices.PhenologyMetricQueryService;
 import com.arcadiadevs.viora.platform.phenology.domain.model.queries.GetPlotMetricsQuery;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.ChillSeasonEvaluation;
-import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.HourlyTemperature;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.MetricEvaluationResult;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.MetricType;
 import com.arcadiadevs.viora.platform.phenology.domain.model.valueobjects.PlotId;
@@ -44,7 +44,7 @@ public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryServ
 
     private final ChillAccumulationTrackerRepository trackerRepository;
     private final ExternalOrchardService externalOrchardService;
-    private final HourlyTemperatureProvider temperatureProvider;
+    private final ChillSeasonReader chillSeasonReader;
     private final Clock clock;
 
     /**
@@ -63,7 +63,7 @@ public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryServ
     ) {
         this.trackerRepository = trackerRepository;
         this.externalOrchardService = externalOrchardService;
-        this.temperatureProvider = temperatureProvider;
+        this.chillSeasonReader = new ChillSeasonReader(temperatureProvider);
         this.clock = clock;
     }
 
@@ -131,16 +131,12 @@ public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryServ
         int seasonYear = ChillSeasonEvaluator.seasonYearFor(today);
         double threshold = ErezDynamicModelCalculator.DEFAULT_VARIETAL_CHILL_THRESHOLD;
 
-        var currentHours = seasonHours(latitude, longitude, seasonYear, today);
-        if (currentHours.isEmpty()) {
+        var evaluated = chillSeasonReader.evaluate(latitude, longitude, seasonYear, today);
+        if (evaluated.isEmpty()) {
             return Result.failure(ApplicationError.unavailable("chill-weather", plotId.plotId()));
         }
-        var current = ChillSeasonEvaluator.evaluate(seasonYear, currentHours.get(), threshold, today);
-
-        var previousEnd = ChillSeasonEvaluator.seasonEnd(seasonYear - 1);
-        var previous = seasonHours(latitude, longitude, seasonYear - 1, today)
-                .map(hours -> ChillSeasonEvaluator.evaluate(seasonYear - 1, hours, threshold, previousEnd.plusDays(1)))
-                .orElse(null);
+        var current = evaluated.get();
+        var previous = chillSeasonReader.evaluateWholeSeason(latitude, longitude, seasonYear - 1).orElse(null);
 
         return Result.success(new MetricEvaluationResult(
                 MetricType.EREZ_CHILLING_PORTIONS,
@@ -149,17 +145,6 @@ public class PhenologyMetricQueryServiceImpl implements PhenologyMetricQueryServ
                 chillDetails(current, previous),
                 clock.instant()
         ));
-    }
-
-    private Optional<List<HourlyTemperature>> seasonHours(double latitude, double longitude, int seasonYear, LocalDate today) {
-        var from = ChillSeasonEvaluator.seasonStart(seasonYear);
-        var seasonEnd = ChillSeasonEvaluator.seasonEnd(seasonYear);
-        var yesterday = today.minusDays(1);
-        var to = yesterday.isBefore(seasonEnd) ? yesterday : seasonEnd;
-        if (to.isBefore(from)) {
-            return Optional.of(List.of());
-        }
-        return temperatureProvider.fetchHourlyTemperatures(latitude, longitude, from, to);
     }
 
     private static Map<String, Object> chillDetails(ChillSeasonEvaluation current, ChillSeasonEvaluation previous) {

@@ -43,7 +43,8 @@ class PhenologyContextFacadeImplTest {
 
     @BeforeEach
     void setUp() {
-        facade = new PhenologyContextFacadeImpl(harvestRecordQueryService, externalOrchardService, temperatureProvider);
+        facade = new PhenologyContextFacadeImpl(harvestRecordQueryService, externalOrchardService, temperatureProvider,
+                java.time.Clock.systemUTC());
     }
 
     @Test
