@@ -19,7 +19,10 @@ public enum ScreenKey {
     ALERT,
 
     /** Climate of a plot: forecast and sensors (P90, P130-P132). */
-    CLIMATE;
+    CLIMATE,
+
+    /** Winter chill of a plot: Erez chill portions of the season (P80, P133-P135). */
+    WINTER_CHILL;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -42,12 +45,22 @@ public enum ScreenKey {
     }
 
     /**
-     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}.
+     * Whether the questions of the screen answer from the winter chill season of the plot (Phenology).
+     *
+     * @return true for WINTER_CHILL
+     */
+    public boolean readsChill() {
+        return this == WINTER_CHILL;
+    }
+
+    /**
+     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL questions use the
+     * shorter {@code chill.} of the contract.
      *
      * @return the prefix
      */
     public String questionPrefix() {
-        return name().toLowerCase(Locale.ROOT) + ".";
+        return this == WINTER_CHILL ? "chill." : name().toLowerCase(Locale.ROOT) + ".";
     }
 
     /**

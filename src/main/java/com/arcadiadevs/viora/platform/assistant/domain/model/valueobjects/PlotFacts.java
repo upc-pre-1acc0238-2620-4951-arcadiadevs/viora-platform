@@ -14,6 +14,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
  * @param treesNeeded         trees still missing for a representative sampling
  * @param climate             climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
  * @param home                data of the HOME screen; {@link HomeData#NONE} otherwise
+ * @param chill               winter chill data of the WINTER_CHILL screen; {@link ChillData#NONE} otherwise
  */
 public record PlotFacts(
         int campaignYear,
@@ -25,12 +26,24 @@ public record PlotFacts(
         int sampledTrees,
         int treesNeeded,
         ClimateData climate,
-        HomeData home
+        HomeData home,
+        ChillData chill
 ) {
 
     public PlotFacts {
         climate = climate == null ? ClimateData.NONE : climate;
         home = home == null ? HomeData.NONE : home;
+        chill = chill == null ? ChillData.NONE : chill;
+    }
+
+    /**
+     * Facts of a screen that reads no chill data.
+     */
+    public PlotFacts(int campaignYear, Double bearingIndex, int historicalCampaigns, boolean caliberEstimated,
+            boolean prescriptionIssued, Double percentageToRemove, int sampledTrees, int treesNeeded,
+            ClimateData climate, HomeData home) {
+        this(campaignYear, bearingIndex, historicalCampaigns, caliberEstimated, prescriptionIssued,
+                percentageToRemove, sampledTrees, treesNeeded, climate, home, ChillData.NONE);
     }
 
     /**
@@ -72,5 +85,17 @@ public record PlotFacts(
      */
     public static PlotFacts ofHome(int campaignYear, HomeData home) {
         return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, ClimateData.NONE, home);
+    }
+
+    /**
+     * Facts of the WINTER_CHILL screen: only the chill seasons of the plot matter.
+     *
+     * @param campaignYear current campaign year
+     * @param chill        the current and last winter of the plot
+     * @return the facts
+     */
+    public static PlotFacts ofChill(int campaignYear, ChillData chill) {
+        return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, ClimateData.NONE, HomeData.NONE,
+                chill);
     }
 }

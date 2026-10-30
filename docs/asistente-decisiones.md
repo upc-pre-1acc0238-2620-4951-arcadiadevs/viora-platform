@@ -157,3 +157,27 @@ El dueño eligió "completo": HOME responde para un lote o, sin `plotId`, para t
 
 - **Total de kilos del campo.** Si el dueño quiere un total, decidir qué superficie usar (polígono o plantada) y si se suma kg/ha × ha.
 - **Lotes sin muestreo en "esta semana".** Decidir con el agrónomo si un lote sin ningún muestreo en temporada debe aparecer como pendiente.
+
+## Pantalla Frío (WINTER_CHILL)
+
+Preguntas del contrato: `chill.missing`, `chill.reach_30`, `chill.vs_last_winter` y `chill.if_incomplete`. Los datos salen de Fenología (`PhenologyContextFacade.findChillSeason`), con el mismo modelo dinámico de Erez, el mismo clima horario de Open-Meteo y el mismo requisito varietal (`DEFAULT_VARIETAL_CHILL_THRESHOLD`, 30) que la métrica de frío; el asistente nunca recalcula porciones.
+
+- **2026-10-30 · Qué invierno.** El de la métrica de frío (`ChillSeasonEvaluator.seasonYearFor`): del 1 de junio al 31 de agosto, el invierno en curso; del 1 de septiembre al 31 de mayo, el último invierno terminado. Fuera de temporada no se deshabilita la pantalla: responde sobre ese invierno y las etiquetas nombran su año ("¿Cuánto frío acumuló el invierno 2026?"). Es lo mismo que ya muestra la pantalla de frío fuera de temporada.
+- **2026-10-30 · Invierno pasado.** Es el año anterior al invierno de la pantalla, evaluado en toda su temporada. En temporada se compara a la misma fecha (porciones del invierno pasado el mismo día del año) y se dice cómo terminó; si ese día no tiene datos, solo su total. Fuera de temporada se comparan los dos totales y los días sobre 24 °C.
+- **2026-10-30 · Brotación.** La fecha de brotación de la pantalla es el 31 de agosto, fin de la temporada de frío, como en el mockup del contrato ("fecha estimada 4 ago vs brotación 31 ago"); no es una brotación observada en el lote. Pendiente de validar con el agrónomo junto con la regla de >24 °C y las 30 porciones.
+- **2026-10-30 · Fecha estimada.** `chill.reach_30` da la fecha que proyecta Fenología con el ritmo de los últimos 14 días (`PROJECTED`) y la llama "estimación". Si a ese ritmo no llega antes del 31 de agosto (`NOT_REACHABLE_IN_SEASON`) lo dice y da lo que falta. Con menos de 14 días evaluados (`INSUFFICIENT_DATA`) la pregunta se deshabilita: "Faltan días de invierno para estimar la fecha". Si ya completó el requisito, da el día en que lo hizo.
+- **2026-10-30 · Sin datos.** Sin ubicación del lote, con el clima no disponible o sin ningún día evaluado (1 de junio) las cuatro preguntas se deshabilitan con "Sin datos de frío para este lote todavía". Sin datos del invierno pasado solo se deshabilita la comparación ("Sin datos del invierno pasado para este lote").
+- **2026-10-30 · Cifras.** Las porciones se muestran con un decimal y lo que falta es el requisito menos las porciones mostradas, así las dos cifras suman el requisito (24,4 + 5,6 = 30).
+- **2026-10-30 · "¿Qué pasa si no llego?".** Redacción conservadora y sin cifras de efecto: con frío insuficiente la brotación y la floración pueden salir más tardías y desparejas, y se remite al técnico (mismo tono que las alertas). Viora no estima el efecto en la cosecha. Pendiente de validar con el agrónomo.
+- **2026-10-30 · Fuente.** "Modelo de frío de Erez con el clima horario de Open-Meteo, hasta el {día}". El contrato dice "estación de frío EREZ", pero el dato no sale de una estación en el lote sino del clima horario del punto central del lote; la fuente lo dice así para no inducir a error.
+- **2026-10-30 · Identificador `chill.reach_30`.** Se mantiene el del contrato; el formato de `QuestionId` ahora admite dígitos en las palabras después de la primera.
+- **2026-10-30 · Caché de Fenología.** `findChillSeason` lee el clima (segundos), así que guarda cada temporada por lote y año: 30 minutos un invierno en curso y 24 horas uno terminado (Open-Meteo corrige días recientes). Un fallo del clima o de Orchard devuelve vacío y no se guarda. Un candado por lote y temporada evita que pedidos simultáneos llamen varias veces al proveedor; solo se guardan lotes con ubicación y las entradas vencidas se borran al guardar. Corre fuera de transacción. La métrica de frío y la fachada comparten la lectura en `ChillSeasonReader`; `WinterWarmthMonitor` queda igual.
+
+### Seguimiento de la verificación de frío (2026-10-30)
+
+El verificador independiente aprobó la rama `feature/assistant-winter-chill` sin bloqueos (la fachada coincide con la métrica CHILLING campo por campo; 300 pedidos concurrentes sobre 3 lotes × 2 temporadas hicieron 6 lecturas del clima). La revisión nativa se omitió por decisión del dueño. Pendiente para un parche:
+
+- **Redondeo justo debajo del umbral.** Con 29,96 porciones sin completar, el redondeo a un decimal muestra "30 de 30 … le faltan 0" (`ChillFactsAssembler`). Mostrar "le falta menos de 0,1" o no redondear hacia el umbral.
+- **Mapa de locks sin limpieza.** `seasonLocks` en `PhenologyContextFacadeImpl` guarda un lock por lote y temporada consultada durante toda la vida del proceso (acotado por lotes reales, unas 2 por lote al año).
+- **Desfase por la caché.** Hasta 30 minutos después de medianoche o del 31 de agosto la fachada puede mostrar un día menos evaluado o el estado anterior que la métrica.
+- **Temporadas antiguas.** `findChillSeason` acepta cualquier temporada pasada de un lote real y la guarda; hoy solo se piden la actual y la anterior.

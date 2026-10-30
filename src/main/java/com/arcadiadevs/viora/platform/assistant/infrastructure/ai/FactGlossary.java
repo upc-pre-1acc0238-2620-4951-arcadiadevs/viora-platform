@@ -36,7 +36,12 @@ final class FactGlossary {
             Map.entry("climate.fruitset_effect",
                     "how the forecast heat affects fruit set; the platform does not estimate that effect, say so"),
             Map.entry("climate.heat_ends", "until when the forecast reaches the heat threshold"),
-            Map.entry("climate.sensors_say", "what the latest reading of the plot says"));
+            Map.entry("climate.sensors_say", "what the latest reading of the plot says"),
+            Map.entry("chill.missing", "how many Erez chill portions the plot has and how many it still needs"),
+            Map.entry("chill.reach_30", "when the plot reaches its chill requirement, against the budbreak date"),
+            Map.entry("chill.vs_last_winter", "how the chill of this winter compares with last winter"),
+            Map.entry("chill.if_incomplete", "what too little chill may mean; Viora does not estimate the effect, "
+                    + "point to the technician"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -115,7 +120,26 @@ final class FactGlossary {
             Map.entry("linkedNodes", "nodes linked to the plot"),
             Map.entry("simulated", "true when the data source is simulated (virtual node)"),
             Map.entry("airTemperature", "latest air temperature, °C"),
-            Map.entry("airHumidity", "latest air relative humidity, %"));
+            Map.entry("airHumidity", "latest air relative humidity, %"),
+            Map.entry("seasonYear", "year of the winter the answer is about"),
+            Map.entry("accumulatedPortions", "Erez chill portions accumulated up to evaluatedThrough"),
+            Map.entry("thresholdPortions", "chill portions the variety needs"),
+            Map.entry("missingPortions", "portions still missing to reach thresholdPortions"),
+            Map.entry("evaluatedThrough", "last day with weather counted"),
+            Map.entry("seasonState", "IN_PROGRESS, HALTED (warm spell), COMPLETED or OFF_SEASON (winter over)"),
+            Map.entry("completionDate", "day thresholdPortions was reached"),
+            Map.entry("projectionStatus", "whether a completion date could be projected from the recent pace"),
+            Map.entry("projectedCompletionDate", "day thresholdPortions would be reached at the recent pace; "
+                    + "an estimate"),
+            Map.entry("budbreakOn", "budbreak reference date, the end of the chill season"),
+            Map.entry("marginDays", "days between the (projected) completion and budbreakOn"),
+            Map.entry("warmDayCelsius", "maximum above which a winter day counts as warm, °C"),
+            Map.entry("daysAbove24Celsius", "winter days whose maximum was above warmDayCelsius"),
+            Map.entry("lastWinterYear", "year of last winter"),
+            Map.entry("lastWinterPortions", "chill portions of the whole last winter"),
+            Map.entry("lastWinterSameDatePortions", "chill portions last winter had on the same date"),
+            Map.entry("lastWinterCompletionDate", "day last winter reached thresholdPortions"),
+            Map.entry("lastWinterDaysAbove24Celsius", "days of last winter whose maximum was above warmDayCelsius"));
 
     private FactGlossary() {
     }

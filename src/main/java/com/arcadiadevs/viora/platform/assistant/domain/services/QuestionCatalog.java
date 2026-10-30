@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.services;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ChillData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
@@ -35,7 +36,9 @@ public final class QuestionCatalog {
             ScreenKey.ALERT, List.of(QuestionId.ALERT_WHAT_TO_DO, QuestionId.ALERT_FRUITSET_EFFECT,
                     QuestionId.ALERT_WHEN_ENDS, QuestionId.ALERT_PLOTS_AT_RISK),
             ScreenKey.CLIMATE, List.of(QuestionId.CLIMATE_IRRIGATE, QuestionId.CLIMATE_FRUITSET_EFFECT,
-                    QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY));
+                    QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY),
+            ScreenKey.WINTER_CHILL, List.of(QuestionId.CHILL_MISSING, QuestionId.CHILL_REACH_30,
+                    QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE));
 
     private QuestionCatalog() {
     }
@@ -67,6 +70,7 @@ public final class QuestionCatalog {
             case PLAN -> plan(facts);
             case ALERT -> alert(facts.climate());
             case CLIMATE -> climate(facts.climate());
+            case WINTER_CHILL -> chill(facts.chill());
         };
     }
 
@@ -195,6 +199,48 @@ public final class QuestionCatalog {
                         forecastMissing),
                 question(QuestionId.CLIMATE_SENSORS_SAY, label(QuestionId.CLIMATE_SENSORS_SAY, "label"), "sensor",
                         sensorsMissing));
+    }
+
+    /**
+     * The WINTER_CHILL screen is about the season the chill metric describes: the winter in progress from June 1 to
+     * August 31, otherwise the last finished one, whose year the labels name. Without an evaluated day every question
+     * is disabled; the date needs 14 evaluated days to be projected (or the requirement already reached) and the
+     * comparison needs last winter.
+     */
+    private static List<CatalogQuestion> chill(ChillData chill) {
+        if (!chill.evaluated()) {
+            var missing = CatalogText.of("assistant.reason.chill_missing");
+            return List.of(
+                    question(QuestionId.CHILL_MISSING, label(QuestionId.CHILL_MISSING, "label"), "temp", missing),
+                    question(QuestionId.CHILL_REACH_30, label(QuestionId.CHILL_REACH_30, "label_without_threshold"),
+                            "calendar", missing),
+                    question(QuestionId.CHILL_VS_LAST_WINTER, label(QuestionId.CHILL_VS_LAST_WINTER, "label"),
+                            "history", missing),
+                    question(QuestionId.CHILL_IF_INCOMPLETE,
+                            label(QuestionId.CHILL_IF_INCOMPLETE, "label_without_threshold"), "alert", missing));
+        }
+        var current = chill.current();
+        double threshold = current.thresholdPortions();
+        boolean closed = current.closed();
+        String year = String.valueOf(current.seasonYear());
+        String lastYear = String.valueOf(current.seasonYear() - 1);
+        CatalogText paceMissing = current.inProgress()
+                && ChillData.Season.INSUFFICIENT_DATA.equals(current.projectionStatus())
+                ? CatalogText.of("assistant.reason.chill_pace_missing") : null;
+        return List.of(
+                question(QuestionId.CHILL_MISSING, closed
+                        ? label(QuestionId.CHILL_MISSING, "label.closed", year)
+                        : label(QuestionId.CHILL_MISSING, "label"), "temp", null),
+                question(QuestionId.CHILL_REACH_30, closed
+                        ? label(QuestionId.CHILL_REACH_30, "label.closed", threshold, year)
+                        : label(QuestionId.CHILL_REACH_30, "label", threshold), "calendar", paceMissing),
+                question(QuestionId.CHILL_VS_LAST_WINTER, closed
+                        ? label(QuestionId.CHILL_VS_LAST_WINTER, "label.closed", year, lastYear)
+                        : label(QuestionId.CHILL_VS_LAST_WINTER, "label"), "history",
+                        chill.lastWinterEvaluated() ? null : CatalogText.of("assistant.reason.last_winter_missing")),
+                question(QuestionId.CHILL_IF_INCOMPLETE, closed
+                        ? label(QuestionId.CHILL_IF_INCOMPLETE, "label.closed", threshold, year)
+                        : label(QuestionId.CHILL_IF_INCOMPLETE, "label", threshold), "alert", null));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

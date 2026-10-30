@@ -49,7 +49,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
      *
      * @param externalSubscriptionService tells whether the producer's plan is active
      * @param externalOrchardService      verifies the plot
-     * @param externalPhenologyService    reads the harvest history and the bearing index
+     * @param externalPhenologyService    reads the harvest history, the bearing index and the winter chill
      * @param externalThinningService     reads the prescription and the caliber projection
      * @param climateDataReader           reads the alerts, forecast and nodes of the ALERT and CLIMATE screens
      * @param homeDataReader              reads the plot, or every active plot of the producer, for HOME
@@ -113,6 +113,9 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
             return PlotFacts.ofHome(campaignYear, homeDataReader == null
                     ? new HomeData(plotId == null, List.of(), null)
                     : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
+        }
+        if (screen.readsChill()) {
+            return PlotFacts.ofChill(campaignYear, externalPhenologyService.findChillData(plotId));
         }
         if (screen.readsClimate()) {
             return PlotFacts.ofClimate(campaignYear,
