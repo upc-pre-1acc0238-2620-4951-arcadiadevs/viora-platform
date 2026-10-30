@@ -13,6 +13,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
  * @param sampledTrees        distinct trees sampled in the current campaign
  * @param treesNeeded         trees still missing for a representative sampling
  * @param climate             climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
+ * @param home                data of the HOME screen; {@link HomeData#NONE} otherwise
  */
 public record PlotFacts(
         int campaignYear,
@@ -23,11 +24,23 @@ public record PlotFacts(
         Double percentageToRemove,
         int sampledTrees,
         int treesNeeded,
-        ClimateData climate
+        ClimateData climate,
+        HomeData home
 ) {
 
     public PlotFacts {
         climate = climate == null ? ClimateData.NONE : climate;
+        home = home == null ? HomeData.NONE : home;
+    }
+
+    /**
+     * Facts of a screen that reads no HOME data.
+     */
+    public PlotFacts(int campaignYear, Double bearingIndex, int historicalCampaigns, boolean caliberEstimated,
+            boolean prescriptionIssued, Double percentageToRemove, int sampledTrees, int treesNeeded,
+            ClimateData climate) {
+        this(campaignYear, bearingIndex, historicalCampaigns, caliberEstimated, prescriptionIssued,
+                percentageToRemove, sampledTrees, treesNeeded, climate, HomeData.NONE);
     }
 
     /**
@@ -48,5 +61,16 @@ public record PlotFacts(
      */
     public static PlotFacts ofClimate(int campaignYear, ClimateData climate) {
         return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, climate);
+    }
+
+    /**
+     * Facts of the HOME screen: only the plot or the active plots of the field matter.
+     *
+     * @param campaignYear current campaign year
+     * @param home         the plot or the active plots of the producer
+     * @return the facts
+     */
+    public static PlotFacts ofHome(int campaignYear, HomeData home) {
+        return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, ClimateData.NONE, home);
     }
 }

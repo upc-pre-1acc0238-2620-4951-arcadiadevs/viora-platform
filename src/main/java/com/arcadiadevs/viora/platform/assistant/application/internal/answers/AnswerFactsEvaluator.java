@@ -43,7 +43,7 @@ public class AnswerFactsEvaluator {
      *
      * @param producerId producer asking
      * @param questionId the question
-     * @param plotId     the plot
+     * @param plotId     the plot; null for a HOME question about the producer's whole field
      * @return the assessment, or the catalog error (no active plan, unknown plot, unknown question)
      */
     public Result<AnswerAssessment, ApplicationError> assess(String producerId, QuestionId questionId,
@@ -67,7 +67,7 @@ public class AnswerFactsEvaluator {
                     if (assembler.isEmpty()) {
                         return new AnswerAssessment.Unavailable(CatalogText.of(FACTS_MISSING));
                     }
-                    return assembler.get().assemble(dataReader.read(screen.get(), plotId))
+                    return assembler.get().assemble(dataReader.read(screen.get(), producerId, plotId))
                             .<AnswerAssessment>map(AnswerAssessment.Available::new)
                             .orElseGet(() -> new AnswerAssessment.Unavailable(CatalogText.of(FACTS_MISSING)));
                 });

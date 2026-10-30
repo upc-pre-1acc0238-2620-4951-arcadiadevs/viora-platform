@@ -11,6 +11,10 @@ public record QuestionId(String value) {
 
     private static final Pattern FORMAT = Pattern.compile("[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z]+)*");
 
+    public static final QuestionId HOME_WEEK_PLAN = new QuestionId("home.week_plan");
+    public static final QuestionId HOME_CAMPAIGN_VS_PREVIOUS = new QuestionId("home.campaign_vs_previous");
+    public static final QuestionId HOME_ALERTS_AFFECTING = new QuestionId("home.alerts_affecting");
+    public static final QuestionId HOME_HARVEST_ESTIMATE = new QuestionId("home.harvest_estimate");
     public static final QuestionId ALTERNATION_WHY_INDEX = new QuestionId("alternation.why_index");
     public static final QuestionId ALTERNATION_BREAK_CYCLE = new QuestionId("alternation.break_cycle");
     public static final QuestionId ALTERNATION_VS_CAMPAIGNS = new QuestionId("alternation.vs_campaigns");

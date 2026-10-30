@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.services;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -25,6 +26,8 @@ public final class QuestionCatalog {
 
     /** Questions of each screen, in display order. */
     private static final Map<ScreenKey, List<QuestionId>> QUESTIONS = Map.of(
+            ScreenKey.HOME, List.of(QuestionId.HOME_WEEK_PLAN, QuestionId.HOME_CAMPAIGN_VS_PREVIOUS,
+                    QuestionId.HOME_ALERTS_AFFECTING, QuestionId.HOME_HARVEST_ESTIMATE),
             ScreenKey.ALTERNATION, List.of(QuestionId.ALTERNATION_WHY_INDEX, QuestionId.ALTERNATION_BREAK_CYCLE,
                     QuestionId.ALTERNATION_VS_CAMPAIGNS, QuestionId.ALTERNATION_NEXT_YEAR),
             ScreenKey.PLAN, List.of(QuestionId.PLAN_WHY_PERCENT, QuestionId.PLAN_IF_LESS, QuestionId.PLAN_IF_NONE,
@@ -59,11 +62,33 @@ public final class QuestionCatalog {
      */
     public static List<CatalogQuestion> questionsFor(ScreenKey screen, PlotFacts facts) {
         return switch (screen) {
+            case HOME -> home(facts.home());
             case ALTERNATION -> alternation(facts);
             case PLAN -> plan(facts);
             case ALERT -> alert(facts.climate());
             case CLIMATE -> climate(facts.climate());
         };
+    }
+
+    /**
+     * The HOME screen, about one plot or the producer's whole field: the week plan needs an active plot, the
+     * comparison two campaigns of the same plots and the estimate an estimated caliber. The alerts question is
+     * always offered; without alerts it says so.
+     */
+    private static List<CatalogQuestion> home(HomeData home) {
+        var alertsLabel = home.fieldScope()
+                ? label(QuestionId.HOME_ALERTS_AFFECTING, "label.field")
+                : label(QuestionId.HOME_ALERTS_AFFECTING, "label");
+        return List.of(
+                question(QuestionId.HOME_WEEK_PLAN, label(QuestionId.HOME_WEEK_PLAN, "label"), "calendar",
+                        home.activePlots() > 0 ? null : CatalogText.of("assistant.reason.plots_missing")),
+                question(QuestionId.HOME_CAMPAIGN_VS_PREVIOUS, label(QuestionId.HOME_CAMPAIGN_VS_PREVIOUS, "label"),
+                        "history", home.campaignComparison().isPresent()
+                                ? null : CatalogText.of("assistant.reason.campaigns_missing")),
+                question(QuestionId.HOME_ALERTS_AFFECTING, alertsLabel, "alert", null),
+                question(QuestionId.HOME_HARVEST_ESTIMATE, label(QuestionId.HOME_HARVEST_ESTIMATE, "label"),
+                        "harvest", home.caliberEstimates().isEmpty()
+                                ? CatalogText.of("assistant.reason.caliber_missing") : null));
     }
 
     private static List<CatalogQuestion> alternation(PlotFacts facts) {

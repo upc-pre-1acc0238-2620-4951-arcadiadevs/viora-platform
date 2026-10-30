@@ -6,6 +6,8 @@ import java.util.Locale;
  * Screen of the app the assistant is opened from. Each screen has its own closed set of questions.
  */
 public enum ScreenKey {
+    /** Home of the producer (P110-P113): about one plot or, without plot, the producer's whole field. */
+    HOME,
 
     /** Alternate bearing of a plot (P40, P114-P119). */
     ALTERNATION,
@@ -20,12 +22,13 @@ public enum ScreenKey {
     CLIMATE;
 
     /**
-     * Whether the questions of the screen are about one plot, so the request must name it.
+     * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
+     * without a plot its questions are about every active plot of the producer.
      *
-     * @return true for plot screens
+     * @return true for plot screens, false for HOME
      */
     public boolean requiresPlot() {
-        return true;
+        return this != HOME;
     }
 
     /**

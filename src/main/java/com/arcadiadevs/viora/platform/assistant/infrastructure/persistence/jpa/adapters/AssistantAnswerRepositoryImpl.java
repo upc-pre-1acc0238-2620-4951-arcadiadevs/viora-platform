@@ -99,7 +99,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
             String locale, DataVersion dataVersion, Instant since) {
         return answers
                 .findFirstByProducerIdAndQuestionIdAndPlotIdAndLocaleAndDataVersionAndCreatedAtGreaterThanOrderByCreatedAtDesc(
-                        producerId, questionId.value(), plotId.plotId(), locale, dataVersion.value(), since)
+                        producerId, questionId.value(), plotValue(plotId), locale, dataVersion.value(), since)
                 .map(AssistantAnswerRepositoryImpl::toDomain);
     }
 
@@ -116,7 +116,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
             Instant since) {
         return answers
                 .findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-                        producerId, plotId.plotId(), questionPrefix, since)
+                        producerId, plotValue(plotId), questionPrefix, since)
                 .map(AssistantAnswerRepositoryImpl::toDomain);
     }
 
@@ -134,12 +134,20 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
         return answers.deleteCreatedBefore(cutoff);
     }
 
+    /**
+     * The stored plot; null for the whole field. A derived query turns a null argument into {@code plot_id IS NULL},
+     * so a field answer only matches a field question and a plot answer only its plot.
+     */
+    private static String plotValue(PlotId plotId) {
+        return plotId == null ? null : plotId.plotId();
+    }
+
     private static AssistantAnswerPersistenceEntity toEntity(AssistantAnswer answer) {
         var entity = new AssistantAnswerPersistenceEntity();
         entity.setId(answer.id());
         entity.setClientRequestId(answer.clientRequestId());
         entity.setProducerId(answer.producerId());
-        entity.setPlotId(answer.plotId().plotId());
+        entity.setPlotId(plotValue(answer.plotId()));
         entity.setQuestionId(answer.questionId().value());
         entity.setLocale(answer.locale());
         entity.setDataVersion(answer.dataVersion().value());
@@ -161,7 +169,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
                 entity.getId(),
                 entity.getClientRequestId(),
                 entity.getProducerId(),
-                new PlotId(entity.getPlotId()),
+                entity.getPlotId() == null ? null : new PlotId(entity.getPlotId()),
                 new QuestionId(entity.getQuestionId()),
                 entity.getLocale(),
                 new DataVersion(entity.getDataVersion()),
