@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.outboundse
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade;
+import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.CampaignThinningPlan;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
 import org.springframework.stereotype.Service;
 
@@ -28,5 +29,16 @@ public class ExternalThinningService {
      */
     public Optional<PrescriptionAvailability> findPrescriptionAvailability(PlotId plotId, int campaignYear) {
         return thinningContextFacade.findPrescriptionAvailability(plotId.plotId(), campaignYear);
+    }
+
+    /**
+     * Resolves the crop load, target and window of the prescription of a plot campaign.
+     *
+     * @param plotId       the assistant PlotId value object
+     * @param campaignYear the campaign year
+     * @return the plan, or empty when the plot was never sampled that campaign
+     */
+    public Optional<CampaignThinningPlan> findCampaignThinningPlan(PlotId plotId, int campaignYear) {
+        return thinningContextFacade.findCampaignThinningPlan(plotId.plotId(), campaignYear);
     }
 }
