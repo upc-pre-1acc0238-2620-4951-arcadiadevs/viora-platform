@@ -53,3 +53,14 @@ Formato: fecha, decisión, porqué. Las más nuevas al final.
 - **Redacción agronómica.** Frases como "antes del endurecimiento del hueso", "la que el árbol puede sostener" o "los años altos y bajos suelen alternarse" esperan la validación del agrónomo.
 - **Prueba de arquitectura.** `PlotRouteAuthorizationTest` solo revisa `plotId` en parámetros de consulta. El POST lo recibe en el cuerpo; extender la prueba queda fuera de esta rama.
 - **Retención.** Las respuestas de más de 10 días se ocultan pero no se borran; el job diario queda para `feature/assistant-limits-metrics`.
+
+### Seguimiento de la revisión (2026-10-30)
+
+La revisión nativa aprobó los tramos `280922b` (aplicación) y `fa2a46e` (endpoints y persistencia) sin bloqueos. Advertencias anotadas para `feature/assistant-limits-metrics` o un parche posterior:
+
+- **Carreras de idempotencia.** La clave puede quedar en la fila de la respuesta o en `assistant_answer_requests`; dos pedidos simultáneos con la misma clave, uno creando y otro sirviendo caché, no comparten una restricción única entre tablas. Hoy se resuelve volviendo a leer tras el conflicto; falta una prueba de concurrencia y, si hace falta, una sola tabla de claves.
+- **Purga.** `deleteAllByProducerId` carga y borra fila por fila, en dos tablas sin transacción explícita. Para cuentas con muchas respuestas conviene un borrado masivo transaccional; la prueba de borrado de cuenta no verifica la tabla de claves.
+- **Frescura del historial.** `GET /answers` recalcula los hechos de cada respuesta (hasta 10) y no degrada si una fachada falla. Conviene cachear el `dataVersion` actual por pregunta y lote, y responder `STALE` ante un error.
+- **Pruebas con años fijos.** `AccountDeletionIntegrationTest` usa cosechas 2024/2025; derivarlas del `Clock`.
+- **Menores.** Nombre del ensamblador de recursos, límite inclusivo/exclusivo del TTL distinto entre caché e historial, comentario de la propiedad `cache-ttl`.
+
