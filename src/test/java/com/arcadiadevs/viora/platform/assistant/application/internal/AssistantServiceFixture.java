@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerFactsEvaluator;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.AnswerRenderer;
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.PlotAnswerDataReader;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.TemplateAnswerWriter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotAnswerData;
@@ -45,6 +46,8 @@ public class AssistantServiceFixture {
     public final InMemoryAssistantAnswerRepository repository = new InMemoryAssistantAnswerRepository();
     public final MutableClock clock = new MutableClock(T0);
     public final AnswerRenderer renderer = new AnswerRenderer(messageSource());
+    /** The template writer, spied to prove when a writer (and so a model) is called. */
+    public final TemplateAnswerWriter writer = spy(new TemplateAnswerWriter());
     public final AnswerFactsEvaluator evaluator = new AnswerFactsEvaluator(catalog, dataReader,
             new FactsAssemblerRegistry(List.of(whyPercent, whyIndex)));
 

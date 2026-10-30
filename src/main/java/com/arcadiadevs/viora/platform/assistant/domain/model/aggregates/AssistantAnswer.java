@@ -96,8 +96,35 @@ public record AssistantAnswer(
     public static AssistantAnswer create(UUID clientRequestId, String producerId, PlotId plotId,
             QuestionId questionId, String locale, DataVersion dataVersion, String text, List<AnswerFact> facts,
             List<AnswerSource> sources, List<AnswerAction> actions, AnswerModel model, Instant now) {
+        return create(clientRequestId, producerId, plotId, questionId, locale, dataVersion, text, facts, sources,
+                actions, model, null, null, now);
+    }
+
+    /**
+     * Creates a new answer whose text a model wrote, or tried to write.
+     *
+     * @param clientRequestId idempotency key sent by the app
+     * @param producerId      producer who asked
+     * @param plotId          plot the question is about
+     * @param questionId      question answered
+     * @param locale          language of the texts
+     * @param dataVersion     version of the facts
+     * @param text            answer text
+     * @param facts           exactly two fact cards
+     * @param sources         what the answer is based on
+     * @param actions         links to existing screens
+     * @param model           what wrote the text
+     * @param inputTokens     tokens sent to the model; null when none was called or it did not say
+     * @param outputTokens    tokens received from the model; null when none was called or it did not say
+     * @param now             current instant
+     * @return the answer, with a new identifier
+     */
+    public static AssistantAnswer create(UUID clientRequestId, String producerId, PlotId plotId,
+            QuestionId questionId, String locale, DataVersion dataVersion, String text, List<AnswerFact> facts,
+            List<AnswerSource> sources, List<AnswerAction> actions, AnswerModel model, Integer inputTokens,
+            Integer outputTokens, Instant now) {
         return new AssistantAnswer(UUID.randomUUID(), clientRequestId, producerId, plotId, questionId, locale,
-                dataVersion, text, facts, sources, actions, model, null, null, now);
+                dataVersion, text, facts, sources, actions, model, inputTokens, outputTokens, now);
     }
 
     /**
