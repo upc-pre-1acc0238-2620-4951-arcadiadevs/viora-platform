@@ -12,6 +12,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
  * @param percentageToRemove  prescribed percentage of fruits to remove; null while not issued
  * @param sampledTrees        distinct trees sampled in the current campaign
  * @param treesNeeded         trees still missing for a representative sampling
+ * @param climate             climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
  */
 public record PlotFacts(
         int campaignYear,
@@ -21,6 +22,31 @@ public record PlotFacts(
         boolean prescriptionIssued,
         Double percentageToRemove,
         int sampledTrees,
-        int treesNeeded
+        int treesNeeded,
+        ClimateData climate
 ) {
+
+    public PlotFacts {
+        climate = climate == null ? ClimateData.NONE : climate;
+    }
+
+    /**
+     * Facts of a screen that reads no climate data.
+     */
+    public PlotFacts(int campaignYear, Double bearingIndex, int historicalCampaigns, boolean caliberEstimated,
+            boolean prescriptionIssued, Double percentageToRemove, int sampledTrees, int treesNeeded) {
+        this(campaignYear, bearingIndex, historicalCampaigns, caliberEstimated, prescriptionIssued,
+                percentageToRemove, sampledTrees, treesNeeded, ClimateData.NONE);
+    }
+
+    /**
+     * Facts of a climate screen (ALERT, CLIMATE): only the climate data matters.
+     *
+     * @param campaignYear current campaign year
+     * @param climate      the climate data of the plot
+     * @return the facts
+     */
+    public static PlotFacts ofClimate(int campaignYear, ClimateData climate) {
+        return new PlotFacts(campaignYear, null, 0, false, false, null, 0, 0, climate);
+    }
 }

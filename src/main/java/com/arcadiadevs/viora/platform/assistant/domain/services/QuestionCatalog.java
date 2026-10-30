@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.domain.services;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -27,7 +28,11 @@ public final class QuestionCatalog {
             ScreenKey.ALTERNATION, List.of(QuestionId.ALTERNATION_WHY_INDEX, QuestionId.ALTERNATION_BREAK_CYCLE,
                     QuestionId.ALTERNATION_VS_CAMPAIGNS, QuestionId.ALTERNATION_NEXT_YEAR),
             ScreenKey.PLAN, List.of(QuestionId.PLAN_WHY_PERCENT, QuestionId.PLAN_IF_LESS, QuestionId.PLAN_IF_NONE,
-                    QuestionId.PLAN_BEST_TIME));
+                    QuestionId.PLAN_BEST_TIME),
+            ScreenKey.ALERT, List.of(QuestionId.ALERT_WHAT_TO_DO, QuestionId.ALERT_FRUITSET_EFFECT,
+                    QuestionId.ALERT_WHEN_ENDS, QuestionId.ALERT_PLOTS_AT_RISK),
+            ScreenKey.CLIMATE, List.of(QuestionId.CLIMATE_IRRIGATE, QuestionId.CLIMATE_FRUITSET_EFFECT,
+                    QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY));
 
     private QuestionCatalog() {
     }
@@ -56,6 +61,8 @@ public final class QuestionCatalog {
         return switch (screen) {
             case ALTERNATION -> alternation(facts);
             case PLAN -> plan(facts);
+            case ALERT -> alert(facts.climate());
+            case CLIMATE -> climate(facts.climate());
         };
     }
 
@@ -98,6 +105,71 @@ public final class QuestionCatalog {
                 question(QuestionId.PLAN_IF_LESS, ifLess, "pruning", reason),
                 question(QuestionId.PLAN_IF_NONE, label(QuestionId.PLAN_IF_NONE, "label"), "alert", reason),
                 question(QuestionId.PLAN_BEST_TIME, label(QuestionId.PLAN_BEST_TIME, "label"), "calendar", reason));
+    }
+
+    /**
+     * The ALERT screen is about the most severe open heat, frost or hydric alert of the plot: without one every
+     * question is disabled. The forecast tells when a heat or frost alert ends, never a hydric one.
+     */
+    private static List<CatalogQuestion> alert(ClimateData climate) {
+        var incident = climate.incident();
+        if (incident == null) {
+            var missing = CatalogText.of("assistant.reason.alert_missing");
+            return List.of(
+                    question(QuestionId.ALERT_WHAT_TO_DO, label(QuestionId.ALERT_WHAT_TO_DO, "label"), "alert",
+                            missing),
+                    question(QuestionId.ALERT_FRUITSET_EFFECT, label(QuestionId.ALERT_FRUITSET_EFFECT, "label"),
+                            "fruit", missing),
+                    question(QuestionId.ALERT_WHEN_ENDS, label(QuestionId.ALERT_WHEN_ENDS, "label"), "calendar",
+                            missing),
+                    question(QuestionId.ALERT_PLOTS_AT_RISK, label(QuestionId.ALERT_PLOTS_AT_RISK, "label"), "lote",
+                            missing));
+        }
+        CatalogText whenEndsMissing = null;
+        if (!ClimateData.HEAT_WAVE.equals(incident.type()) && !ClimateData.FROST_WARNING.equals(incident.type())) {
+            whenEndsMissing = CatalogText.of("assistant.reason.forecast_soil");
+        } else if (climate.forecast() == null) {
+            whenEndsMissing = CatalogText.of("assistant.reason.forecast_missing");
+        }
+        return List.of(
+                question(QuestionId.ALERT_WHAT_TO_DO, label(QuestionId.ALERT_WHAT_TO_DO, "label." + incident.type()),
+                        "alert", null),
+                question(QuestionId.ALERT_FRUITSET_EFFECT, label(QuestionId.ALERT_FRUITSET_EFFECT, "label"), "fruit",
+                        null),
+                question(QuestionId.ALERT_WHEN_ENDS, label(QuestionId.ALERT_WHEN_ENDS, "label"), "calendar",
+                        whenEndsMissing),
+                question(QuestionId.ALERT_PLOTS_AT_RISK, label(QuestionId.ALERT_PLOTS_AT_RISK, "label"), "lote",
+                        null));
+    }
+
+    /**
+     * The CLIMATE screen: irrigation only with a real (not virtual) soil probe reading recently (contract, section
+     * 0), the forecast questions with a forecast, the sensors with a linked node reading recently.
+     */
+    private static List<CatalogQuestion> climate(ClimateData climate) {
+        boolean recent = climate.latestReading() != null;
+        CatalogText irrigateMissing = null;
+        if (climate.realProbes().isEmpty()) {
+            irrigateMissing = CatalogText.of("assistant.reason.real_probe_missing");
+        } else if (!recent) {
+            irrigateMissing = CatalogText.of("assistant.reason.readings_missing");
+        }
+        var forecastMissing = climate.forecast() == null ? CatalogText.of("assistant.reason.forecast_missing") : null;
+        CatalogText sensorsMissing = null;
+        if (climate.nodes().isEmpty()) {
+            sensorsMissing = CatalogText.of("assistant.reason.nodes_missing");
+        } else if (!recent) {
+            sensorsMissing = CatalogText.of("assistant.reason.readings_missing");
+        }
+        return List.of(
+                question(QuestionId.CLIMATE_IRRIGATE, label(QuestionId.CLIMATE_IRRIGATE, "label"), "water",
+                        irrigateMissing),
+                question(QuestionId.CLIMATE_FRUITSET_EFFECT, label(QuestionId.CLIMATE_FRUITSET_EFFECT, "label"),
+                        "fruit", forecastMissing),
+                question(QuestionId.CLIMATE_HEAT_ENDS, label(QuestionId.CLIMATE_HEAT_ENDS, "label"), "temp",
+                        forecastMissing),
+                question(QuestionId.CLIMATE_SENSORS_SAY, label(QuestionId.CLIMATE_SENSORS_SAY, "label"), "sensor",
+                        sensorsMissing));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

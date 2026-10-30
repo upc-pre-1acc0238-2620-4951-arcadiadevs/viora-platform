@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
  * most {@value #MAX_LENGTH} characters and {@value #MAX_SENTENCES} sentences), every number must be a fact
  * ({@link TextNumbers}) and it must not give advice the facts do not allow: irrigating unless the fact
  * {@value #IRRIGATION_ADVISABLE} is true, or recording the thinning unless that action is among
- * {@value #ALLOWED_ACTIONS}. The phrase checks are simple word patterns in Spanish and English, not a grammar.
+ * {@value #ALLOWED_ACTIONS}. When irrigation may be mentioned but the fact {@value #PRODUCER_DECIDES_IRRIGATION}
+ * is true, an order to irrigate ("riega", "debes regar", "you should irrigate") is still rejected. The phrase checks
+ * are simple word patterns in Spanish and English, not a grammar.
  */
 public final class AnswerTextValidator {
 
@@ -27,6 +29,12 @@ public final class AnswerTextValidator {
     /** Interpreted fact: whether the facts support irrigation advice; missing means no. */
     public static final String IRRIGATION_ADVISABLE = "irrigationAdvisable";
 
+    /**
+     * Interpreted fact: the producer decides whether to irrigate, so even an advisable irrigation may only be
+     * described, never ordered.
+     */
+    public static final String PRODUCER_DECIDES_IRRIGATION = "producerDecidesIrrigation";
+
     /** Interpreted fact: labels of the actions the answer offers. */
     public static final String ALLOWED_ACTIONS = "allowedActions";
 
@@ -35,6 +43,14 @@ public final class AnswerTextValidator {
     private static final Pattern IRRIGATION = Pattern.compile(
             "\\b(?:riegu?e?[sn]?|riega[sn]?|regar\\w*|riegos?|regad[ií]o)\\b"
                     + "|\\birrig\\w*|\\bwater(?:ing)?\\s+(?:the|your|it|them|this)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+    /** Orders and obligations to irrigate: imperative forms and "debes/tienes que/hay que regar", "you should ...". */
+    private static final Pattern IRRIGATION_ORDER = Pattern.compile(
+            "\\b(?:riega|riegue[ns]?)\\b"
+                    + "|\\b(?:debes|deber[ií]as|tienes\\s+que|hay\\s+que|necesitas)\\s+regar\\b"
+                    + "|\\b(?:you\\s+(?:should|must|need\\s+to|have\\s+to)|make\\s+sure\\s+to)\\s+(?:irrigate|water)\\b"
+                    + "|(?:^|[.!?:;]\\s*)(?:irrigate|water)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern RECORD_THINNING = Pattern.compile(
@@ -80,6 +96,10 @@ public final class AnswerTextValidator {
     private static boolean forbidden(String text, Map<String, ?> facts) {
         var irrigationAllowed = facts != null && Boolean.TRUE.equals(facts.get(IRRIGATION_ADVISABLE));
         if (!irrigationAllowed && IRRIGATION.matcher(text).find()) {
+            return true;
+        }
+        if (facts != null && Boolean.TRUE.equals(facts.get(PRODUCER_DECIDES_IRRIGATION))
+                && IRRIGATION_ORDER.matcher(text).find()) {
             return true;
         }
         return RECORD_THINNING.matcher(text).find() && !recordingOffered(facts);

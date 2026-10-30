@@ -1,11 +1,13 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.ClimateDataReader;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -15,6 +17,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -34,6 +37,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
     private final ExternalOrchardService externalOrchardService;
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalThinningService externalThinningService;
+    private final ClimateDataReader climateDataReader;
     private final Clock clock;
 
     /**
@@ -43,20 +47,39 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
      * @param externalOrchardService      verifies the plot
      * @param externalPhenologyService    reads the harvest history and the bearing index
      * @param externalThinningService     reads the prescription and the caliber projection
+     * @param climateDataReader           reads the alerts, forecast and nodes of the ALERT and CLIMATE screens
      * @param clock                       the application clock, for the current campaign
      */
+    @Autowired
     public QuestionCatalogQueryServiceImpl(
             ExternalSubscriptionService externalSubscriptionService,
             ExternalOrchardService externalOrchardService,
             ExternalPhenologyService externalPhenologyService,
             ExternalThinningService externalThinningService,
+            ClimateDataReader climateDataReader,
             Clock clock
     ) {
         this.externalSubscriptionService = externalSubscriptionService;
         this.externalOrchardService = externalOrchardService;
         this.externalPhenologyService = externalPhenologyService;
         this.externalThinningService = externalThinningService;
+        this.climateDataReader = climateDataReader;
         this.clock = clock;
+    }
+
+    /**
+     * Constructs the query service for the screens that read no climate data (unit tests of ALTERNATION and PLAN):
+     * the ALERT and CLIMATE screens then see no climate data and offer their questions disabled.
+     */
+    QuestionCatalogQueryServiceImpl(
+            ExternalSubscriptionService externalSubscriptionService,
+            ExternalOrchardService externalOrchardService,
+            ExternalPhenologyService externalPhenologyService,
+            ExternalThinningService externalThinningService,
+            Clock clock
+    ) {
+        this(externalSubscriptionService, externalOrchardService, externalPhenologyService, externalThinningService,
+                null, clock);
     }
 
     @Override
@@ -78,6 +101,10 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
     /** Reads only the data the screen needs. */
     private PlotFacts factsFor(ScreenKey screen, PlotId plotId) {
         int campaignYear = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
+        if (screen.readsClimate()) {
+            return PlotFacts.ofClimate(campaignYear,
+                    climateDataReader == null ? ClimateData.NONE : climateDataReader.read(screen, plotId));
+        }
         Optional<PrescriptionAvailability> prescription =
                 externalThinningService.findPrescriptionAvailability(plotId, campaignYear);
         Double bearingIndex = null;

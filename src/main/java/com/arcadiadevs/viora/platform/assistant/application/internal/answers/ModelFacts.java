@@ -32,8 +32,13 @@ public final class ModelFacts {
         var facts = new TreeMap<String, Object>(draft.facts());
         facts.put(QUESTION, draft.questionId().value());
         facts.put(LANGUAGE, draft.locale().getLanguage());
-        // No ALTERNATION or PLAN question reads soil probes, so no answer may advise irrigating (contract, section 0)
-        facts.put(AnswerTextValidator.IRRIGATION_ADVISABLE, false);
+        // Only a critical real soil probe reading (climate.irrigate) makes irrigation advisable; every other answer,
+        // ALTERNATION and PLAN included, may not mention it (contract, section 0). Even then the producer decides.
+        boolean advisable = Boolean.TRUE.equals(draft.facts().get(AnswerTextValidator.IRRIGATION_ADVISABLE));
+        facts.put(AnswerTextValidator.IRRIGATION_ADVISABLE, advisable);
+        if (advisable) {
+            facts.put(AnswerTextValidator.PRODUCER_DECIDES_IRRIGATION, true);
+        }
         facts.put(AnswerTextValidator.ALLOWED_ACTIONS, draft.actions().stream().map(AnswerAction::label).toList());
         return Collections.unmodifiableSortedMap(facts);
     }

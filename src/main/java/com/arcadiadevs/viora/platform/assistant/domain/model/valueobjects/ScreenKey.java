@@ -11,7 +11,13 @@ public enum ScreenKey {
     ALTERNATION,
 
     /** Thinning plan of a plot (P61, P120-P122). */
-    PLAN;
+    PLAN,
+
+    /** Agroclimatic alert of a plot (T15, P123-P125). */
+    ALERT,
+
+    /** Climate of a plot: forecast and sensors (P90, P130-P132). */
+    CLIMATE;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it.
@@ -20,6 +26,16 @@ public enum ScreenKey {
      */
     public boolean requiresPlot() {
         return true;
+    }
+
+    /**
+     * Whether the questions of the screen answer from Telemetry (alerts, forecast, nodes) instead of the harvest and
+     * thinning data.
+     *
+     * @return true for ALERT and CLIMATE
+     */
+    public boolean readsClimate() {
+        return this == ALERT || this == CLIMATE;
     }
 
     /**

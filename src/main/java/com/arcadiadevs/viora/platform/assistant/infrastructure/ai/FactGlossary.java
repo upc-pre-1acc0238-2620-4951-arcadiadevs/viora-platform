@@ -9,15 +9,29 @@ import java.util.Optional;
  */
 final class FactGlossary {
 
-    private static final Map<String, String> QUESTIONS = Map.of(
-            "alternation.why_index", "why the alternate bearing index of the plot has its value",
-            "alternation.break_cycle", "what can break the alternate bearing; thinning is the only measure known",
-            "alternation.vs_campaigns", "how the last campaign compares with the average of the previous ones",
-            "alternation.next_year", "what the harvest of this campaign is expected to be after thinning",
-            "plan.why_percent", "why the thinning plan removes percentToRemove of the fruits",
-            "plan.if_less", "what happens if the producer removes only lessPercent instead of percentToRemove",
-            "plan.if_none", "what happens if the producer does not thin",
-            "plan.best_time", "when to thin, from the window of the plan");
+    private static final Map<String, String> QUESTIONS = Map.ofEntries(
+            Map.entry("alternation.why_index", "why the alternate bearing index of the plot has its value"),
+            Map.entry("alternation.break_cycle",
+                    "what can break the alternate bearing; thinning is the only measure known"),
+            Map.entry("alternation.vs_campaigns",
+                    "how the last campaign compares with the average of the previous ones"),
+            Map.entry("alternation.next_year", "what the harvest of this campaign is expected to be after thinning"),
+            Map.entry("plan.why_percent", "why the thinning plan removes percentToRemove of the fruits"),
+            Map.entry("plan.if_less",
+                    "what happens if the producer removes only lessPercent instead of percentToRemove"),
+            Map.entry("plan.if_none", "what happens if the producer does not thin"),
+            Map.entry("plan.best_time", "when to thin, from the window of the plan"),
+            Map.entry("alert.what_to_do", "what to do about the open alert; point to its mitigation steps only"),
+            Map.entry("alert.fruitset_effect",
+                    "how the alert affects fruit set; the platform does not estimate that effect, say so"),
+            Map.entry("alert.when_ends", "until when the forecast keeps the risk of the alert"),
+            Map.entry("alert.plots_at_risk", "how many plots of the producer have the same open alert"),
+            Map.entry("climate.irrigate", "whether to irrigate this week; describe the soil probe reading against "
+                    + "its thresholds and leave the decision to the producer"),
+            Map.entry("climate.fruitset_effect",
+                    "how the forecast heat affects fruit set; the platform does not estimate that effect, say so"),
+            Map.entry("climate.heat_ends", "until when the forecast reaches the heat threshold"),
+            Map.entry("climate.sensors_say", "what the latest reading of the plot says"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -48,7 +62,37 @@ final class FactGlossary {
             Map.entry("campaignYear", "current campaign year"),
             Map.entry("mostLikelyFruitsPerKg", "expected fruits per kilo after thinning"),
             Map.entry("commercialSizeGrade", "expected commercial size grade"),
-            Map.entry("estimatedKgPerHa", "expected harvest in kg per hectare after thinning"));
+            Map.entry("estimatedKgPerHa", "expected harvest in kg per hectare after thinning"),
+            Map.entry("incidentType", "type of the open alert"),
+            Map.entry("severity", "level of the alert"),
+            Map.entry("alertValue", "value that breached the threshold, in unit"),
+            Map.entry("alertThreshold", "threshold the alert breached, in unit"),
+            Map.entry("unit", "unit of alertValue and alertThreshold"),
+            Map.entry("alertRaisedOn", "day the alert was raised"),
+            Map.entry("mitigationSteps", "mitigation steps of the alert"),
+            Map.entry("completedSteps", "mitigation steps already completed"),
+            Map.entry("riskThreshold", "threshold the forecast days are judged against, °C"),
+            Map.entry("forecastDays", "days the forecast covers"),
+            Map.entry("riskDays", "forecast days that cross riskThreshold"),
+            Map.entry("lastRiskOn", "last forecast day that crosses the threshold"),
+            Map.entry("endsOn", "first forecast day after the last one over the threshold"),
+            Map.entry("plotsAtRisk", "active plots of the producer with the same open alert, this one included"),
+            Map.entry("activePlots", "active plots of the producer"),
+            Map.entry("probeDepthCm", "depth of the real soil probe, cm"),
+            Map.entry("soilMoisture", "latest soil moisture, %"),
+            Map.entry("warningMoisture", "soil moisture under which the probe warns of water stress, %"),
+            Map.entry("criticalMoisture", "soil moisture under which water stress is critical, %"),
+            Map.entry("moistureState", "soil moisture against the probe thresholds"),
+            Map.entry("producerDecidesIrrigation", "never order irrigation; the producer decides"),
+            Map.entry("hottestMax", "highest forecast maximum, °C"),
+            Map.entry("hottestOn", "day of hottestMax"),
+            Map.entry("heatThreshold", "heat threshold of the alerts, °C"),
+            Map.entry("heatDays", "forecast days that reach heatThreshold"),
+            Map.entry("lastHeatOn", "last forecast day that reaches heatThreshold"),
+            Map.entry("linkedNodes", "nodes linked to the plot"),
+            Map.entry("simulated", "true when the data source is simulated (virtual node)"),
+            Map.entry("airTemperature", "latest air temperature, °C"),
+            Map.entry("airHumidity", "latest air relative humidity, %"));
 
     private FactGlossary() {
     }
