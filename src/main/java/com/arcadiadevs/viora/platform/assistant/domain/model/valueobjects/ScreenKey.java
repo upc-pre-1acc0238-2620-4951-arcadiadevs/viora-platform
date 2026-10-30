@@ -23,6 +23,15 @@ public enum ScreenKey {
     }
 
     /**
+     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}.
+     *
+     * @return the prefix
+     */
+    public String questionPrefix() {
+        return name().toLowerCase(Locale.ROOT) + ".";
+    }
+
+    /**
      * Parses the screen sent by the app, ignoring case.
      *
      * @param value the raw screen key
