@@ -26,8 +26,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -81,7 +81,7 @@ class AccountDeletionIntegrationTest {
         mvc.perform(post("/api/v1/plots/" + plotId + "/field-notes").contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"id":"%s","type":"IRRIGATION","text":"Riego.","observedOn":"%s"}
-                        """.formatted(UUID.randomUUID(), LocalDate.now(ZoneOffset.UTC))))
+                        """.formatted(UUID.randomUUID(), LocalDate.now(ProducerTimeZone.ZONE))))
                 .andExpect(status().isCreated());
         mvc.perform(post("/api/v1/cooperative-code-redemptions").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"code\":\"" + SubscriptionTestCodesSeeder.CODES.firstEntry().getKey() + "\"}"))

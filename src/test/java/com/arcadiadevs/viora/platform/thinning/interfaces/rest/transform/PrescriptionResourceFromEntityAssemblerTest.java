@@ -7,8 +7,8 @@ import com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancing
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +36,7 @@ class PrescriptionResourceFromEntityAssemblerTest {
     @Test
     @DisplayName("An issued prescription shows its figures rounded, its window, its basis and its profile")
     void showsAnIssuedPrescription() {
-        var today = LocalDate.now(ZoneOffset.UTC);
+        var today = LocalDate.now(ProducerTimeZone.ZONE);
         var prescription = PrescriptionTestData.representative(PrescriptionTestData.newPlot());
         prescription.determineSustainableCropLoad(new CropLoadBalancingCalculatorService(0.4),
                 today.minusDays(1), today.plusDays(10), "test-1", "SYNTHETIC_DEMO");
@@ -56,7 +56,7 @@ class PrescriptionResourceFromEntityAssemblerTest {
     @Test
     @DisplayName("The window is not open before it opens or after it closes")
     void windowIsOpenOnlyBetweenItsDates() {
-        var today = LocalDate.now(ZoneOffset.UTC);
+        var today = LocalDate.now(ProducerTimeZone.ZONE);
         var early = PrescriptionTestData.representative(PrescriptionTestData.newPlot());
         early.determineSustainableCropLoad(new CropLoadBalancingCalculatorService(0.4),
                 today.plusDays(3), today.plusDays(30), "test-1", "SYNTHETIC_DEMO");
