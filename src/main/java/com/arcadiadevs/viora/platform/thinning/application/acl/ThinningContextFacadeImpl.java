@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.thinning.application.acl;
 
+import com.arcadiadevs.viora.platform.thinning.application.internal.queryservices.ThinningPrescriptionOutlookService;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CaliberProjectionStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CommercialSizeScale;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
@@ -29,9 +31,12 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
             PrescriptionStatus.PRESCRIBED, PrescriptionStatus.CONFIRMED, PrescriptionStatus.EXECUTED);
 
     private final FruitThinningPrescriptionRepository prescriptionRepository;
+    private final ThinningPrescriptionOutlookService outlookService;
 
-    public ThinningContextFacadeImpl(FruitThinningPrescriptionRepository prescriptionRepository) {
+    public ThinningContextFacadeImpl(FruitThinningPrescriptionRepository prescriptionRepository,
+            ThinningPrescriptionOutlookService outlookService) {
         this.prescriptionRepository = prescriptionRepository;
+        this.outlookService = outlookService;
     }
 
     @Override
@@ -93,6 +98,44 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
                     SamplingCoverageEvaluator.countUniqueEvaluatedTreesFromSnapshots(rounds),
                     SamplingCoverageEvaluator.treesNeededFromSnapshots(rounds),
                     projection == null ? null : projection.status().name());
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ThinningPlanDetail> findThinningPlanDetail(String plotId, int campaignYear) {
+        final PlotId id;
+        final CampaignYear year;
+        try {
+            id = new PlotId(plotId);
+            year = new CampaignYear(campaignYear);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        return prescriptionRepository.findByPlotIdAndCampaignYear(id, year).map(prescription -> {
+            var snapshot = prescription.snapshot();
+            // Same outlook the thinning plan screen shows, so the assistant never reads a different figure
+            var outlook = outlookService.outlookOf(snapshot);
+            var load = snapshot.sustainableLoad();
+            boolean issued = ISSUED.contains(snapshot.status()) && load != null && load.percentageToRemove() != null;
+            var confirmation = snapshot.executionConfirmation();
+            var projection = confirmation == null ? null : confirmation.caliberProjection();
+            var estimated = projection != null && projection.status() == CaliberProjectionStatus.ESTIMATED;
+            var yieldAfter = confirmation == null ? null : outlookService.yieldAfterThinning(snapshot);
+            return new ThinningPlanDetail(
+                    issued,
+                    issued ? load.percentageToRemove() : null,
+                    outlook.currentFruitsPerShoot(),
+                    outlook.targetFruitsPerShoot(),
+                    load == null ? null : load.windowOpensOn(),
+                    load == null ? null : load.windowClosesOn(),
+                    outlook.sampledTrees(),
+                    outlook.lastSampledOn(),
+                    confirmation == null ? null : confirmation.executionDate(),
+                    projection == null ? null : projection.status().name(),
+                    estimated ? projection.mostLikelyFruitsPerKg() : null,
+                    estimated ? CommercialSizeScale.gradeOf(projection.mostLikelyFruitsPerKg()) : null,
+                    yieldAfter == null ? null : yieldAfter.estimatedKgPerHa());
         });
     }
 }
