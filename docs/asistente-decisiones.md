@@ -85,3 +85,15 @@ La revisión nativa aprobó los tramos `280922b` (aplicación) y `fa2a46e` (endp
 - **Presupuesto de entrada.** Con el glosario y el formato del conversor, la entrada medida es de 610–785 tokens, sobre los ~600 del contrato. Se puede recortar el formato del conversor o el glosario; decidir si el límite se ajusta.
 - **Calidad que el validador no ve.** En la prueba en vivo el modelo aún escribió el valor crudo `MODERATE_ALTERNATION`, cambió "brote" por "sarmiento" y dijo "tienes 12 días para registrar el aclareo". Los números eran correctos. Opciones: localizar los hechos de texto antes de enviarlos o añadir esas frases al validador. Requiere revisión del agrónomo antes de producción, igual que las plantillas.
 - **Motivo del respaldo persistido.** Para las métricas de `feature/assistant-limits-metrics` falta decidir si `TextRejection` se guarda en una columna o solo va a Micrometer.
+
+### Seguimiento de la revisión de Spring AI (2026-10-30)
+
+La revisión nativa aprobó el tramo `63a9d88`..`728a3c5` sin bloqueos. Advertencias anotadas para `feature/assistant-limits-metrics` o un parche posterior:
+
+- **Respaldo pegajoso.** Si el modelo falla, la respuesta con plantilla queda en caché 6 h para esos hechos: nadie vuelve a intentar con el modelo hasta que cambien los datos o pase el TTL. Opción: no cachear respuestas con `fallback=true` del proveedor `groq`, o darles un TTL corto.
+- **Llamadas duplicadas en paralelo.** Dos pedidos simultáneos con claves distintas para la misma pregunta pueden llamar dos veces al modelo antes de que exista la caché.
+- **Presupuesto de reintentos.** El reintento del SDK suma latencia a cada pedido; con el circuit breaker de la siguiente rama conviene revisar si se mantiene.
+- **Validador fuera del bloque de respaldo.** Una excepción inesperada del validador no cae a la plantilla; envolverla igual que los errores del modelo.
+- **Prueba faltante.** El arranque con `provider=groq` sin modelo de chat (debe negarse a arrancar) no tiene prueba.
+- **Menores.** Los límites del prompt (280 caracteres, 2–3 frases) se repiten en el prompt y en el validador.
+
