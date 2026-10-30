@@ -21,12 +21,14 @@ public class PlotAnswerDataReader {
 
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalThinningService externalThinningService;
+    private final ClimateDataReader climateDataReader;
     private final Clock clock;
 
     public PlotAnswerDataReader(ExternalPhenologyService externalPhenologyService,
-            ExternalThinningService externalThinningService, Clock clock) {
+            ExternalThinningService externalThinningService, ClimateDataReader climateDataReader, Clock clock) {
         this.externalPhenologyService = externalPhenologyService;
         this.externalThinningService = externalThinningService;
+        this.climateDataReader = climateDataReader;
         this.clock = clock;
     }
 
@@ -40,6 +42,10 @@ public class PlotAnswerDataReader {
     public PlotAnswerData read(ScreenKey screen, PlotId plotId) {
         var today = LocalDate.now(clock.withZone(ProducerTimeZone.ZONE));
         int campaignYear = today.getYear();
+        if (screen.readsClimate()) {
+            return new PlotAnswerData(plotId, today, campaignYear, null, null, Collections.emptySortedMap(), null,
+                    climateDataReader.read(screen, plotId));
+        }
         var plan = externalThinningService.findThinningPlan(plotId, campaignYear).orElse(null);
         if (screen != ScreenKey.ALTERNATION) {
             return new PlotAnswerData(plotId, today, campaignYear, null, null, Collections.emptySortedMap(), plan);

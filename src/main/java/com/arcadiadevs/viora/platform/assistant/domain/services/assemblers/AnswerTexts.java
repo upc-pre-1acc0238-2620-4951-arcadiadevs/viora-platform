@@ -1,9 +1,11 @@
 package com.arcadiadevs.viora.platform.assistant.domain.services.assemblers;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactCardTemplate;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,6 +31,11 @@ final class AnswerTexts {
         return CatalogText.of(PREFIX + key, args);
     }
 
+    /** "Pronóstico de Open-Meteo, actualizado el 30 de octubre". */
+    static CatalogText forecastSource(ClimateData.Forecast forecast) {
+        return shared("source.forecast", TextDate.of(forecast.syncedOn()));
+    }
+
     static FactCardTemplate card(CatalogText value, CatalogText label, CatalogText pill, FactTone tone) {
         return new FactCardTemplate(value, label, pill, tone);
     }
@@ -36,6 +43,11 @@ final class AnswerTexts {
     /** Two decimals, half up, as loads and indexes are shown. */
     static double twoDecimals(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    /** One decimal, half up, as temperatures and moisture are shown. */
+    static double oneDecimal(double value) {
+        return BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).doubleValue();
     }
 
     /** Whole number, half up. */

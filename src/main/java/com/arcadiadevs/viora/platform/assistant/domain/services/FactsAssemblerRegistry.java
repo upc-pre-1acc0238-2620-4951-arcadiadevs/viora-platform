@@ -1,7 +1,15 @@
 package com.arcadiadevs.viora.platform.assistant.domain.services;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertFruitsetEffectFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertPlotsAtRiskFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhatToDoFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhenEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BestTimeFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateFruitsetEffectFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HeatEndsFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IrrigateFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsSayFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BreakCycleFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfLessFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfNoneFactsAssembler;
@@ -39,7 +47,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the ALTERNATION and PLAN questions.
+     * The assemblers of the ALTERNATION, PLAN, ALERT and CLIMATE questions.
      *
      * @return the registry
      */
@@ -47,7 +55,11 @@ public final class FactsAssemblerRegistry {
         return new FactsAssemblerRegistry(List.of(
                 new WhyIndexFactsAssembler(), new BreakCycleFactsAssembler(), new VsCampaignsFactsAssembler(),
                 new NextYearFactsAssembler(), new WhyPercentFactsAssembler(), new IfLessFactsAssembler(),
-                new IfNoneFactsAssembler(), new BestTimeFactsAssembler()));
+                new IfNoneFactsAssembler(), new BestTimeFactsAssembler(), new AlertWhatToDoFactsAssembler(),
+                new AlertFruitsetEffectFactsAssembler(), new AlertWhenEndsFactsAssembler(),
+                new AlertPlotsAtRiskFactsAssembler(), new IrrigateFactsAssembler(),
+                new ClimateFruitsetEffectFactsAssembler(), new HeatEndsFactsAssembler(),
+                new SensorsSayFactsAssembler()));
     }
 
     /**

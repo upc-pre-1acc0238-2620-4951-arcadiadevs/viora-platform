@@ -16,6 +16,7 @@ import java.util.TreeMap;
  *                         {@code SEVERE_ALTERNATION}); null without index
  * @param historicalYields total kilograms per campaign year, ascending
  * @param plan             thinning plan of the current campaign; null when the plot was never sampled
+ * @param climate          climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
  */
 public record PlotAnswerData(
         PlotId plotId,
@@ -24,8 +25,17 @@ public record PlotAnswerData(
         Double bearingIndex,
         String bearingCategory,
         SortedMap<Integer, Double> historicalYields,
-        ThinningPlanData plan
+        ThinningPlanData plan,
+        ClimateData climate
 ) {
+
+    /**
+     * Data of a screen that reads no climate data.
+     */
+    public PlotAnswerData(PlotId plotId, LocalDate today, int campaignYear, Double bearingIndex,
+            String bearingCategory, SortedMap<Integer, Double> historicalYields, ThinningPlanData plan) {
+        this(plotId, today, campaignYear, bearingIndex, bearingCategory, historicalYields, plan, ClimateData.NONE);
+    }
 
     public PlotAnswerData {
         if (plotId == null || today == null) {
@@ -34,5 +44,6 @@ public record PlotAnswerData(
         historicalYields = historicalYields == null
                 ? Collections.emptySortedMap()
                 : Collections.unmodifiableSortedMap(new TreeMap<>(historicalYields));
+        climate = climate == null ? ClimateData.NONE : climate;
     }
 }

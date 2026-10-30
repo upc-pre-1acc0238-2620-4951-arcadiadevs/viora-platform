@@ -6,7 +6,17 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotAn
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningPlanData;
 import com.arcadiadevs.viora.platform.assistant.domain.services.FactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.TextNumbers;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
+import com.arcadiadevs.viora.platform.assistant.domain.services.AnswerTextValidator;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertFruitsetEffectFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertPlotsAtRiskFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhatToDoFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhenEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BestTimeFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateFruitsetEffectFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HeatEndsFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IrrigateFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsSayFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BreakCycleFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfLessFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IfNoneFactsAssembler;
@@ -27,6 +37,18 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AnswerDataSamples.*;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.climate;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.data;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.forecast;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.frost;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.heat;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.hotThenMild;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.hydric;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.microclimate;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.reading;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.realProbe;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.virtualProbe;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateDataSamples.THRESHOLDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -90,6 +112,86 @@ class AnswerTemplatesTest {
                 + "can sustain. That is why it calls for removing 30% of the fruits.");
         assertThat(en.sources()).extracting(source -> source.label())
                 .containsExactly("Based on 5 trees, round of October 29");
+    }
+
+    private static final List<FactsAssembler> CLIMATE_ASSEMBLERS = List.of(new AlertWhatToDoFactsAssembler(),
+            new AlertFruitsetEffectFactsAssembler(), new AlertWhenEndsFactsAssembler(),
+            new AlertPlotsAtRiskFactsAssembler(), new IrrigateFactsAssembler(),
+            new ClimateFruitsetEffectFactsAssembler(), new HeatEndsFactsAssembler(), new SensorsSayFactsAssembler());
+
+    @Test
+    @DisplayName("ALERT and CLIMATE: every rendered number is a fact and every text passes the model validator")
+    void everyAlertAndClimateNumberIsAFact() {
+        var variants = new HashSet<String>();
+        int rendered = 0;
+        for (var data : climateScenarios()) {
+            for (var assembler : CLIMATE_ASSEMBLERS) {
+                var facts = assembler.assemble(data);
+                if (facts.isEmpty()) {
+                    continue;
+                }
+                variants.add(facts.get().text().key());
+                for (var locale : List.of(ES, EN)) {
+                    assertRendered(facts.get(), locale);
+                    var text = renderer.render(facts.get(), locale).text();
+                    // The template is also what the model falls back to: it must pass the same validator, which
+                    // never lets a text order irrigation and only mentions it when the facts allow it
+                    var modelFacts = ModelFacts.of(new AnswerDraft(assembler.questionId(), locale,
+                            facts.get().facts(), text, List.of()));
+                    assertThat(AnswerTextValidator.check(text, locale, modelFacts)).as(text).isEmpty();
+                    rendered++;
+                }
+            }
+        }
+        // Every text variant of the eight ALERT and CLIMATE questions was reached
+        assertThat(variants).hasSize(19);
+        assertThat(rendered).isGreaterThan(80);
+    }
+
+    @Test
+    @DisplayName("A virtual node reading says \"dato simulado\"; the irrigation answer reads like the mockup")
+    void climateReadsAsTheMockup() {
+        var sensors = new SensorsSayFactsAssembler().assemble(data(climate(null, null,
+                List.of(virtualProbe(), microclimate()), reading(21.5)))).orElseThrow();
+        var es = renderer.render(sensors, ES);
+        assertThat(es.text()).isEqualTo("La última lectura de tu lote marca 27,4 °C, 38 % de humedad del aire y "
+                + "21,5 % en el suelo: dato simulado. Sale del clima observado en tu zona, no de un sensor en el lote.");
+        assertThat(es.sources()).extracting(source -> source.label()).containsExactly("Nodo virtual · dato simulado");
+        assertThat(es.facts()).extracting(fact -> fact.pill()).contains("dato simulado");
+        assertThat(renderer.render(sensors, EN).text()).contains("simulated data");
+
+        var irrigate = new IrrigateFactsAssembler().assemble(data(climate(null, null, List.of(realProbe("WARNING")),
+                reading(18.5)))).orElseThrow();
+        var answer = renderer.render(irrigate, ES);
+        assertThat(answer.text()).isEqualTo("Tu sonda a 30 cm marca 18,5 % de humedad, bajo el umbral de aviso de "
+                + "20 % y sin llegar al crítico de 16 %. Vigila la lectura y decide el agua con tu técnico.");
+        assertThat(answer.sources()).extracting(source -> source.label()).containsExactly("Sonda 30 cm");
+
+        var heatAlert = renderer.render(new AlertWhatToDoFactsAssembler().assemble(data(climate(heat(),
+                hotThenMild(), List.of(), null))).orElseThrow(), ES);
+        assertThat(heatAlert.text()).isEqualTo("Tu lote tiene una alerta de golpe de calor en nivel aviso: 34,2 °C "
+                + "frente al umbral de 32 °C. Sigue los pasos de mitigación de la alerta; llevas 1 de 3 completados.");
+        assertThat(heatAlert.facts()).extracting(fact -> fact.value()).containsExactly("34,2 °C", "Aviso");
+        var whenEnds = renderer.render(new AlertWhenEndsFactsAssembler().assemble(data(climate(heat(),
+                hotThenMild(), List.of(), null))).orElseThrow(), ES);
+        assertThat(whenEnds.sources()).extracting(source -> source.label())
+                .containsExactly("Pronóstico de Open-Meteo, actualizado el 30 de octubre");
+    }
+
+    private static List<PlotAnswerData> climateScenarios() {
+        var noHeat = forecast(30.0, 31.0, 29.0, 30.0, 31.0, 28.5, 27.0);
+        var heatAtTheEnd = forecast(30.0, 31.0, 33.0, 30.0, 31.0, 33.5, 34.0);
+        var oneHotDay = forecast(33.0, 31.0, 29.0, 30.0, 31.0, 28.5, 27.0);
+        var frostDays = forecast(9.0, 8.5, 12.0, 15.0, 16.0, 18.0, 19.0);
+        return List.of(
+                data(climate(heat(), hotThenMild(), List.of(virtualProbe(), microclimate()), reading(21.5))),
+                data(climate(heat(), heatAtTheEnd, List.of(realProbe("CRITICAL")), reading(14.04))),
+                data(climate(heat(), noHeat, List.of(realProbe(null)), reading(24.0))),
+                data(climate(heat(), oneHotDay, List.of(realProbe("WARNING"), realProbe("WARNING")), reading(18.5))),
+                data(climate(frost(), frostDays, List.of(), null)),
+                data(climate(hydric(), null, List.of(realProbe()), reading(19.0))),
+                data(new ClimateData(THRESHOLDS, heat(), 1, 5, null, List.of(), null)),
+                data(new ClimateData(THRESHOLDS, frost(), 1, 1, null, List.of(), null)));
     }
 
     private void assertRendered(AssembledFacts facts, Locale locale) {
