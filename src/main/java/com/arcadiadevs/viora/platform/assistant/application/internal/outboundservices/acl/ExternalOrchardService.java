@@ -40,4 +40,15 @@ public class ExternalOrchardService {
                 .map(orchardContextFacade::findActivePlotIdsByProducerId)
                 .orElse(List.of());
     }
+
+    /**
+     * Lists the active plots of a producer, for the questions about its whole field. The producer is always the
+     * authenticated one, so no other producer's plot is ever read.
+     *
+     * @param producerId the producer asking
+     * @return its active plots, in the order the Orchard context lists them
+     */
+    public List<PlotId> findActivePlotIdsOfProducer(String producerId) {
+        return orchardContextFacade.findActivePlotIdsByProducerId(producerId).stream().map(PlotId::new).toList();
+    }
 }

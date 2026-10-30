@@ -22,26 +22,34 @@ public class PlotAnswerDataReader {
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalThinningService externalThinningService;
     private final ClimateDataReader climateDataReader;
+    private final HomeDataReader homeDataReader;
     private final Clock clock;
 
     public PlotAnswerDataReader(ExternalPhenologyService externalPhenologyService,
-            ExternalThinningService externalThinningService, ClimateDataReader climateDataReader, Clock clock) {
+            ExternalThinningService externalThinningService, ClimateDataReader climateDataReader,
+            HomeDataReader homeDataReader, Clock clock) {
         this.externalPhenologyService = externalPhenologyService;
         this.externalThinningService = externalThinningService;
         this.climateDataReader = climateDataReader;
+        this.homeDataReader = homeDataReader;
         this.clock = clock;
     }
 
     /**
      * Reads the data of a plot for the questions of a screen.
      *
-     * @param screen the screen
-     * @param plotId the plot
+     * @param screen     the screen
+     * @param producerId the producer asking; on HOME without plot, its active plots are read
+     * @param plotId     the plot; null only on HOME, for the whole field
      * @return the data; the campaign is the calendar year in the producers' time zone, as in the catalog
      */
-    public PlotAnswerData read(ScreenKey screen, PlotId plotId) {
+    public PlotAnswerData read(ScreenKey screen, String producerId, PlotId plotId) {
         var today = LocalDate.now(clock.withZone(ProducerTimeZone.ZONE));
         int campaignYear = today.getYear();
+        if (screen == ScreenKey.HOME) {
+            return PlotAnswerData.ofHome(plotId, today, campaignYear,
+                    homeDataReader.readForAnswer(producerId, plotId, campaignYear));
+        }
         if (screen.readsClimate()) {
             return new PlotAnswerData(plotId, today, campaignYear, null, null, Collections.emptySortedMap(), null,
                     climateDataReader.read(screen, plotId));

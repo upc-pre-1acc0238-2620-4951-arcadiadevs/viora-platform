@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.interfaces.rest.resources;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -11,7 +12,7 @@ import java.util.List;
  *
  * @param answerId    answer identifier
  * @param questionId  question answered
- * @param plotId      plot the question is about
+ * @param plotId      plot the question is about; null for a HOME answer about the whole field
  * @param createdAt   creation instant (ISO-8601, UTC)
  * @param dataVersion version of the facts the answer was built from
  * @param freshness   whether the data is still current
@@ -26,7 +27,8 @@ import java.util.List;
 public record AnswerResource(
         @Schema(description = "Answer identifier UUID") String answerId,
         @Schema(description = "Question identifier", example = "plan.why_percent") String questionId,
-        @Schema(description = "Plot identifier UUID") String plotId,
+        @Schema(description = "Plot identifier UUID; null for a HOME answer about the producer's whole field",
+                nullable = true) @Nullable String plotId,
         @Schema(description = "Creation instant, ISO-8601 UTC", example = "2026-10-28T12:00:00Z") String createdAt,
         @Schema(description = "Version of the facts", example = "sha256:3f2a…") String dataVersion,
         @Schema(description = "UP_TO_DATE while the data has not changed, STALE otherwise",

@@ -8,6 +8,10 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.Alert
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BestTimeFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateFruitsetEffectFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HeatEndsFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeAlertsAffectingFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeCampaignVsPreviousFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeHarvestEstimateFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeWeekPlanFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IrrigateFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsSayFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BreakCycleFactsAssembler;
@@ -47,12 +51,14 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the ALTERNATION, PLAN, ALERT and CLIMATE questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT and CLIMATE questions.
      *
      * @return the registry
      */
     public static FactsAssemblerRegistry standard() {
         return new FactsAssemblerRegistry(List.of(
+                new HomeWeekPlanFactsAssembler(), new HomeCampaignVsPreviousFactsAssembler(),
+                new HomeAlertsAffectingFactsAssembler(), new HomeHarvestEstimateFactsAssembler(),
                 new WhyIndexFactsAssembler(), new BreakCycleFactsAssembler(), new VsCampaignsFactsAssembler(),
                 new NextYearFactsAssembler(), new WhyPercentFactsAssembler(), new IfLessFactsAssembler(),
                 new IfNoneFactsAssembler(), new BestTimeFactsAssembler(), new AlertWhatToDoFactsAssembler(),

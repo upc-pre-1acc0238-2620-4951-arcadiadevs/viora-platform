@@ -24,7 +24,7 @@ public final class AnswerResourceFromEntityAssembler {
         return new AnswerResource(
                 answer.id().toString(),
                 answer.questionId().value(),
-                answer.plotId().plotId(),
+                answer.plotId() == null ? null : answer.plotId().plotId(),
                 answer.createdAt().toString(),
                 answer.dataVersion().value(),
                 view.freshness().name(),

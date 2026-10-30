@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Answers the closed questions. Order: active plan, replay of the same {@code clientRequestId}, rate limit of the
@@ -162,7 +163,8 @@ public class AssistantAnswerCommandServiceImpl implements AssistantAnswerCommand
     }
 
     private Result<AnswerOutcome, ApplicationError> replay(AssistantAnswer stored, AskQuestionCommand command) {
-        if (!stored.questionId().equals(command.questionId()) || !stored.plotId().equals(command.plotId())) {
+        // A field answer (no plot) and a plot answer are different requests, even for the same question
+        if (!stored.questionId().equals(command.questionId()) || !Objects.equals(stored.plotId(), command.plotId())) {
             return Result.failure(ApplicationError.conflict("assistant_request", "assistant.request.reused"));
         }
         // Idempotent replay: the same response as the first request, without building the facts again

@@ -16,13 +16,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * An answer of the assistant to a closed question about a plot, kept so the producer can reopen it. It is never
- * changed once stored: asking again with new data creates a new answer.
+ * An answer of the assistant to a closed question about a plot, or about the producer's whole field on the screens
+ * with field scope (HOME), kept so the producer can reopen it. It is never changed once stored: asking again with
+ * new data creates a new answer.
  *
  * @param id              answer identifier
  * @param clientRequestId idempotency key sent by the app, unique per producer
  * @param producerId      producer who asked
- * @param plotId          plot the question is about
+ * @param plotId          plot the question is about; null when it is about the producer's whole field
  * @param questionId      question answered
  * @param locale          language of the texts ({@code es} or {@code en})
  * @param dataVersion     version of the facts the answer was built from
@@ -60,7 +61,7 @@ public record AssistantAnswer(
     public static final int HISTORY_SIZE = 10;
 
     public AssistantAnswer {
-        if (id == null || clientRequestId == null || producerId == null || producerId.isBlank() || plotId == null
+        if (id == null || clientRequestId == null || producerId == null || producerId.isBlank()
                 || questionId == null || locale == null || dataVersion == null || model == null
                 || createdAt == null) {
             throw new IllegalArgumentException("assistant.answer.invalid");
@@ -81,7 +82,7 @@ public record AssistantAnswer(
      *
      * @param clientRequestId idempotency key sent by the app
      * @param producerId      producer who asked
-     * @param plotId          plot the question is about
+     * @param plotId          plot the question is about; null for the producer's whole field
      * @param questionId      question answered
      * @param locale          language of the texts
      * @param dataVersion     version of the facts
@@ -105,7 +106,7 @@ public record AssistantAnswer(
      *
      * @param clientRequestId idempotency key sent by the app
      * @param producerId      producer who asked
-     * @param plotId          plot the question is about
+     * @param plotId          plot the question is about; null for the producer's whole field
      * @param questionId      question answered
      * @param locale          language of the texts
      * @param dataVersion     version of the facts

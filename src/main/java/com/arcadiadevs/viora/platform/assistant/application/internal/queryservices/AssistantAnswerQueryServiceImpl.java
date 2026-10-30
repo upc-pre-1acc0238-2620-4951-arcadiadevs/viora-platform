@@ -10,6 +10,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetAnswerHi
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetLatestAnswerQuery;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerView;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Freshness;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.repositories.AssistantAnswerRepository;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -50,11 +51,12 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         }
         var answers = repository.findRecent(query.producerId(), clock.instant().minus(AssistantAnswer.RETENTION),
                 query.limit());
-        // Answers to the same question about the same plot share their current facts
+        // Answers to the same question about the same plot (or the whole field) share their current facts
         var freshness = new HashMap<String, Freshness>();
         return Result.success(answers.stream()
                 .map(answer -> new AnswerView(answer, freshness.computeIfAbsent(
-                        answer.questionId().value() + "|" + answer.plotId().plotId() + "|" + answer.dataVersion().value(),
+                        answer.questionId().value() + "|" + scopeOf(answer.plotId()) + "|"
+                                + answer.dataVersion().value(),
                         key -> factsEvaluator.freshnessOf(answer))))
                 .toList());
     }
@@ -79,12 +81,18 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         if (!externalSubscriptionService.hasActivePlan(query.producerId())) {
             return inactivePlan();
         }
-        if (!externalOrchardService.existsActivePlot(query.plotId())) {
+        // Without plot (HOME about the whole field) there is no plot to verify
+        if (query.plotId() != null && !externalOrchardService.existsActivePlot(query.plotId())) {
             return Result.failure(ApplicationError.notFound("plot", query.plotId().plotId()));
         }
         return Result.success(repository.findLatestOfScreen(query.producerId(), query.plotId(),
                         query.screen().questionPrefix(), clock.instant().minus(AssistantAnswer.RETENTION))
                 .map(answer -> new AnswerView(answer, factsEvaluator.freshnessOf(answer))));
+    }
+
+    /** The plot of an answer, or a marker no plot identifier can take for the whole field. */
+    private static String scopeOf(PlotId plotId) {
+        return plotId == null ? "field" : plotId.plotId();
     }
 
     private static <T> Result<T, ApplicationError> inactivePlan() {

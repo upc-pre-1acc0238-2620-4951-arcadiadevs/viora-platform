@@ -74,7 +74,7 @@ public class AssistantAnswerController {
     }
 
     /**
-     * Answers a closed question about a plot.
+     * Answers a closed question about a plot, or about the whole field on HOME.
      *
      * @param resource the question
      * @return the answer (201 new, 200 cached or replayed) or an RFC 7807 error
@@ -83,7 +83,8 @@ public class AssistantAnswerController {
     @PreAuthorize("@plotAccess.isAccessible(#resource?.plotId())")
     @Operation(
             summary = "Ask the assistant a closed question",
-            description = "Answers a question of the ALTERNATION or PLAN catalog with the real facts of the plot: a "
+            description = "Answers a question of the catalog with the real facts of the plot (HOME questions without "
+                    + "plotId answer for every active plot of the producer, and are stored and cached apart): a "
                     + "localized text (Accept-Language es/en), exactly two fact cards, the sources and, while the "
                     + "thinning window is open, a link to record it. The text is worded by the configured model when "
                     + "enabled and validated against the facts; otherwise, or when it is rejected or fails, it comes "
@@ -97,8 +98,8 @@ public class AssistantAnswerController {
                     content = @Content(schema = @Schema(implementation = AnswerResource.class))),
             @ApiResponse(responseCode = "200", description = "Answer served from cache or replayed for the same "
                     + "clientRequestId", content = @Content(schema = @Schema(implementation = AnswerResource.class))),
-            @ApiResponse(responseCode = "400", description = "Unknown questionId, or missing or malformed plotId or "
-                    + "clientRequestId", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "400", description = "Unknown questionId, missing plotId for a question "
+                    + "of a plot screen, or malformed plotId or clientRequestId", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "401", description = "No authenticated user"),
             @ApiResponse(responseCode = "403", description = "Plot of another producer, or no active plan",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
@@ -175,7 +176,8 @@ public class AssistantAnswerController {
             @ApiResponse(responseCode = "200", description = "Latest answer",
                     content = @Content(schema = @Schema(implementation = AnswerResource.class))),
             @ApiResponse(responseCode = "204", description = "No answer for the screen and plot"),
-            @ApiResponse(responseCode = "400", description = "Unknown screen, missing or malformed plotId",
+            @ApiResponse(responseCode = "400", description = "Unknown screen, missing plotId for a plot screen, "
+                    + "or malformed plotId",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "401", description = "No authenticated user"),
             @ApiResponse(responseCode = "403", description = "Plot of another producer, or no active plan",
@@ -243,10 +245,8 @@ public class AssistantAnswerController {
         if (QuestionCatalog.screenOf(questionId).isEmpty()) {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
-        if (resource.plotId() == null) {
-            throw new IllegalArgumentException("assistant.plot.required");
-        }
-        var plotId = new PlotId(resource.plotId());
+        // Without plot, the command accepts only a question of a screen with field scope (HOME)
+        var plotId = resource.plotId() == null ? null : new PlotId(resource.plotId());
         return new AskQuestionCommand(currentUserProvider.requireCurrentUserId(), questionId, plotId,
                 parseClientRequestId(resource.clientRequestId()), Boolean.TRUE.equals(resource.forceRefresh()),
                 LocaleContextHolder.getLocale());

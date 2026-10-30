@@ -43,7 +43,11 @@ public class AssistantAnswerPersistenceEntity implements Persistable<UUID> {
     @Column(name = "producer_id", nullable = false, updatable = false, length = 36)
     private String producerId;
 
-    @Column(name = "plot_id", nullable = false, updatable = false, length = 36)
+    /**
+     * Plot of the answer; null for an answer about the producer's whole field (HOME). An existing PostgreSQL table
+     * needs scripts/sql/2026-10-30-assistant-answers-field-scope.sql: ddl-auto=update never drops a NOT NULL.
+     */
+    @Column(name = "plot_id", updatable = false, length = 36)
     private String plotId;
 
     @Column(name = "question_id", nullable = false, updatable = false, length = 60)

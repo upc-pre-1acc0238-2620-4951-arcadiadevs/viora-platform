@@ -122,6 +122,40 @@ class AssistantAnswerRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("A whole-field answer is stored without plot and never served for a plot, nor a plot one for the field")
+    void fieldAnswersAreKeptApartFromPlotAnswers() {
+        var producer = UUID.randomUUID().toString();
+        var plot = new PlotId(UUID.randomUUID().toString());
+        var question = new QuestionId("home.alerts_affecting");
+        var since = clock.instant().minus(Duration.ofHours(1));
+        var field = repository.save(answer(producer, UUID.randomUUID(), null, question, clock.instant()));
+
+        assertThat(jdbc.queryForObject("select plot_id from assistant_answers where id = ?", String.class,
+                field.id())).isNull();
+        assertThat(repository.findById(field.id())).map(AssistantAnswer::plotId).isEmpty();
+        assertThat(repository.findLatestCached(producer, question, null, "es", VERSION, since))
+                .map(AssistantAnswer::id).contains(field.id());
+        assertThat(repository.findLatestCached(producer, question, plot, "es", VERSION, since)).isEmpty();
+        assertThat(repository.findLatestOfScreen(producer, null, "home.", since)).map(AssistantAnswer::id)
+                .contains(field.id());
+        assertThat(repository.findLatestOfScreen(producer, plot, "home.", since)).isEmpty();
+
+        var ofPlot = repository.save(answer(producer, UUID.randomUUID(), plot, question,
+                clock.instant().plusSeconds(1)));
+
+        assertThat(repository.findLatestCached(producer, question, null, "es", VERSION, since))
+                .map(AssistantAnswer::id).contains(field.id());
+        assertThat(repository.findLatestOfScreen(producer, null, "home.", since)).map(AssistantAnswer::id)
+                .contains(field.id());
+        assertThat(repository.findLatestCached(producer, question, plot, "es", VERSION, since))
+                .map(AssistantAnswer::id).contains(ofPlot.id());
+        assertThat(repository.findLatestOfScreen(producer, plot, "home.", since)).map(AssistantAnswer::id)
+                .contains(ofPlot.id());
+        assertThat(repository.findRecent(producer, since, 10)).extracting(AssistantAnswer::id)
+                .containsExactly(ofPlot.id(), field.id());
+    }
+
+    @Test
     @DisplayName("The job refuses a retention shorter than the 10 days of the history")
     void retentionCoversTheHistory() {
         assertThatThrownBy(() -> new AssistantRetentionScheduler(repository, clock, 9))
@@ -143,8 +177,13 @@ class AssistantAnswerRepositoryIntegrationTest {
     }
 
     private static AssistantAnswer answer(String producer, UUID key, Instant createdAt) {
-        return AssistantAnswer.create(key, producer, new PlotId(UUID.randomUUID().toString()),
-                QuestionId.PLAN_WHY_PERCENT, "es", VERSION, "Texto.",
+        return answer(producer, key, new PlotId(UUID.randomUUID().toString()), QuestionId.PLAN_WHY_PERCENT,
+                createdAt);
+    }
+
+    private static AssistantAnswer answer(String producer, UUID key, PlotId plot, QuestionId question,
+            Instant createdAt) {
+        return AssistantAnswer.create(key, producer, plot, question, "es", VERSION, "Texto.",
                 FACTS, List.<AnswerSource>of(), List.<AnswerAction>of(), AnswerModel.TEMPLATE, null,
                 null, createdAt);
     }

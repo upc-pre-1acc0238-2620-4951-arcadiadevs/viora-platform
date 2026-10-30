@@ -86,7 +86,7 @@ public class AssistantServiceFixture {
     }
 
     public void givenData(PlotAnswerData data) {
-        doReturn(data).when(dataReader).read(any(), any());
+        doReturn(data).when(dataReader).read(any(), any(), any());
     }
 
     /** Every ALTERNATION and PLAN question enabled. */

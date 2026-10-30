@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.answers.ClimateDataReader;
+import com.arcadiadevs.viora.platform.assistant.application.internal.answers.HomeDataReader;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
@@ -8,6 +9,7 @@ import com.arcadiadevs.viora.platform.assistant.application.internal.outboundser
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Year;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -38,6 +41,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalThinningService externalThinningService;
     private final ClimateDataReader climateDataReader;
+    private final HomeDataReader homeDataReader;
     private final Clock clock;
 
     /**
@@ -48,6 +52,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
      * @param externalPhenologyService    reads the harvest history and the bearing index
      * @param externalThinningService     reads the prescription and the caliber projection
      * @param climateDataReader           reads the alerts, forecast and nodes of the ALERT and CLIMATE screens
+     * @param homeDataReader              reads the plot, or every active plot of the producer, for HOME
      * @param clock                       the application clock, for the current campaign
      */
     @Autowired
@@ -57,6 +62,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
             ExternalPhenologyService externalPhenologyService,
             ExternalThinningService externalThinningService,
             ClimateDataReader climateDataReader,
+            HomeDataReader homeDataReader,
             Clock clock
     ) {
         this.externalSubscriptionService = externalSubscriptionService;
@@ -64,12 +70,13 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
         this.externalPhenologyService = externalPhenologyService;
         this.externalThinningService = externalThinningService;
         this.climateDataReader = climateDataReader;
+        this.homeDataReader = homeDataReader;
         this.clock = clock;
     }
 
     /**
      * Constructs the query service for the screens that read no climate data (unit tests of ALTERNATION and PLAN):
-     * the ALERT and CLIMATE screens then see no climate data and offer their questions disabled.
+     * the ALERT and CLIMATE screens then see no climate data and offer their questions disabled, and HOME no plot.
      */
     QuestionCatalogQueryServiceImpl(
             ExternalSubscriptionService externalSubscriptionService,
@@ -79,7 +86,7 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
             Clock clock
     ) {
         this(externalSubscriptionService, externalOrchardService, externalPhenologyService, externalThinningService,
-                null, clock);
+                null, null, clock);
     }
 
     @Override
@@ -90,17 +97,23 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
         if (!externalSubscriptionService.hasActivePlan(query.producerId())) {
             return Result.failure(ApplicationError.forbidden("assistant", "assistant.subscription.inactive"));
         }
-        if (!externalOrchardService.existsActivePlot(query.plotId())) {
+        // Without plot (HOME about the whole field) there is no plot to verify
+        if (query.plotId() != null && !externalOrchardService.existsActivePlot(query.plotId())) {
             return Result.failure(ApplicationError.notFound("plot", query.plotId().plotId()));
         }
-        var facts = factsFor(query.screen(), query.plotId());
+        var facts = factsFor(query.screen(), query.producerId(), query.plotId());
         return Result.success(new ScreenQuestionCatalog(query.screen(), query.plotId(),
                 QuestionCatalog.questionsFor(query.screen(), facts)));
     }
 
     /** Reads only the data the screen needs. */
-    private PlotFacts factsFor(ScreenKey screen, PlotId plotId) {
+    private PlotFacts factsFor(ScreenKey screen, String producerId, PlotId plotId) {
         int campaignYear = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
+        if (screen == ScreenKey.HOME) {
+            return PlotFacts.ofHome(campaignYear, homeDataReader == null
+                    ? new HomeData(plotId == null, List.of(), null)
+                    : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
+        }
         if (screen.readsClimate()) {
             return PlotFacts.ofClimate(campaignYear,
                     climateDataReader == null ? ClimateData.NONE : climateDataReader.read(screen, plotId));
