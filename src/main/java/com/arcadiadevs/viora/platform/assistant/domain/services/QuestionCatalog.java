@@ -7,6 +7,8 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Questi
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Owner of the closed question catalog: which questions each screen offers, in which order, with which icon,
@@ -16,11 +18,31 @@ import java.util.List;
 public final class QuestionCatalog {
 
     /** Points the {@code plan.if_less} scenario thins less than the prescription. */
-    static final int LESS_THINNING_POINTS = 10;
+    public static final int LESS_THINNING_POINTS = 10;
 
     private static final String PREFIX = "assistant.question.";
 
+    /** Questions of each screen, in display order. */
+    private static final Map<ScreenKey, List<QuestionId>> QUESTIONS = Map.of(
+            ScreenKey.ALTERNATION, List.of(QuestionId.ALTERNATION_WHY_INDEX, QuestionId.ALTERNATION_BREAK_CYCLE,
+                    QuestionId.ALTERNATION_VS_CAMPAIGNS, QuestionId.ALTERNATION_NEXT_YEAR),
+            ScreenKey.PLAN, List.of(QuestionId.PLAN_WHY_PERCENT, QuestionId.PLAN_IF_LESS, QuestionId.PLAN_IF_NONE,
+                    QuestionId.PLAN_BEST_TIME));
+
     private QuestionCatalog() {
+    }
+
+    /**
+     * Finds the screen a question belongs to.
+     *
+     * @param questionId the question
+     * @return its screen, or empty for a question the catalog does not offer
+     */
+    public static Optional<ScreenKey> screenOf(QuestionId questionId) {
+        return QUESTIONS.entrySet().stream()
+                .filter(entry -> entry.getValue().contains(questionId))
+                .map(Map.Entry::getKey)
+                .findFirst();
     }
 
     /**

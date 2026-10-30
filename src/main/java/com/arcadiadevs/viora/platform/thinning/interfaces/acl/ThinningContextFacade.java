@@ -77,4 +77,50 @@ public interface ThinningContextFacade {
             String caliberProjectionStatus
     ) {
     }
+
+    /**
+     * Retrieves what the assistant needs to explain the thinning plan of a plot campaign: the load measured by the
+     * sampling against the target, the window, the sampling behind it and, once the thinning was confirmed, the
+     * caliber projection and the yield estimated with the load left. Every figure is the one the thinning plan
+     * already shows; nothing is recomputed here.
+     *
+     * @param plotId       the plot identifier string (UUID)
+     * @param campaignYear the campaign year
+     * @return the plan detail, or empty when the plot was never sampled that campaign
+     */
+    Optional<ThinningPlanDetail> findThinningPlanDetail(String plotId, int campaignYear);
+
+    /**
+     * Thinning plan of a campaign as the assistant explains it. Every field is null when unknown.
+     *
+     * @param issued                        whether the prescription was issued (prescribed, confirmed or executed)
+     * @param percentageToRemove            prescribed percentage of fruits to remove; null while not issued
+     * @param preThinningFruitsPerShoot     mean load of the representative sampling, before thinning
+     * @param targetFruitsPerShoot          sustainable target of the prescription
+     * @param windowOpensOn                 first recommended thinning date
+     * @param windowClosesOn                latest recommended thinning date
+     * @param sampledTrees                  distinct trees sampled so far
+     * @param lastSampledOn                 date of the latest tree sampled
+     * @param executedOn                    date the thinning was confirmed as done; null while not confirmed
+     * @param caliberProjectionStatus       status of the caliber projection of the confirmed execution
+     * @param mostLikelyFruitsPerKg         central caliber estimate, only when the projection is estimated
+     * @param commercialSizeGrade           commercial size grade of that caliber, only when estimated
+     * @param estimatedKgPerHaAfterThinning campaign yield estimated with the load left by the thinning
+     */
+    record ThinningPlanDetail(
+            boolean issued,
+            Double percentageToRemove,
+            Double preThinningFruitsPerShoot,
+            Double targetFruitsPerShoot,
+            LocalDate windowOpensOn,
+            LocalDate windowClosesOn,
+            int sampledTrees,
+            LocalDate lastSampledOn,
+            LocalDate executedOn,
+            String caliberProjectionStatus,
+            Double mostLikelyFruitsPerKg,
+            String commercialSizeGrade,
+            Double estimatedKgPerHaAfterThinning
+    ) {
+    }
 }
