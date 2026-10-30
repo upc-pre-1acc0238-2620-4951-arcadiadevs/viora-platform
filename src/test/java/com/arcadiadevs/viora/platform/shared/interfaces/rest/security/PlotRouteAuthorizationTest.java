@@ -17,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Every endpoint reaching the data hanging from a plot, or a prescription by its id, checks the owner with method
@@ -65,6 +66,23 @@ class PlotRouteAuthorizationTest {
         }
         assertFalse(routes.isEmpty(), "no route takes a plotId parameter");
         assertEquals(List.of(), missing);
+    }
+
+    /**
+     * The plot can also come in the body of a request, as it does when asking the assistant a question. The rule on
+     * the method must then read it from the body.
+     */
+    @Test
+    void theAssistantRouteTakingThePlotInItsBodyChecksItsOwner() throws Exception {
+        var controller = ClassUtils.forName(
+                BASE_PACKAGE + ".assistant.interfaces.rest.controllers.AssistantAnswerController",
+                getClass().getClassLoader());
+        var ask = Arrays.stream(controller.getDeclaredMethods()).filter(method -> method.getName().equals("ask"))
+                .findFirst().orElseThrow();
+        var rule = AnnotatedElementUtils.findMergedAnnotation(ask, PreAuthorize.class);
+
+        assertNotNull(rule, "the route asking a question does not check the owner of the plot");
+        assertEquals("@plotAccess.isAccessible(#resource.plotId())", rule.value());
     }
 
     private static boolean takesPlotIdParameter(Method method) {
