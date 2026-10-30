@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.orchard.interfaces.rest;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +18,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Field notes of the logbook (P75)")
 class FieldNoteControllerIntegrationTest {
 
-    private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
+    private static final LocalDate TODAY = LocalDate.now(ProducerTimeZone.ZONE);
     private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3};
 
     @Autowired WebApplicationContext context;
