@@ -288,6 +288,14 @@ class AssistantHomeScreenIntegrationTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.detail").value("Indica el lote de esta pantalla"));
+            // The missing plot is reported before a missing or malformed request key, as before field scope
+            for (var body : List.of("{\"questionId\":\"%s\"}".formatted(questionId),
+                    "{\"questionId\":\"%s\",\"clientRequestId\":\"not-a-uuid\"}".formatted(questionId))) {
+                mvc.perform(post(ANSWERS).contentType(MediaType.APPLICATION_JSON).content(body)
+                                .header(HttpHeaders.ACCEPT_LANGUAGE, "es"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.detail").value("Indica el lote de esta pantalla"));
+            }
         }
         for (var screen : List.of("ALTERNATION", "PLAN", "ALERT", "CLIMATE")) {
             mvc.perform(get(QUESTIONS).param("screen", screen).header(HttpHeaders.ACCEPT_LANGUAGE, "es"))

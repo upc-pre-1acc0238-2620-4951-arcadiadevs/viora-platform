@@ -242,10 +242,15 @@ public class AssistantAnswerController {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
         var questionId = new QuestionId(resource.questionId().trim());
-        if (QuestionCatalog.screenOf(questionId).isEmpty()) {
+        var screen = QuestionCatalog.screenOf(questionId);
+        if (screen.isEmpty()) {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
-        // Without plot, the command accepts only a question of a screen with field scope (HOME)
+        // Without plot, only a question of a screen with field scope (HOME) goes on; the missing plot is reported
+        // before the request key is parsed
+        if (resource.plotId() == null && screen.get().requiresPlot()) {
+            throw new IllegalArgumentException("assistant.plot.required");
+        }
         var plotId = resource.plotId() == null ? null : new PlotId(resource.plotId());
         return new AskQuestionCommand(currentUserProvider.requireCurrentUserId(), questionId, plotId,
                 parseClientRequestId(resource.clientRequestId()), Boolean.TRUE.equals(resource.forceRefresh()),
