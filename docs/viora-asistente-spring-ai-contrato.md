@@ -227,6 +227,8 @@ Implementado (2026-10-30): del 1 de junio al 31 de agosto responde sobre el invi
 ### PLOT_DETAIL (P26, P136–P138)
 `plot.how_is` (vecería 0,51 + 12 días), `plot.today`, `plot.last_sampling`, `plot.next_year_harvest` (deshabilitada sin calibre).
 
+Implementado (2026-10-30): la pantalla lee el lote como HOME lo lee para un solo lote, así que no hay fachadas nuevas. `plot.how_is` da el índice de vecería y dónde está el aclareo; con la ventana abierta, los días que quedan, hoy incluido ("12 días de ventana · ventana abierta"). Sin índice y sin muestreo se deshabilita. `plot.today` resume el aclareo, el pronóstico de hoy y las alertas, y siempre se ofrece. `plot.last_sampling` resume el muestreo de la campaña con el día de la última ronda y se deshabilita sin muestreo. `plot.next_year_harvest` responde como `alternation.next_year` y se deshabilita sin calibre. Detalle en `asistente-decisiones.md` (Pantalla Detalle de lote).
+
 ### SENSORS (P85, P139–P141)
 `sensors.what_say` (2 nodos activos, 27,4 °C), `sensors.why_paused`, `sensors.reliability`, `sensors.how_link`. Datos de nodos virtuales etiquetados como simulados.
 
