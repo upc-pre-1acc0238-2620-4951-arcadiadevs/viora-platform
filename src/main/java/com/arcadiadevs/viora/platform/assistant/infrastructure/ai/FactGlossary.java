@@ -41,7 +41,11 @@ final class FactGlossary {
             Map.entry("chill.reach_30", "when the plot reaches its chill requirement, against the budbreak date"),
             Map.entry("chill.vs_last_winter", "how the chill of this winter compares with last winter"),
             Map.entry("chill.if_incomplete", "what too little chill may mean; Viora does not estimate the effect, "
-                    + "point to the technician"));
+                    + "point to the technician"),
+            Map.entry("plot.how_is", "the bearing index of the plot and where its thinning stands"),
+            Map.entry("plot.today", "what the producer can do in the plot today: thinning, today's weather, alerts"),
+            Map.entry("plot.last_sampling", "what the sampling of the campaign measured and what it leads to"),
+            Map.entry("plot.next_year_harvest", "the harvest estimated after the thinning, with its caliber"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -139,7 +143,11 @@ final class FactGlossary {
             Map.entry("lastWinterPortions", "chill portions of the whole last winter"),
             Map.entry("lastWinterSameDatePortions", "chill portions last winter had on the same date"),
             Map.entry("lastWinterCompletionDate", "day last winter reached thresholdPortions"),
-            Map.entry("lastWinterDaysAbove24Celsius", "days of last winter whose maximum was above warmDayCelsius"));
+            Map.entry("lastWinterDaysAbove24Celsius", "days of last winter whose maximum was above warmDayCelsius"),
+            Map.entry("todayMax", "forecast maximum of today, °C"),
+            Map.entry("todayMin", "forecast minimum of today, °C"),
+            Map.entry("frostThreshold", "minimum that opens a frost warning, °C"),
+            Map.entry("frostReached", "true when today's minimum reaches frostThreshold"));
 
     private FactGlossary() {
     }

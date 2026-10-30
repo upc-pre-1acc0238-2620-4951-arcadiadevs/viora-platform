@@ -114,6 +114,13 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
                     ? new HomeData(plotId == null, List.of(), null)
                     : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
         }
+        if (screen == ScreenKey.PLOT_DETAIL) {
+            return PlotFacts.ofPlotDetail(campaignYear,
+                    externalPhenologyService.findBiennialBearingIndex(plotId).orElse(null),
+                    homeDataReader == null
+                            ? new HomeData(false, List.of(), null)
+                            : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
+        }
         if (screen.readsChill()) {
             return PlotFacts.ofChill(campaignYear, externalPhenologyService.findChillData(plotId));
         }

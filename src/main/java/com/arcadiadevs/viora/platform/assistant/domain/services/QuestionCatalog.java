@@ -38,7 +38,9 @@ public final class QuestionCatalog {
             ScreenKey.CLIMATE, List.of(QuestionId.CLIMATE_IRRIGATE, QuestionId.CLIMATE_FRUITSET_EFFECT,
                     QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY),
             ScreenKey.WINTER_CHILL, List.of(QuestionId.CHILL_MISSING, QuestionId.CHILL_REACH_30,
-                    QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE));
+                    QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE),
+            ScreenKey.PLOT_DETAIL, List.of(QuestionId.PLOT_HOW_IS, QuestionId.PLOT_TODAY,
+                    QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST));
 
     private QuestionCatalog() {
     }
@@ -71,6 +73,7 @@ public final class QuestionCatalog {
             case ALERT -> alert(facts.climate());
             case CLIMATE -> climate(facts.climate());
             case WINTER_CHILL -> chill(facts.chill());
+            case PLOT_DETAIL -> plotDetail(facts);
         };
     }
 
@@ -241,6 +244,28 @@ public final class QuestionCatalog {
                 question(QuestionId.CHILL_IF_INCOMPLETE, closed
                         ? label(QuestionId.CHILL_IF_INCOMPLETE, "label.closed", threshold, year)
                         : label(QuestionId.CHILL_IF_INCOMPLETE, "label", threshold), "alert", null));
+    }
+
+    /**
+     * The PLOT_DETAIL screen: the state of the plot needs its bearing index or a sampling of the campaign, the last
+     * sampling a sampled tree and the harvest an estimated caliber, as on HOME. Today's tasks are always offered;
+     * without any pending they say so.
+     */
+    private static List<CatalogQuestion> plotDetail(PlotFacts facts) {
+        var home = facts.home();
+        var plan = home.singlePlot() ? home.plots().getFirst().plan() : null;
+        boolean sampled = plan != null && plan.sampledTrees() > 0;
+        return List.of(
+                question(QuestionId.PLOT_HOW_IS, label(QuestionId.PLOT_HOW_IS, "label"), "lote",
+                        facts.bearingIndex() != null || sampled
+                                ? null : CatalogText.of("assistant.reason.plot_data_missing")),
+                question(QuestionId.PLOT_TODAY, label(QuestionId.PLOT_TODAY, "label"), "calendar", null),
+                question(QuestionId.PLOT_LAST_SAMPLING, label(QuestionId.PLOT_LAST_SAMPLING, "label"), "fruit",
+                        sampled ? null : CatalogText.of("assistant.reason.sampling_missing")),
+                question(QuestionId.PLOT_NEXT_YEAR_HARVEST,
+                        label(QuestionId.PLOT_NEXT_YEAR_HARVEST, "label", String.valueOf(facts.campaignYear() + 1)),
+                        "harvest", home.caliberEstimates().isEmpty()
+                                ? CatalogText.of("assistant.reason.caliber_missing") : null));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */
