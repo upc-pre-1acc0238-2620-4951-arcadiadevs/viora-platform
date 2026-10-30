@@ -28,4 +28,14 @@ public record QuestionId(String value) {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
     }
+
+    /**
+     * The screen whose catalog this question belongs to, which is the part before the dot.
+     *
+     * @return the screen
+     * @throws IllegalArgumentException with {@code assistant.screen.invalid} when no screen has that name
+     */
+    public ScreenKey screen() {
+        return ScreenKey.fromValue(value.substring(0, value.indexOf('.')));
+    }
 }
