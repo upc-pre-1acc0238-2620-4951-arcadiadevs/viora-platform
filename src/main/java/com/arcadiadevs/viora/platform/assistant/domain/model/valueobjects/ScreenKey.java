@@ -11,7 +11,16 @@ public enum ScreenKey {
     ALTERNATION,
 
     /** Thinning plan of a plot (P61, P120-P122). */
-    PLAN;
+    PLAN,
+
+    /** Agroclimatic alert of a plot (T15, P123-P125). */
+    ALERT,
+
+    /** Climate of a plot: forecast and sensors (P90, P130-P132). */
+    CLIMATE,
+
+    /** Winter chill of a plot: Erez chill portions of the season (P80, P133-P135). */
+    WINTER_CHILL;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it.
@@ -20,6 +29,16 @@ public enum ScreenKey {
      */
     public boolean requiresPlot() {
         return true;
+    }
+
+    /**
+     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL questions use
+     * the shorter {@code chill.} of the contract.
+     *
+     * @return the prefix
+     */
+    public String questionPrefix() {
+        return this == WINTER_CHILL ? "chill." : name().toLowerCase(Locale.ROOT) + ".";
     }
 
     /**

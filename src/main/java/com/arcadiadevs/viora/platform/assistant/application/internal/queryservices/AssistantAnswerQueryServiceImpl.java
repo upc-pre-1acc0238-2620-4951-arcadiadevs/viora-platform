@@ -20,7 +20,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -85,7 +84,7 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         if (!externalSubscriptionService.hasActivePlan(query.producerId())) {
             return Result.failure(inactivePlan());
         }
-        var prefix = query.screen().name().toLowerCase(Locale.ROOT) + ".";
+        var prefix = query.screen().questionPrefix();
         return repository.findLatestOfScreen(query.producerId(), query.plotId(), prefix, since())
                 .<Result<AnswerView, ApplicationError>>map(answer -> Result.success(view(answer, new HashMap<>())))
                 .orElseGet(() -> Result.failure(ApplicationError.notFound("Answer", "assistant.answer.none")));

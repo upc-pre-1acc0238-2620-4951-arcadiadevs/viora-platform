@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.queryservi
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
@@ -51,6 +52,8 @@ class QuestionCatalogQueryServiceImplTest {
     private ExternalPhenologyService externalPhenologyService;
     @Mock
     private ExternalThinningService externalThinningService;
+    @Mock
+    private ExternalTelemetryService externalTelemetryService;
 
     private QuestionCatalogQueryServiceImpl queryService;
 
@@ -61,7 +64,10 @@ class QuestionCatalogQueryServiceImplTest {
     void setUp() {
         var factsAssembler = new AnswerFactsAssembler(List.of(
                 new AlternationFactsReader(externalOrchardService, externalPhenologyService, externalThinningService),
-                new PlanFactsReader(externalThinningService)), CLOCK);
+                new PlanFactsReader(externalThinningService),
+                new AlertFactsReader(externalTelemetryService, externalOrchardService),
+                new ClimateFactsReader(externalTelemetryService, CLOCK),
+                new ChillFactsReader(externalPhenologyService)), CLOCK);
         queryService = new QuestionCatalogQueryServiceImpl(externalSubscriptionService, externalOrchardService,
                 factsAssembler);
     }

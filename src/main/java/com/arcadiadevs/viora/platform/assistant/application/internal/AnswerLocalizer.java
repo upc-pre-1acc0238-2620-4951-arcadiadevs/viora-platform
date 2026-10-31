@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Answer
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerSource;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactDraft;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,9 @@ import java.util.Locale;
  */
 @Component
 public class AnswerLocalizer {
+
+    private static final String DATE = "assistant.answer.date";
+    private static final String DATE_SHORT = "assistant.answer.date_short";
 
     private final MessageSource messageSource;
 
@@ -89,6 +93,10 @@ public class AnswerLocalizer {
         }
         if (arg instanceof LocalDate date) {
             return DateTimeFormatter.ofPattern("d MMM", locale).format(date).replace(".", "");
+        }
+        if (arg instanceof TextDate date) {
+            var pattern = messageSource.getMessage(date.shortForm() ? DATE_SHORT : DATE, null, locale);
+            return DateTimeFormatter.ofPattern(pattern, locale).format(date.date()).replace(".", "");
         }
         return arg;
     }

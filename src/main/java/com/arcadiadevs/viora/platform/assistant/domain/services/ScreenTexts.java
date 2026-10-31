@@ -2,7 +2,9 @@ package com.arcadiadevs.viora.platform.assistant.domain.services;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,6 +38,16 @@ final class ScreenTexts {
     /** A part of the template of an answer. */
     static CatalogText text(String question, String part, Object... args) {
         return CatalogText.of(ANSWER_KEY + question + "." + part, args);
+    }
+
+    /** A text several answers share, such as a card label, a value format or a source. */
+    static CatalogText shared(String key, Object... args) {
+        return CatalogText.of(ANSWER_KEY + key, args);
+    }
+
+    /** "Pronóstico de Open-Meteo, actualizado el 30 de octubre". */
+    static CatalogText forecastSource(ClimateData.Forecast forecast) {
+        return shared("source.forecast", TextDate.of(forecast.syncedOn()));
     }
 
     /** By how many whole percent {@code value} is above (positive) or below (negative) {@code reference}. */
