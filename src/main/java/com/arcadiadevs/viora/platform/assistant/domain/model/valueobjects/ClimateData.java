@@ -7,8 +7,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * The climate figures of a plot the ALERT and CLIMATE screens read, already judged by Telemetry: its thresholds, its
- * open alerts, the forecast and the nodes. The assistant never evaluates a threshold itself.
+ * The climate figures of a plot the ALERT, CLIMATE, SENSORS and PLOT_DETAIL screens read, already judged by
+ * Telemetry: its thresholds, its open alerts, the forecast and the nodes. The assistant never evaluates a threshold
+ * itself.
  */
 public final class ClimateData {
 
@@ -136,6 +137,21 @@ public final class ClimateData {
 
         String canonical() {
             return temperature + ";" + humidity + ";" + soilMoisture;
+        }
+    }
+
+    /**
+     * How much the plot read over the last days, as Telemetry counts it in the producers' time zone. Telemetry keeps
+     * the readings per plot, not per node, so this is the coverage of the plot.
+     *
+     * @param lastReadingOn    day of the latest reading; null without readings
+     * @param daysWithReadings days of the window with at least one hourly reading
+     * @param windowDays       days of the window, today included
+     */
+    public record Coverage(LocalDate lastReadingOn, int daysWithReadings, int windowDays) {
+
+        String canonical() {
+            return lastReadingOn + ";" + daysWithReadings + ";" + windowDays;
         }
     }
 }

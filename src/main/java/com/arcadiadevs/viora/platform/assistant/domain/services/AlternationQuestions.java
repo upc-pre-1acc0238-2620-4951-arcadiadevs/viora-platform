@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.SAMPLING_ROUTE;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.THINNING_PLAN_ROUTE;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.band;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.label;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.percentOf;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTexts.question;
@@ -29,8 +30,6 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.ScreenTex
  * template each one is answered with.
  */
 public final class AlternationQuestions {
-
-    private static final String BAND_KEY = "assistant.band.";
 
     private AlternationQuestions() {
     }
@@ -202,18 +201,6 @@ public final class AlternationQuestions {
                                 text("alternation.next_year", "fact2.pill", lastYear), FactTone.HIGHLIGHT)),
                 text("alternation", "source", campaigns.size()),
                 List.of()));
-    }
-
-    private static Optional<CatalogText> band(String category) {
-        if (category == null) {
-            return Optional.empty();
-        }
-        return switch (category) {
-            case "REGULAR" -> Optional.of(CatalogText.of(BAND_KEY + "regular"));
-            case "MODERATE_ALTERNATION" -> Optional.of(CatalogText.of(BAND_KEY + "moderate"));
-            case "SEVERE_ALTERNATION" -> Optional.of(CatalogText.of(BAND_KEY + "severe"));
-            default -> Optional.empty();
-        };
     }
 
     private static double average(List<Campaign> campaigns) {

@@ -67,7 +67,14 @@ class QuestionCatalogQueryServiceImplTest {
                 new PlanFactsReader(externalThinningService),
                 new AlertFactsReader(externalTelemetryService, externalOrchardService),
                 new ClimateFactsReader(externalTelemetryService, CLOCK),
-                new ChillFactsReader(externalPhenologyService)), CLOCK);
+                new ChillFactsReader(externalPhenologyService),
+                new PlotDetailFactsReader(externalThinningService, externalPhenologyService, externalTelemetryService,
+                        CLOCK),
+                new SensorsFactsReader(externalTelemetryService, CLOCK),
+                new SamplingFactsReader(externalThinningService, CLOCK),
+                new ThinningDoneFactsReader(externalThinningService),
+                new CampaignClosedFactsReader(externalPhenologyService, externalThinningService,
+                        externalOrchardService)), CLOCK);
         queryService = new QuestionCatalogQueryServiceImpl(externalSubscriptionService, externalOrchardService,
                 factsAssembler);
     }

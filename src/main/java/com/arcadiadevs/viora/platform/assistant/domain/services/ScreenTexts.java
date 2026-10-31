@@ -8,6 +8,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDa
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Optional;
 
 /**
  * The message keys and the arithmetic every screen writes its questions and answers with, so each screen rounds
@@ -17,6 +18,7 @@ final class ScreenTexts {
 
     private static final String QUESTION_KEY = "assistant.question.";
     private static final String ANSWER_KEY = "assistant.answer.";
+    private static final String BAND_KEY = "assistant.band.";
 
     static final String THINNING_PLAN_ROUTE = "thinning/plan?plotId=";
     static final String THINNING_EXECUTE_ROUTE = "thinning/execute?plotId=";
@@ -58,5 +60,23 @@ final class ScreenTexts {
     /** Rounds half up, so the figure of the text and of the card are the same number. */
     static double round(double value, int decimals) {
         return BigDecimal.valueOf(value).setScale(decimals, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    /** Rounds half up to a whole number, as percentages, kilograms and calibers are shown. */
+    static long whole(double value) {
+        return BigDecimal.valueOf(value).setScale(0, RoundingMode.HALF_UP).longValue();
+    }
+
+    /** "producción regular", "vecería moderada", "vecería severa": the band of a bearing index category. */
+    static Optional<CatalogText> band(String category) {
+        if (category == null) {
+            return Optional.empty();
+        }
+        return switch (category) {
+            case "REGULAR" -> Optional.of(CatalogText.of(BAND_KEY + "regular"));
+            case "MODERATE_ALTERNATION" -> Optional.of(CatalogText.of(BAND_KEY + "moderate"));
+            case "SEVERE_ALTERNATION" -> Optional.of(CatalogText.of(BAND_KEY + "severe"));
+            default -> Optional.empty();
+        };
     }
 }
