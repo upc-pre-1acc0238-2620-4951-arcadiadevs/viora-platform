@@ -44,6 +44,10 @@ public record QuestionId(String value) {
     public static final QuestionId SENSORS_WHY_PAUSED = new QuestionId("sensors.why_paused");
     public static final QuestionId SENSORS_RELIABILITY = new QuestionId("sensors.reliability");
     public static final QuestionId SENSORS_HOW_LINK = new QuestionId("sensors.how_link");
+    public static final QuestionId SAMPLING_ENOUGH_TREES = new QuestionId("sampling.enough_trees");
+    public static final QuestionId SAMPLING_MEANING = new QuestionId("sampling.meaning");
+    public static final QuestionId SAMPLING_NEXT = new QuestionId("sampling.next");
+    public static final QuestionId SAMPLING_CORRECT_TREE = new QuestionId("sampling.correct_tree");
 
     /**
      * Compact constructor validating the {@code screen.question} format.

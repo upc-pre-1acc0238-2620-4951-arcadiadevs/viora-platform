@@ -2,8 +2,11 @@ package com.arcadiadevs.viora.platform.assistant.domain.services.assemblers;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AssembledFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactCardTemplate;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotAnswerData;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningPlanData;
 import com.arcadiadevs.viora.platform.assistant.domain.services.FactsAssembler;
 
@@ -13,13 +16,13 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AnswerTexts.whole;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AnswerTexts.*;
 
 /**
- * Base of the PLOT_DETAIL questions, about one plot read as HOME reads it. The thinning of the campaign is judged
+ * Base of the PLOT_DETAIL and SAMPLING_SUMMARY questions, about one plot read as HOME reads it. The thinning of the campaign is judged
  * with the window rules of the PLAN screen: the days left count today, the days until it opens do not.
  */
-abstract class PlotDetailFactsAssembler implements FactsAssembler {
+abstract class OnePlotFactsAssembler implements FactsAssembler {
 
     /** Where the thinning of the campaign stands today. */
     enum Window {
@@ -41,7 +44,7 @@ abstract class PlotDetailFactsAssembler implements FactsAssembler {
     public final Optional<AssembledFacts> assemble(PlotAnswerData data) {
         var home = data.home();
         if (home.fieldScope() || !home.singlePlot()) {
-            // Not a PLOT_DETAIL question: there is no plot to answer from
+            // Not a question about one plot: there is nothing to answer from
             return Optional.empty();
         }
         return build(data, home.plots().getFirst(), home, new TreeMap<>());
@@ -129,5 +132,36 @@ abstract class PlotDetailFactsAssembler implements FactsAssembler {
             return Optional.empty();
         }
         return plot.forecast().days().stream().filter(day -> today.equals(day.date())).findFirst();
+    }
+
+    /**
+     * The card of the thinning window: days left or until it opens, closed, recorded, or no plan yet.
+     *
+     * @param today the current day
+     * @param plan  the plan of the campaign; may be null
+     * @param state its state
+     * @return the card
+     */
+    static FactCardTemplate windowCard(LocalDate today, ThinningPlanData plan, Window state) {
+        return switch (state) {
+            case OPEN -> {
+                long days = daysLeft(today, plan);
+                yield card(shared("value.integer", days), shared("card.days_left.label", days),
+                        shared("card.window.open"), FactTone.HIGHLIGHT);
+            }
+            case BEFORE -> {
+                long days = daysUntilOpen(today, plan);
+                yield card(shared("value.integer", days), shared("card.days_to_open.label", days),
+                        shared("card.opens.pill", TextDate.shortOf(plan.windowOpensOn())), FactTone.HIGHLIGHT);
+            }
+            case CLOSED -> card(shared("card.closed.value"), shared("card.window.label"),
+                    shared("card.closed_on.pill", TextDate.shortOf(plan.windowClosesOn())), FactTone.HIGHLIGHT);
+            case DONE -> card(shared("card.done.value"), shared("card.done.label"),
+                    shared("card.done.pill", TextDate.shortOf(plan.executedOn())), FactTone.HIGHLIGHT);
+            case SAMPLING -> card(shared("card.no_plan.value"), shared("card.no_plan.label"),
+                    shared("card.sampling.pill", plan.sampledTrees()), FactTone.HIGHLIGHT);
+            case NONE -> card(shared("card.no_plan.value"), shared("card.no_plan.label"),
+                    shared("card.no_plan.pill"), FactTone.HIGHLIGHT);
+        };
     }
 }

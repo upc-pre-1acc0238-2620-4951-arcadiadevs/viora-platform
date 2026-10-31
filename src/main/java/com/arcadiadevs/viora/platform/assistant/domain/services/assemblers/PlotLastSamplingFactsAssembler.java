@@ -21,7 +21,7 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.assembler
  * it leads to, otherwise the trees still missing. The thinning context exposes the rounds summed up, never one by
  * one, so the load is that of the whole sampling.
  */
-public final class PlotLastSamplingFactsAssembler extends PlotDetailFactsAssembler {
+public final class PlotLastSamplingFactsAssembler extends OnePlotFactsAssembler {
 
     @Override
     public QuestionId questionId() {

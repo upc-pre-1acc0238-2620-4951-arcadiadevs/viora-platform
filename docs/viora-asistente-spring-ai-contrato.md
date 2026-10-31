@@ -237,6 +237,8 @@ Implementado (2026-10-30): `sensors.what_say` responde como `climate.sensors_say
 ### SAMPLING_SUMMARY (P54, P142–P144)
 `sampling.enough_trees` (5/5 y 0,59 frutos por brote vs objetivo 0,40; mínimo 5 árboles), `sampling.meaning`, `sampling.next`, `sampling.correct_tree`.
 
+Implementado (2026-10-30): `sampling.enough_trees` da los árboles sobre el mínimo de 5 y la carga frente al objetivo. `sampling.meaning` explica cuántas veces la carga supera al objetivo y el porcentaje a quitar. `sampling.next` da el paso siguiente según la ventana de aclareo, con "Registrar aclareo" mientras está abierta. `sampling.correct_tree` se ofrece siempre deshabilitada ("Corregir un árbol todavía no está disponible") porque Raleo no permite corregir un árbol. Por qué, cómo, el hallazgo de la carga duplicada y qué falta para activarla: `asistente-decisiones.md` (Pantalla Resumen de muestreo).
+
 ### THINNING_DONE (P63, P145–P147)
 `thinning.harvest_change` (8,2 t/ha y 2027 más estable), `thinning.why_target`, `thinning.next_sampling`.
 

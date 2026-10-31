@@ -28,7 +28,10 @@ public enum ScreenKey {
     PLOT_DETAIL,
 
     /** Nodes of a plot: what they read, how reliable it is and how to link one (P85, P139-P141). */
-    SENSORS;
+    SENSORS,
+
+    /** Summary of the sampling of a plot: enough trees, what it means, what to do next (P54, P142-P144). */
+    SAMPLING_SUMMARY;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -51,6 +54,16 @@ public enum ScreenKey {
     }
 
     /**
+     * Whether the questions of the screen are about one plot read as HOME reads it: its thinning plan, sampling,
+     * alerts, harvests and forecast.
+     *
+     * @return true for PLOT_DETAIL and SAMPLING_SUMMARY
+     */
+    public boolean readsOnePlot() {
+        return this == PLOT_DETAIL || this == SAMPLING_SUMMARY;
+    }
+
+    /**
      * Whether the questions of the screen answer from the winter chill season of the plot (Phenology).
      *
      * @return true for WINTER_CHILL
@@ -61,7 +74,7 @@ public enum ScreenKey {
 
     /**
      * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL and PLOT_DETAIL
-     * questions use the shorter {@code chill.} and {@code plot.} of the contract.
+     * and SAMPLING_SUMMARY questions use the shorter {@code chill.}, {@code plot.} and {@code sampling.} of the contract.
      *
      * @return the prefix
      */
@@ -69,6 +82,7 @@ public enum ScreenKey {
         return switch (this) {
             case WINTER_CHILL -> "chill.";
             case PLOT_DETAIL -> "plot.";
+            case SAMPLING_SUMMARY -> "sampling.";
             default -> name().toLowerCase(Locale.ROOT) + ".";
         };
     }

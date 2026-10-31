@@ -158,6 +158,54 @@ El dueño eligió "completo": HOME responde para un lote o, sin `plotId`, para t
 - **Total de kilos del campo.** Si el dueño quiere un total, decidir qué superficie usar (polígono o plantada) y si se suma kg/ha × ha.
 - **Lotes sin muestreo en "esta semana".** Decidir con el agrónomo si un lote sin ningún muestreo en temporada debe aparecer como pendiente.
 
+## Pantalla Resumen de muestreo (SAMPLING_SUMMARY)
+
+Preguntas del contrato: `sampling.enough_trees` (5/5 y 0,59 frutos por brote vs objetivo 0,40; mínimo 5 árboles), `sampling.meaning`, `sampling.next` y `sampling.correct_tree`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`: plan de aclareo y árboles que faltan de Raleo); no se agregó nada a Raleo.
+
+### `sampling.correct_tree`: se ofrece siempre deshabilitada (decisión del dueño, 2026-10-30)
+
+**Por qué.** El contrato pide explicar cómo corregir un árbol mal registrado, pero Raleo no lo permite:
+
+- El único endpoint de muestreo es `POST /api/v1/plots/{plotId}/samplings`, que agrega una ronda nueva. No hay forma de editar ni de borrar el registro de un árbol.
+- Volver a registrar el árbol con la misma etiqueta tampoco lo corrige; ver el hallazgo de abajo.
+
+Decirle al productor "vuelve a registrarlo" sería un mal consejo. Se evaluaron dos caminos:
+
+- **A (elegido):** mostrar la pregunta deshabilitada con un motivo.
+- **B:** implementar la corrección en Raleo, haciendo que el último registro de una etiqueta reemplace al anterior o agregando un endpoint de edición. Se descartó por ahora: cambia cómo se calcula la carga de las prescripciones (y con ella el porcentaje a quitar y el calibre), así que es una decisión de negocio y un cambio de mayor riesgo en otro contexto.
+
+**Cómo.**
+
+- `QuestionCatalog.sampling` ofrece la pregunta con `enabled: false` y `disabledReason` "Corregir un árbol todavía no está disponible" (`assistant.reason.tree_correction_unavailable`).
+- No hay ensamblador registrado para ella. Si la app la pide igual, la API responde 409 con ese mismo motivo.
+- Lo fijan `SamplingQuestionCatalogTest`, `SamplingFactsAssemblersTest.registered` y `AssistantSamplingSummaryScreenIntegrationTest`.
+
+**Para qué.**
+
+- La app muestra el catálogo completo del contrato sin dar un consejo que empeore el plan.
+- El equipo ve en un solo lugar qué falta para activarla.
+
+**Hallazgo para Raleo: un árbol registrado dos veces distorsiona la carga.**
+
+- `SamplingCoverageEvaluator.countUniqueEvaluatedTrees` cuenta etiquetas únicas, así que el árbol repetido cuenta una sola vez para la representatividad.
+- `computeMeanFruitsPerShoot` en cambio suma todos los registros, así que los brotes y frutos del árbol entran dos veces en la carga (el registro malo y el nuevo).
+- Resultado: si un productor intenta "corregir" un árbol cargándolo de nuevo, la carga, el porcentaje a quitar y el calibre proyectado se calculan con datos duplicados, sin ningún aviso.
+- No se tocó; queda para que el equipo decida la regla (por ejemplo, que el último registro de cada etiqueta reemplace al anterior).
+
+**Cuándo activarla.** Cuando Raleo permita corregir un árbol:
+
+1. una regla o un endpoint que reemplace el registro de una etiqueta en la campaña;
+2. el promedio de la carga calculado con un solo registro por etiqueta;
+3. en el asistente, habilitar la pregunta y agregar su ensamblador con los pasos.
+
+### Resto de la pantalla (2026-10-30)
+
+- **Mínimo de árboles.** Raleo solo expone los árboles que faltan, no el mínimo. El asistente muestra 5, el mismo `SamplingCoverageEvaluator.MIN_REPRESENTATIVE_TREES` de Raleo; un test falla si dejan de coincidir.
+- **`sampling.enough_trees`.** Árboles muestreados sobre el mínimo ("5/5 · muestra representativa" o "3/5 · faltan 2") y, con la prescripción emitida, la carga frente al objetivo. Se deshabilita sin muestreo en la campaña.
+- **`sampling.meaning`.** La carga frente al objetivo, cuántas veces lo supera y el porcentaje que quita el plan. La razón se calcula en decimal con las cifras que se muestran (0,59 / 0,40 = 1,48), para que coincida con la cuenta que haría el productor. Se deshabilita sin prescripción ("Sin plan de aclareo activo").
+- **`sampling.next`.** El paso siguiente según el aclareo: muestrear los árboles que faltan, revisar el plan si aún no se calcula, esperar la ventana, aclarear (con el botón "Registrar aclareo" de PLAN mientras la ventana está abierta), consultar al técnico si la ventana cerró, o nada si el aclareo ya se registró.
+- **Redacción.** Se usa "aclarear", como en PLAN. Se corrigió "aclarar" en `plot.today`.
+
 ## Pantalla Sensores (SENSORS)
 
 Preguntas del contrato: `sensors.what_say` (2 nodos activos, 27,4 °C), `sensors.why_paused`, `sensors.reliability` y `sensors.how_link`. Todo sale de Telemetría por la fachada (`findPlotSensors` y `findTelemetryCoverage`, ambas de solo lectura y ya existentes); no se agregó nada a Telemetría.

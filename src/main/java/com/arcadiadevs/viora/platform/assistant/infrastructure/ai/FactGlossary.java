@@ -49,7 +49,11 @@ final class FactGlossary {
             Map.entry("sensors.what_say", "what the latest reading of the plot says"),
             Map.entry("sensors.why_paused", "why a node is paused; Telemetry cannot pause nodes yet"),
             Map.entry("sensors.reliability", "where the readings come from and how many recent days had readings"),
-            Map.entry("sensors.how_link", "what is needed to link a node to the plot"));
+            Map.entry("sensors.how_link", "what is needed to link a node to the plot"),
+            Map.entry("sampling.enough_trees", "whether the trees sampled reach the minimum, with the load and target"),
+            Map.entry("sampling.meaning", "what the measured load against the target means for the thinning"),
+            Map.entry("sampling.next", "the next step after the sampling"),
+            Map.entry("sampling.correct_tree", "how to correct a sampled tree; Thinning cannot do it yet"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -156,7 +160,9 @@ final class FactGlossary {
             Map.entry("windowDays", "days counted, today included"),
             Map.entry("lastReadingOn", "day of the latest reading"),
             Map.entry("microclimateNodes", "linked microclimate (air) nodes"),
-            Map.entry("soilProbes", "linked soil moisture probes"));
+            Map.entry("soilProbes", "linked soil moisture probes"),
+            Map.entry("minimumTrees", "distinct trees Thinning needs for a representative sampling"),
+            Map.entry("representative", "true when the sampling reaches minimumTrees"));
 
     private FactGlossary() {
     }
