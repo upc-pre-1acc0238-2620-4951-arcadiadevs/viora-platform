@@ -97,6 +97,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
         entity.setProducerId(answer.producerId());
         entity.setPlotId(answer.plotId().plotId());
         entity.setQuestionId(answer.questionId().value());
+        entity.setQuestion(answer.question());
         entity.setLanguage(answer.language().code());
         entity.setDataVersion(answer.dataVersion().value());
         entity.setClientRequestId(answer.clientRequestId().value());
@@ -119,6 +120,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
                 entity.getProducerId(),
                 new PlotId(entity.getPlotId()),
                 new QuestionId(entity.getQuestionId()),
+                entity.getQuestion(),
                 new AnswerLanguage(entity.getLanguage()),
                 new DataVersion(entity.getDataVersion()),
                 entity.getText(),

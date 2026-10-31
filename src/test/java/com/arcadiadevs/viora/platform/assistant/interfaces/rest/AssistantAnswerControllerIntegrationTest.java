@@ -95,6 +95,7 @@ class AssistantAnswerControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answerId").isNotEmpty())
                 .andExpect(jsonPath("$.questionId").value("alternation.why_index"))
+                .andExpect(jsonPath("$.question").value("¿Por qué mi índice es 0,50?"))
                 .andExpect(jsonPath("$.plotId").value(plotId))
                 .andExpect(jsonPath("$.freshness").value("UP_TO_DATE"))
                 .andExpect(jsonPath("$.dataVersion").value(startsWith("sha256:")))
@@ -120,6 +121,7 @@ class AssistantAnswerControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.text").value(startsWith("Your alternate bearing index is 0.50: moderate "
                         + "alternate bearing.")))
+                .andExpect(jsonPath("$.question").value("Why is my index 0.50?"))
                 .andExpect(jsonPath("$.sources[0].label").value("Based on your 3 recorded campaigns"));
     }
 
@@ -189,6 +191,7 @@ class AssistantAnswerControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answers", hasSize(3)))
                 .andExpect(jsonPath("$.answers[0].questionId").value("plan.if_none"))
+                .andExpect(jsonPath("$.answers[0].question").value("¿Y si no aclaro?"))
                 .andExpect(jsonPath("$.answers[2].questionId").value("alternation.why_index"));
         mvc.perform(get(ANSWERS).param("limit", "2"))
                 .andExpect(jsonPath("$.answers", hasSize(2)));

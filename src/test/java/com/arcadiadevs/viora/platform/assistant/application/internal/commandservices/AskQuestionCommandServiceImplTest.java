@@ -108,7 +108,7 @@ class AskQuestionCommandServiceImplTest {
     }
 
     private AssistantAnswer savedAnswer(boolean fallback) {
-        return new AssistantAnswer(AnswerId.generate(), producerId, plotId, question, AnswerLanguage.SPANISH,
+        return new AssistantAnswer(AnswerId.generate(), producerId, plotId, question, "¿Y si no aclaro?", AnswerLanguage.SPANISH,
                 new DataVersion("sha256:abc"), "Respuesta guardada",
                 List.of(new AnswerFact("1", "a", "b", FactTone.PRIMARY), new AnswerFact("2", "c", "d", FactTone.HIGHLIGHT)),
                 List.of(), List.of(), requestId, AssistantAnswer.TEMPLATE, null, fallback, null, null, NOW.minusSeconds(60));
@@ -245,4 +245,5 @@ class AskQuestionCommandServiceImplTest {
         assertThat(view.answer()).isEqualTo(saved);
         assertThat(view.freshness()).isEqualTo(Freshness.UP_TO_DATE);
     }
+
 }

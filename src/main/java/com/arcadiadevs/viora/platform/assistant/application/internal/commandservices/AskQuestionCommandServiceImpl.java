@@ -122,7 +122,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
         var text = textChooser.choose(command.questionId(), question, command.language(), written.text(),
                 written.facts());
         var answer = new AssistantAnswer(AnswerId.generate(), command.producerId(), command.plotId(),
-                command.questionId(), command.language(), version, text.text(), written.facts(),
+                command.questionId(), question, command.language(), version, text.text(), written.facts(),
                 written.sources(), written.actions(), command.clientRequestId(), text.provider(), text.model(),
                 text.fallback(), text.inputTokens(), text.outputTokens(), now);
         try {

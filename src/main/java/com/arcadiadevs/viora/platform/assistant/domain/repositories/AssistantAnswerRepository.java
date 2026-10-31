@@ -87,4 +87,5 @@ public interface AssistantAnswerRepository {
      * @param producerId producer whose account is deleted
      */
     void deleteAllByProducerId(String producerId);
+
 }

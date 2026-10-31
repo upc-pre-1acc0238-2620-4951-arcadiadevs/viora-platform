@@ -117,4 +117,5 @@ class SpringAiAnswerTextWriterTest {
         assertThat(turnedOff.rewrite(REQUEST)).isEmpty();
         assertThat(model.prompts).isEmpty();
     }
+
 }
