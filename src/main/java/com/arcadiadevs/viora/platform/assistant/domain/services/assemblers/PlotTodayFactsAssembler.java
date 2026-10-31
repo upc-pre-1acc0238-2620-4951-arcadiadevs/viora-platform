@@ -22,7 +22,7 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.assembler
  * open, then a sampling left halfway), today's forecast against the heat and frost thresholds, and the open alerts.
  * Always answerable: without anything pending it says so.
  */
-public final class PlotTodayFactsAssembler extends PlotDetailFactsAssembler {
+public final class PlotTodayFactsAssembler extends OnePlotFactsAssembler {
 
     @Override
     public QuestionId questionId() {

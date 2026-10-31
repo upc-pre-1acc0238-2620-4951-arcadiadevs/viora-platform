@@ -42,7 +42,9 @@ public final class QuestionCatalog {
             ScreenKey.PLOT_DETAIL, List.of(QuestionId.PLOT_HOW_IS, QuestionId.PLOT_TODAY,
                     QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST),
             ScreenKey.SENSORS, List.of(QuestionId.SENSORS_WHAT_SAY, QuestionId.SENSORS_WHY_PAUSED,
-                    QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK));
+                    QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK),
+            ScreenKey.SAMPLING_SUMMARY, List.of(QuestionId.SAMPLING_ENOUGH_TREES, QuestionId.SAMPLING_MEANING,
+                    QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE));
 
     private QuestionCatalog() {
     }
@@ -77,6 +79,7 @@ public final class QuestionCatalog {
             case WINTER_CHILL -> chill(facts.chill());
             case PLOT_DETAIL -> plotDetail(facts);
             case SENSORS -> sensors(facts.climate());
+            case SAMPLING_SUMMARY -> sampling(facts.home());
         };
     }
 
@@ -291,6 +294,32 @@ public final class QuestionCatalog {
                 question(QuestionId.SENSORS_RELIABILITY, label(QuestionId.SENSORS_RELIABILITY, "label"), "history",
                         nodesMissing),
                 question(QuestionId.SENSORS_HOW_LINK, label(QuestionId.SENSORS_HOW_LINK, "label"), "lote", null));
+    }
+
+    /**
+     * The SAMPLING_SUMMARY screen: every question needs a tree sampled this campaign; what the load means needs the
+     * issued prescription. {@code correct_tree} is always disabled: Thinning cannot correct a sampled tree yet, and
+     * sampling it again adds its counts to the load a second time (docs/asistente-decisiones.md, Pantalla Resumen
+     * de muestreo).
+     */
+    private static List<CatalogQuestion> sampling(HomeData home) {
+        var plan = home.singlePlot() ? home.plots().getFirst().plan() : null;
+        var samplingMissing = plan != null && plan.sampledTrees() > 0
+                ? null : CatalogText.of("assistant.reason.sampling_missing");
+        CatalogText meaningMissing = samplingMissing;
+        if (meaningMissing == null && (!plan.issued() || plan.percentageToRemove() == null
+                || plan.preThinningFruitsPerShoot() == null || plan.targetFruitsPerShoot() == null)) {
+            meaningMissing = CatalogText.of("assistant.reason.plan_missing");
+        }
+        return List.of(
+                question(QuestionId.SAMPLING_ENOUGH_TREES, label(QuestionId.SAMPLING_ENOUGH_TREES, "label"), "lote",
+                        samplingMissing),
+                question(QuestionId.SAMPLING_MEANING, label(QuestionId.SAMPLING_MEANING, "label"), "fruit",
+                        meaningMissing),
+                question(QuestionId.SAMPLING_NEXT, label(QuestionId.SAMPLING_NEXT, "label"), "calendar",
+                        samplingMissing),
+                question(QuestionId.SAMPLING_CORRECT_TREE, label(QuestionId.SAMPLING_CORRECT_TREE, "label"),
+                        "pruning", CatalogText.of("assistant.reason.tree_correction_unavailable")));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

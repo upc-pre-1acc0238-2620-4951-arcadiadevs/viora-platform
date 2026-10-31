@@ -75,7 +75,7 @@ class PlotDetailQuestionCatalogTest {
         assertThat(nothing).extracting(CatalogQuestion::enabled).containsExactly(false, true, false, false);
         assertThat(nothing.get(0).disabledReason()).isEqualTo(CatalogText.of("assistant.reason.plot_data_missing"));
 
-        var sampledWithoutIndex = QuestionCatalog.questionsFor(ScreenKey.PLOT_DETAIL, PlotFacts.ofPlotDetail(2026,
+        var sampledWithoutIndex = QuestionCatalog.questionsFor(ScreenKey.PLOT_DETAIL, PlotFacts.ofOnePlot(2026,
                 null, new HomeData(false, List.of(withPlan(halfway(), 2)), null)));
         assertThat(sampledWithoutIndex).extracting(CatalogQuestion::enabled)
                 .containsExactly(true, true, true, false);
@@ -84,6 +84,6 @@ class PlotDetailQuestionCatalogTest {
     private static List<CatalogQuestion> plotDetail(Double bearingIndex, ThinningPlanData plan) {
         PlotHome plot = plan == null ? bare() : withPlan(plan, 0);
         return QuestionCatalog.questionsFor(ScreenKey.PLOT_DETAIL,
-                PlotFacts.ofPlotDetail(2026, bearingIndex, new HomeData(false, List.of(plot), null)));
+                PlotFacts.ofOnePlot(2026, bearingIndex, new HomeData(false, List.of(plot), null)));
     }
 }

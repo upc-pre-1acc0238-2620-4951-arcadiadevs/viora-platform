@@ -139,7 +139,7 @@ class AssistantPlotDetailScreenIntegrationTest {
                 .andExpect(jsonPath("$.model.fallback").value(true));
         answer("plot.today", plotId, "es")
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.text", startsWith("Hoy puedes aclarar: la ventana cierra el ")))
+                .andExpect(jsonPath("$.text", startsWith("Hoy puedes aclarear: la ventana cierra el ")))
                 .andExpect(jsonPath("$.text", containsString(" el plan indica quitar el 30 % de los frutos. Hoy se "
                         + "esperan 34,2 °C de máxima, que alcanzan el umbral de calor de 32 °C. ")))
                 .andExpect(jsonPath("$.text", endsWith("Tienes 1 alerta activa, la más grave de golpe de calor en "

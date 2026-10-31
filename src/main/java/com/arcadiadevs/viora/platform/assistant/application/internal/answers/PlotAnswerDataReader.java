@@ -50,8 +50,8 @@ public class PlotAnswerDataReader {
             return PlotAnswerData.ofHome(plotId, today, campaignYear,
                     homeDataReader.readForAnswer(producerId, plotId, campaignYear));
         }
-        if (screen == ScreenKey.PLOT_DETAIL) {
-            return PlotAnswerData.ofPlotDetail(plotId, today, campaignYear,
+        if (screen.readsOnePlot()) {
+            return PlotAnswerData.ofOnePlot(plotId, today, campaignYear,
                     homeDataReader.readForAnswer(producerId, plotId, campaignYear));
         }
         if (screen.readsChill()) {

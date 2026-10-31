@@ -17,6 +17,9 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeC
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeHarvestEstimateFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeWeekPlanFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.IrrigateFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SamplingEnoughTreesFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SamplingMeaningFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SamplingNextFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsHowLinkFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsReliabilityFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.SensorsSayFactsAssembler;
@@ -60,7 +63,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL and SENSORS questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS and SAMPLING_SUMMARY questions.
      *
      * @return the registry
      */
@@ -79,7 +82,8 @@ public final class FactsAssemblerRegistry {
                 new PlotHowIsFactsAssembler(), new PlotTodayFactsAssembler(), new PlotLastSamplingFactsAssembler(),
                 new NextYearFactsAssembler(QuestionId.PLOT_NEXT_YEAR_HARVEST),
                 new SensorsSayFactsAssembler(QuestionId.SENSORS_WHAT_SAY), new SensorsReliabilityFactsAssembler(),
-                new SensorsHowLinkFactsAssembler()));
+                new SensorsHowLinkFactsAssembler(), new SamplingEnoughTreesFactsAssembler(),
+                new SamplingMeaningFactsAssembler(), new SamplingNextFactsAssembler()));
     }
 
     /**

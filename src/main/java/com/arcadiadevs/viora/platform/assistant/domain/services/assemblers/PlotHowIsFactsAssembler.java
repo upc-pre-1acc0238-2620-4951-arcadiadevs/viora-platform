@@ -22,7 +22,7 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.assembler
  * "¿Cómo está este lote?": two sentences, the bearing index with its band and where the thinning of the campaign
  * stands (contract: "vecería 0,51 + 12 días", the days left in the open window). Either may be missing, not both.
  */
-public final class PlotHowIsFactsAssembler extends PlotDetailFactsAssembler {
+public final class PlotHowIsFactsAssembler extends OnePlotFactsAssembler {
 
     @Override
     public QuestionId questionId() {
@@ -83,29 +83,6 @@ public final class PlotHowIsFactsAssembler extends PlotDetailFactsAssembler {
                     ? text(questionId(), "thinning.sampling", treesNeeded)
                     : text(questionId(), "thinning.unissued");
             case NONE -> text(questionId(), "thinning.none");
-        };
-    }
-
-    private static FactCardTemplate windowCard(LocalDate today, ThinningPlanData plan, Window state) {
-        return switch (state) {
-            case OPEN -> {
-                long days = daysLeft(today, plan);
-                yield card(shared("value.integer", days), shared("card.days_left.label", days),
-                        shared("card.window.open"), FactTone.HIGHLIGHT);
-            }
-            case BEFORE -> {
-                long days = daysUntilOpen(today, plan);
-                yield card(shared("value.integer", days), shared("card.days_to_open.label", days),
-                        shared("card.opens.pill", TextDate.shortOf(plan.windowOpensOn())), FactTone.HIGHLIGHT);
-            }
-            case CLOSED -> card(shared("card.closed.value"), shared("card.window.label"),
-                    shared("card.closed_on.pill", TextDate.shortOf(plan.windowClosesOn())), FactTone.HIGHLIGHT);
-            case DONE -> card(shared("card.done.value"), shared("card.done.label"),
-                    shared("card.done.pill", TextDate.shortOf(plan.executedOn())), FactTone.HIGHLIGHT);
-            case SAMPLING -> card(shared("card.no_plan.value"), shared("card.no_plan.label"),
-                    shared("card.sampling.pill", plan.sampledTrees()), FactTone.HIGHLIGHT);
-            case NONE -> card(shared("card.no_plan.value"), shared("card.no_plan.label"),
-                    shared("card.no_plan.pill"), FactTone.HIGHLIGHT);
         };
     }
 }

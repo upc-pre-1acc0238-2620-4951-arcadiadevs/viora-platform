@@ -17,7 +17,8 @@ import java.util.TreeMap;
  * @param historicalYields total kilograms per campaign year, ascending
  * @param plan             thinning plan of the current campaign; null when the plot was never sampled
  * @param climate          climate data of the ALERT and CLIMATE screens; {@link ClimateData#NONE} otherwise
- * @param home             data of the HOME screen, one plot or the whole field, and of the plot on PLOT_DETAIL;
+ * @param home             data of the HOME screen, one plot or the whole field, and of the plot on PLOT_DETAIL
+ *                         and SAMPLING_SUMMARY;
  *                         {@link HomeData#NONE} otherwise
  * @param chill            winter chill data of the WINTER_CHILL screen; {@link ChillData#NONE} otherwise
  */
@@ -82,7 +83,7 @@ public record PlotAnswerData(
     }
 
     /**
-     * Data of the PLOT_DETAIL screen: the plot as HOME reads it, with its index, harvests and plan also set apart so
+     * Data of a screen about one plot (PLOT_DETAIL, SAMPLING_SUMMARY): the plot as HOME reads it, with its index, harvests and plan also set apart so
      * the questions shared with ALTERNATION read them the same way.
      *
      * @param plotId       the plot
@@ -92,7 +93,7 @@ public record PlotAnswerData(
      * @return the data
      * @throws IllegalArgumentException with {@code assistant.answer_data.invalid} when the data is not about one plot
      */
-    public static PlotAnswerData ofPlotDetail(PlotId plotId, LocalDate today, int campaignYear, HomeData plot) {
+    public static PlotAnswerData ofOnePlot(PlotId plotId, LocalDate today, int campaignYear, HomeData plot) {
         if (plotId == null || plot == null || plot.fieldScope() || !plot.singlePlot()) {
             throw new IllegalArgumentException("assistant.answer_data.invalid");
         }

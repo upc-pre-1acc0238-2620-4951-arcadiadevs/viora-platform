@@ -114,9 +114,10 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
                     ? new HomeData(plotId == null, List.of(), null)
                     : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
         }
-        if (screen == ScreenKey.PLOT_DETAIL) {
-            return PlotFacts.ofPlotDetail(campaignYear,
-                    externalPhenologyService.findBiennialBearingIndex(plotId).orElse(null),
+        if (screen.readsOnePlot()) {
+            // Only the state of the plot (PLOT_DETAIL) shows the bearing index
+            return PlotFacts.ofOnePlot(campaignYear, screen == ScreenKey.PLOT_DETAIL
+                            ? externalPhenologyService.findBiennialBearingIndex(plotId).orElse(null) : null,
                     homeDataReader == null
                             ? new HomeData(false, List.of(), null)
                             : homeDataReader.readForCatalog(producerId, plotId, campaignYear));

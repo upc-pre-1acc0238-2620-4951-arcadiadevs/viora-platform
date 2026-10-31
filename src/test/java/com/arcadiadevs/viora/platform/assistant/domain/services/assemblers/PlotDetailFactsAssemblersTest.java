@@ -67,7 +67,7 @@ class PlotDetailFactsAssemblersTest {
             assertThat(List.<FactsAssembler>of(howIs, today, lastSampling))
                     .allSatisfy(assembler -> assertThat(assembler.assemble(other)).isEmpty());
         }
-        assertThatThrownBy(() -> PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        assertThatThrownBy(() -> PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(), THRESHOLDS)))
                 .hasMessage("assistant.answer_data.invalid");
     }
@@ -113,7 +113,7 @@ class PlotDetailFactsAssemblersTest {
         assertThat(done.facts()).contains(entry("windowState", "DONE"), entry("thinningRecordedOn", "2026-10-28"));
         assertThat(done.cards().get(1).value().key()).isEqualTo("assistant.template.card.done.value");
 
-        var sampling = howIs.assemble(PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        var sampling = howIs.assemble(PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(withPlan(halfway(), 2)), THRESHOLDS))).orElseThrow();
         assertThat(sampling.facts()).containsExactly(entry("sampledTrees", 3), entry("treesNeeded", 2),
                 entry("windowState", "SAMPLING"));
@@ -122,7 +122,7 @@ class PlotDetailFactsAssemblersTest {
         assertThat(sampling.cards().get(0).value().key()).isEqualTo("assistant.template.card.no_index.value");
 
         // Neither index nor sampling: nothing to answer, the catalog disables it
-        assertThat(howIs.assemble(PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        assertThat(howIs.assemble(PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(bare()), THRESHOLDS)))).isEmpty();
     }
 
@@ -167,7 +167,7 @@ class PlotDetailFactsAssemblersTest {
         assertThat(sentence(unforecast, 1).key()).isEqualTo(PREFIX + "today.forecast.none");
         assertThat(unforecast.cards().get(0).value().key()).isEqualTo("assistant.template.card.no_forecast.value");
 
-        var halfwaySampling = today.assemble(PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        var halfwaySampling = today.assemble(PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(withPlan(halfway(), 1)), THRESHOLDS))).orElseThrow();
         assertThat(sentence(halfwaySampling, 0)).isEqualTo(CatalogText.of(PREFIX + "today.thinning.sampling", 1));
     }
@@ -193,7 +193,7 @@ class PlotDetailFactsAssemblersTest {
     @Test
     @DisplayName("last_sampling before the prescription: the trees still missing; without sampling, nothing")
     void lastSamplingHalfway() {
-        var facts = lastSampling.assemble(PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        var facts = lastSampling.assemble(PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(withPlan(halfway(), 2)), THRESHOLDS))).orElseThrow();
 
         assertThat(facts.facts()).containsExactly(entry("lastSampledOn", "2026-10-29"),
@@ -204,7 +204,7 @@ class PlotDetailFactsAssemblersTest {
 
         var undated = new ThinningPlanData(false, null, null, null, null, null, 4, null, null, null, null, null,
                 null);
-        var pending = lastSampling.assemble(PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026,
+        var pending = lastSampling.assemble(PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026,
                 new HomeData(false, List.of(withPlan(undated, 0)), THRESHOLDS))).orElseThrow();
         assertThat(pending.text()).isEqualTo(CatalogText.of(PREFIX + "last_sampling.text.pending", 4,
                 CatalogText.of(PREFIX + "last_sampling.latest.undated")));
@@ -231,7 +231,7 @@ class PlotDetailFactsAssemblersTest {
     /** PLOT_DETAIL about the sample plot, with index 0,5123 (moderate alternation) and three harvests. */
     private static PlotAnswerData plot(ThinningPlanData plan, int treesNeeded, List<Incident> alerts,
             Forecast forecast) {
-        return PlotAnswerData.ofPlotDetail(PLOT, TODAY, 2026, new HomeData(false, List.of(new PlotHome(plan,
+        return PlotAnswerData.ofOnePlot(PLOT, TODAY, 2026, new HomeData(false, List.of(new PlotHome(plan,
                 treesNeeded, alerts, yields(), 0.5123, "MODERATE_ALTERNATION", forecast)), THRESHOLDS));
     }
 
