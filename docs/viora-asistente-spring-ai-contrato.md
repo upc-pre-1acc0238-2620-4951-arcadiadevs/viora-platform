@@ -177,6 +177,8 @@ Respuesta (JSON completo; sin SSE, ver sección 0):
 
 `GET /assistant/daily-summary?plotId={uuid?}` → mismo formato que una respuesta, con `questionId: "home.daily_summary"` y 3 hechos para el bento de 3 tarjetas (los tres del mismo tamaño). Se **precalcula una vez al día** (zona `America/Lima`, p. ej. 06:30) con un job, y se genera bajo demanda si falta. Cache por `dataVersion`. El push de "tu resumen está listo" quedó descartado por ahora.
 
+Implementado (2026-10-30): `GET /api/v1/assistant/daily-summary` (`AssistantDailySummaryController`) responde 200 con el formato de una respuesta y `questionId: "home.daily_summary"`. El texto, los hechos y las fuentes son los de `home.week_plan`; las 3 tarjetas son días de ventana (días que quedan contando hoy, días para abrir, o "Sin ventana"), máxima de la semana y alertas activas. Es la única respuesta con 3 tarjetas: toda pregunta del catálogo sigue con exactamente 2. Un job (`AssistantDailySummaryScheduler`, 06:30 de Lima) precalcula el resumen del campo en español de cada productor con lotes activos, sin gastar sus límites; el de un lote o en inglés se genera bajo demanda. Se sirve el guardado del mismo día (Lima) con el mismo `dataVersion`, ámbito e idioma; si los datos cambiaron se genera otro, así que `freshness` es siempre `UP_TO_DATE`. Cada GET cuenta como lectura del catálogo y generar uno como respuesta (429). Sin lotes activos: 409. Los resúmenes no salen en el historial ni en `/answers/latest`. Sin cambio de esquema. Detalle en `asistente-decisiones.md` (Resumen del día).
+
 ### 4.5 Códigos de error
 
 | HTTP | Cuándo | Pantalla |

@@ -17,7 +17,7 @@ import java.util.List;
  * @param dataVersion version of the facts the answer was built from
  * @param freshness   whether the data is still current
  * @param text        answer text
- * @param facts       exactly two fact cards
+ * @param facts       exactly two fact cards; three for the daily summary (home.daily_summary)
  * @param sources     what the answer is based on
  * @param actions     links to existing screens
  * @param model       what wrote the text
@@ -35,7 +35,9 @@ public record AnswerResource(
                 allowableValues = {"UP_TO_DATE", "STALE"}) String freshness,
         @Schema(description = "Answer text, 2-3 sentences", example = "Tu carga está en 0,57 frutos por brote…")
         String text,
-        @ArraySchema(minItems = 2, maxItems = 2, schema = @Schema(implementation = AnswerFactResource.class))
+        @ArraySchema(minItems = 2, maxItems = 3, arraySchema = @Schema(description = "Exactly two fact cards; three "
+                + "for the daily summary (home.daily_summary)"),
+                schema = @Schema(implementation = AnswerFactResource.class))
         List<AnswerFactResource> facts,
         @Schema(description = "What the answer is based on") List<AnswerSourceResource> sources,
         @Schema(description = "Links to existing screens; may be empty") List<AnswerActionResource> actions,

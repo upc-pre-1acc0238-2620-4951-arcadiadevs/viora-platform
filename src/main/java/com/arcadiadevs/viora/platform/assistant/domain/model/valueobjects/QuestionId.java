@@ -16,6 +16,11 @@ public record QuestionId(String value) {
     public static final QuestionId HOME_CAMPAIGN_VS_PREVIOUS = new QuestionId("home.campaign_vs_previous");
     public static final QuestionId HOME_ALERTS_AFFECTING = new QuestionId("home.alerts_affecting");
     public static final QuestionId HOME_HARVEST_ESTIMATE = new QuestionId("home.harvest_estimate");
+    /**
+     * The precomputed summary of Inicio (contract section 4.4): not offered in the catalog, answered only by
+     * {@code GET /assistant/daily-summary}, with three fact cards instead of two.
+     */
+    public static final QuestionId HOME_DAILY_SUMMARY = new QuestionId("home.daily_summary");
     public static final QuestionId ALTERNATION_WHY_INDEX = new QuestionId("alternation.why_index");
     public static final QuestionId ALTERNATION_BREAK_CYCLE = new QuestionId("alternation.break_cycle");
     public static final QuestionId ALTERNATION_VS_CAMPAIGNS = new QuestionId("alternation.vs_campaigns");
@@ -55,6 +60,12 @@ public record QuestionId(String value) {
     public static final QuestionId CAMPAIGN_CALIBER_CHANGE = new QuestionId("campaign.caliber_change");
     public static final QuestionId CAMPAIGN_PLAN_NEXT = new QuestionId("campaign.plan_next");
 
+    /** Fact cards of an answer: the app shows two bento cards of the same size. */
+    private static final int CARDS = 2;
+
+    /** Fact cards of the daily summary: its bento has three cards of the same size. */
+    private static final int SUMMARY_CARDS = 3;
+
     /**
      * Compact constructor validating the {@code screen.question} format.
      */
@@ -62,5 +73,14 @@ public record QuestionId(String value) {
         if (value == null || !FORMAT.matcher(value).matches()) {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
+    }
+
+    /**
+     * How many fact cards an answer to this question carries.
+     *
+     * @return three for the daily summary, two for every question of the catalog
+     */
+    public int factCards() {
+        return HOME_DAILY_SUMMARY.equals(this) ? SUMMARY_CARDS : CARDS;
     }
 }

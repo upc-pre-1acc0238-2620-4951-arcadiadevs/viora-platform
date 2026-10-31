@@ -12,6 +12,8 @@ final class FactGlossary {
     private static final Map<String, String> QUESTIONS = Map.ofEntries(
             Map.entry("home.week_plan", "what to look at this week: the thinning window or sampling, the hottest "
                     + "forecast day and the open alerts"),
+            Map.entry("home.daily_summary", "the summary of the day: the thinning window or sampling, the hottest "
+                    + "forecast day of the week and the open alerts"),
             Map.entry("home.campaign_vs_previous", "how the last campaign compares with the one before it"),
             Map.entry("home.alerts_affecting", "which open alerts affect the plot or the plots"),
             Map.entry("home.harvest_estimate", "what the harvest of this campaign is expected to be after thinning"),
