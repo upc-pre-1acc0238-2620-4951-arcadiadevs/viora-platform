@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.commandser
 import com.arcadiadevs.viora.platform.assistant.application.commandservices.AskQuestionCommandService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerTextChooser;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.ratelimit.AnswerRateLimiter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.queryservices.AnswerFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
@@ -39,6 +40,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
     private final AssistantAnswerRepository repository;
     private final AnswerLocalizer localizer;
     private final AnswerTextChooser textChooser;
+    private final AnswerRateLimiter rateLimiter;
     private final Clock clock;
     private final Duration cacheTtl;
 
@@ -50,6 +52,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
      * @param repository          the saved answers
      * @param localizer           writes the answer in a language
      * @param textChooser         keeps the text of the model or the template
+     * @param rateLimiter         limits the new answers of a producer
      * @param clock               the application clock
      * @param cacheTtl            how long a saved answer is reused for the same data
      */
@@ -59,6 +62,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
             AssistantAnswerRepository repository,
             AnswerLocalizer localizer,
             AnswerTextChooser textChooser,
+            AnswerRateLimiter rateLimiter,
             Clock clock,
             @Value("${viora.assistant.answer-cache-ttl:PT6H}") Duration cacheTtl
     ) {
@@ -67,6 +71,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
         this.repository = repository;
         this.localizer = localizer;
         this.textChooser = textChooser;
+        this.rateLimiter = rateLimiter;
         this.clock = clock;
         this.cacheTtl = cacheTtl;
     }
@@ -116,6 +121,12 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
         var draft = AnswerComposer.compose(command.questionId(), facts, command.plotId());
         if (draft.isEmpty()) {
             return unavailable();
+        }
+        // Only an answer that is about to be written counts: replays and reused answers above cost nothing
+        var retryAfter = rateLimiter.tryAcquire(command.producerId(), command.forceRefresh(), now);
+        if (retryAfter.isPresent()) {
+            return Result.failure(ApplicationError.tooManyRequests("assistant", "assistant.answers.too_many",
+                    retryAfter.getAsLong()));
         }
         var written = localizer.localize(draft.get(), command.language());
         var question = localizer.resolve(offered.get().label(), command.language().locale());
