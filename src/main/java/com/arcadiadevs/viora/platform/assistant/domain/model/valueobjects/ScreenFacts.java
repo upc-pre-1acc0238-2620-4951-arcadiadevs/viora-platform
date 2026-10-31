@@ -10,8 +10,8 @@ import java.util.Optional;
  * <p>Each screen has its own record, which hands its questions and templates to the domain class of the screen. A
  * new screen adds its record, its domain class and its reader, and no switch over the screens.</p>
  */
-public sealed interface ScreenFacts permits AlternationFacts, PlanFacts, AlertFacts, ClimateFacts, ChillFacts,
-        PlotDetailFacts, SensorsFacts, SamplingFacts, ThinningDoneFacts, CampaignClosedFacts {
+public sealed interface ScreenFacts permits HomeFacts, AlternationFacts, PlanFacts, AlertFacts, ClimateFacts,
+        ChillFacts, PlotDetailFacts, SensorsFacts, SamplingFacts, ThinningDoneFacts, CampaignClosedFacts {
 
     /**
      * The screen these figures are of.

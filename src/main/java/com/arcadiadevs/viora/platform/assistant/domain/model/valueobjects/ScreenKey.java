@@ -7,6 +7,9 @@ import java.util.Locale;
  */
 public enum ScreenKey {
 
+    /** Home of the producer (P110-P113): the week, the campaign, the alerts and the harvest of its plots. */
+    HOME,
+
     /** Alternate bearing of a plot (P40, P114-P119). */
     ALTERNATION,
 

@@ -201,16 +201,16 @@ public final class AlertQuestions {
     }
 
     /** "golpe de calor", "helada", "estrés hídrico". */
-    private static CatalogText alertName(ClimateData.Incident incident) {
+    static CatalogText alertName(ClimateData.Incident incident) {
         return shared("alert." + incident.type());
     }
 
-    private static CatalogText severityName(ClimateData.Incident incident) {
+    static CatalogText severityName(ClimateData.Incident incident) {
         return shared("severity." + incident.severity());
     }
 
     /** The value that breached the threshold, with the threshold as pill. */
-    private static FactDraft valueCard(ClimateData.Incident incident) {
+    static FactDraft valueCard(ClimateData.Incident incident) {
         return new FactDraft(shared("value.measure", round(incident.value(), 1), incident.unit()),
                 shared("card.alert_value.label." + incident.type()),
                 shared("card.threshold.pill", round(incident.threshold(), 1), incident.unit()), FactTone.PRIMARY);
@@ -222,7 +222,7 @@ public final class AlertQuestions {
                 shared("card.since.pill", TextDate.shortOf(incident.triggeredOn())), FactTone.HIGHLIGHT);
     }
 
-    private static CatalogText alertSource(ClimateData.Incident incident) {
+    static CatalogText alertSource(ClimateData.Incident incident) {
         return shared("source.alert", TextDate.of(incident.triggeredOn()));
     }
 }
