@@ -31,6 +31,12 @@ public class AgroclimaticThresholdEvaluator {
     /** Forecast minimum that raises a frost warning, as the requirements set it (US18: ≤ 1.5 °C). */
     public static final double FROST_WARNING_CELSIUS = 1.5;
 
+    /** Maximum that opens a heat wave warning (ADR-006: the single source of the bloom heat threshold). */
+    public static final double HEAT_WARNING_CELSIUS = 32.0;
+
+    /** Maximum that raises a heat wave to critical (ADR-006). */
+    public static final double HEAT_CRITICAL_CELSIUS = 36.0;
+
     private static final List<String> FROST_MITIGATION_STEPS = List.of(
             "frost_warning.step.pre_irrigate_soil",
             "frost_warning.step.activate_frost_protection",
@@ -45,20 +51,8 @@ public class AgroclimaticThresholdEvaluator {
      * @return Optional containing {@link IncidentTrigger} if stress detected, empty otherwise
      */
     public Optional<IncidentTrigger> evaluateHydricRisk(double soilMoisturePercentage, SoilTextureType soilTextureType) {
-        double criticalThreshold;
-        double warningThreshold;
-
-        if (soilTextureType == SoilTextureType.SANDY) {
-            criticalThreshold = 12.0;
-            warningThreshold = 16.0;
-        } else if (soilTextureType == SoilTextureType.CLAY) {
-            criticalThreshold = 20.0;
-            warningThreshold = 24.0;
-        } else {
-            // LOAM, SILT, NOT_APPLICABLE, or others
-            criticalThreshold = 16.0;
-            warningThreshold = 20.0;
-        }
+        double criticalThreshold = hydricCriticalThreshold(soilTextureType);
+        double warningThreshold = hydricWarningThreshold(soilTextureType);
 
         if (soilMoisturePercentage < criticalThreshold) {
             var breach = new ThresholdBreachInfo(
@@ -92,6 +86,38 @@ public class AgroclimaticThresholdEvaluator {
     }
 
     /**
+     * Soil moisture at 30 cm below which hydric stress is critical for a soil texture.
+     *
+     * @param soilTextureType the soil texture class; null is treated as a loam
+     * @return the threshold, in volumetric %
+     */
+    public static double hydricCriticalThreshold(SoilTextureType soilTextureType) {
+        if (soilTextureType == SoilTextureType.SANDY) {
+            return 12.0;
+        } else if (soilTextureType == SoilTextureType.CLAY) {
+            return 20.0;
+        }
+        // LOAM, SILT, NOT_APPLICABLE, or others
+        return 16.0;
+    }
+
+    /**
+     * Soil moisture at 30 cm below which hydric stress is a warning for a soil texture.
+     *
+     * @param soilTextureType the soil texture class; null is treated as a loam
+     * @return the threshold, in volumetric %
+     */
+    public static double hydricWarningThreshold(SoilTextureType soilTextureType) {
+        if (soilTextureType == SoilTextureType.SANDY) {
+            return 16.0;
+        } else if (soilTextureType == SoilTextureType.CLAY) {
+            return 24.0;
+        }
+        // LOAM, SILT, NOT_APPLICABLE, or others
+        return 20.0;
+    }
+
+    /**
      * Evaluates thermal heat wave risk based on ambient temperature and humidity.
      *
      * @param temperatureCelsius       measured ambient temperature in degrees Celsius
@@ -110,11 +136,11 @@ public class AgroclimaticThresholdEvaluator {
      * @return Optional containing {@link IncidentTrigger} if heat wave conditions are met
      */
     public Optional<IncidentTrigger> evaluateHeatRisk(double temperatureCelsius) {
-        if (temperatureCelsius >= 36.0) {
+        if (temperatureCelsius >= HEAT_CRITICAL_CELSIUS) {
             var breach = new ThresholdBreachInfo(
                     "AMBIENT_TEMPERATURE",
                     temperatureCelsius,
-                    36.0,
+                    HEAT_CRITICAL_CELSIUS,
                     "°C"
             );
             return Optional.of(new IncidentTrigger(
@@ -123,11 +149,11 @@ public class AgroclimaticThresholdEvaluator {
                     breach,
                     HEAT_WAVE_MITIGATION_STEPS
             ));
-        } else if (temperatureCelsius >= 32.0) {
+        } else if (temperatureCelsius >= HEAT_WARNING_CELSIUS) {
             var breach = new ThresholdBreachInfo(
                     "AMBIENT_TEMPERATURE",
                     temperatureCelsius,
-                    32.0,
+                    HEAT_WARNING_CELSIUS,
                     "°C"
             );
             return Optional.of(new IncidentTrigger(
