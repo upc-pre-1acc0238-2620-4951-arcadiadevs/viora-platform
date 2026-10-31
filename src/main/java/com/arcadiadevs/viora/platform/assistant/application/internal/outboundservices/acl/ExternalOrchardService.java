@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Outbound ACL service used by the assistant to verify the plot it is asked about and list its owner's plots.
+ * Outbound ACL service used by the assistant to verify the plot it is asked about, list its owner's plots and find the
+ * producers the daily summary job prepares.
  */
 @Service("assistantExternalOrchardService")
 public class ExternalOrchardService {
@@ -61,5 +62,20 @@ public class ExternalOrchardService {
      */
     public List<PlotId> findActivePlotIdsOfProducer(String producerId) {
         return orchardContextFacade.findActivePlotIdsByProducerId(producerId).stream().map(PlotId::new).toList();
+    }
+
+    /**
+     * Lists the producers that own at least one active plot, for the daily summary job. It reads every active plot
+     * and its owner, one lookup per plot; a plot without a producer is skipped.
+     *
+     * @return the producers, each once, sorted
+     */
+    public List<String> findProducersWithActivePlots() {
+        return orchardContextFacade.findAllActivePlotIds().stream()
+                .map(orchardContextFacade::findPlotProducerId)
+                .flatMap(Optional::stream)
+                .distinct()
+                .sorted()
+                .toList();
     }
 }
