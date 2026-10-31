@@ -91,6 +91,12 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
         answers.deleteAllByProducerId(producerId);
     }
 
+    @Override
+    @Transactional
+    public int deleteCreatedBefore(Instant before) {
+        return answers.deleteCreatedBefore(before);
+    }
+
     private static AssistantAnswerPersistenceEntity toEntity(AssistantAnswer answer) {
         var entity = new AssistantAnswerPersistenceEntity();
         entity.setId(UUID.fromString(answer.id().value()));

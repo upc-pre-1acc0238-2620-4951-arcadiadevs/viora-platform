@@ -88,4 +88,11 @@ public interface AssistantAnswerRepository {
      */
     void deleteAllByProducerId(String producerId);
 
+    /**
+     * Deletes the answers that left the history.
+     *
+     * @param before answers created before this instant are deleted
+     * @return how many were deleted
+     */
+    int deleteCreatedBefore(Instant before);
 }

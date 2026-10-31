@@ -56,4 +56,8 @@ public interface AssistantAnswerPersistenceRepository extends JpaRepository<Assi
     @Modifying
     @Query("delete from AssistantAnswerPersistenceEntity a where a.producerId = :producerId")
     void deleteAllByProducerId(@Param("producerId") String producerId);
+
+    @Modifying
+    @Query("delete from AssistantAnswerPersistenceEntity a where a.createdAt < :before")
+    int deleteCreatedBefore(@Param("before") Instant before);
 }

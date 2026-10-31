@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.assistant.interfaces.rest;
 
 import com.arcadiadevs.viora.platform.assistant.domain.repositories.AssistantAnswerRepository;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.scheduling.AssistantAnswerRetentionScheduler;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountDeletedEvent;
 import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
@@ -30,6 +31,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -296,6 +299,19 @@ class AssistantAnswerControllerIntegrationTest {
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
                 events.publishEvent(new UserAccountDeletedEvent(producer, "producer@viora.test", Instant.now())));
 
+        assertTrue(answers.findRecent(producer, Instant.EPOCH, 10).isEmpty());
+    }
+
+    @Test
+    @DisplayName("the daily retention deletes the answers that left the ten days of the history, and keeps the rest")
+    void retentionDeletesOldAnswers() throws Exception {
+        var plotId = createPlotWithHistory(4.0, 10.0, 5.0);
+        ask("alternation.why_index", plotId, UUID.randomUUID(), "es", false).andExpect(status().isOk());
+
+        new AssistantAnswerRetentionScheduler(answers, Clock.offset(Clock.systemUTC(), Duration.ofDays(9)), 10).run();
+        assertEquals(1, answers.findRecent(producer, Instant.EPOCH, 10).size());
+
+        new AssistantAnswerRetentionScheduler(answers, Clock.offset(Clock.systemUTC(), Duration.ofDays(11)), 10).run();
         assertTrue(answers.findRecent(producer, Instant.EPOCH, 10).isEmpty());
     }
 
