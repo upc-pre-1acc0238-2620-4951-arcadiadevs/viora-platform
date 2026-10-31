@@ -34,7 +34,13 @@ public enum ScreenKey {
     SAMPLING_SUMMARY,
 
     /** After the thinning of a plot is recorded: the harvest, the target, the next sampling (P63, P145-P147). */
-    THINNING_DONE;
+    THINNING_DONE,
+
+    /**
+     * After the harvest of a campaign is recorded: against the earlier campaigns, the caliber and the next campaign
+     * (P73, P148-P150). The closed campaign is the latest one with a recorded harvest.
+     */
+    CAMPAIGN_CLOSED;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -60,10 +66,10 @@ public enum ScreenKey {
      * Whether the questions of the screen are about one plot read as HOME reads it: its thinning plan, sampling,
      * alerts, harvests and forecast.
      *
-     * @return true for PLOT_DETAIL, SAMPLING_SUMMARY and THINNING_DONE
+     * @return true for PLOT_DETAIL, SAMPLING_SUMMARY, THINNING_DONE and CAMPAIGN_CLOSED
      */
     public boolean readsOnePlot() {
-        return this == PLOT_DETAIL || this == SAMPLING_SUMMARY || this == THINNING_DONE;
+        return this == PLOT_DETAIL || this == SAMPLING_SUMMARY || this == THINNING_DONE || this == CAMPAIGN_CLOSED;
     }
 
     /**
@@ -76,9 +82,9 @@ public enum ScreenKey {
     }
 
     /**
-     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL and PLOT_DETAIL
-     * SAMPLING_SUMMARY and THINNING_DONE questions use the shorter {@code chill.}, {@code plot.}, {@code sampling.} and
-     * {@code thinning.} of the contract.
+     * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL, PLOT_DETAIL,
+     * SAMPLING_SUMMARY, THINNING_DONE and CAMPAIGN_CLOSED questions use the shorter {@code chill.}, {@code plot.},
+     * {@code sampling.}, {@code thinning.} and {@code campaign.} of the contract.
      *
      * @return the prefix
      */
@@ -88,6 +94,7 @@ public enum ScreenKey {
             case PLOT_DETAIL -> "plot.";
             case SAMPLING_SUMMARY -> "sampling.";
             case THINNING_DONE -> "thinning.";
+            case CAMPAIGN_CLOSED -> "campaign.";
             default -> name().toLowerCase(Locale.ROOT) + ".";
         };
     }

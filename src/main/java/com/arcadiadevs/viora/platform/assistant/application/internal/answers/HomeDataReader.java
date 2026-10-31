@@ -77,6 +77,21 @@ public class HomeDataReader {
         return new HomeData(plotId == null, plots, externalTelemetryService.findThresholds());
     }
 
+    /**
+     * Adds what CAMPAIGN_CLOSED reads of one plot besides the HOME data: the surface of the plot and the outcome of
+     * the confirmed thinning of the closed campaign (the latest one with a recorded harvest).
+     *
+     * @param plot   the plot, as {@link #readForAnswer} reads one plot
+     * @param plotId the plot
+     * @return the same data with the surface and, when the closed campaign was thinned, its outcome
+     */
+    public HomeData withClosedCampaign(HomeData plot, PlotId plotId) {
+        var outcome = plot.closedCampaignYear()
+                .flatMap(closedYear -> externalThinningService.findThinningOutcome(plotId, closedYear))
+                .orElse(null);
+        return plot.withOutcome(outcome).withArea(externalOrchardService.findPlotAreaHectares(plotId).orElse(null));
+    }
+
     /** The plot asked about, or the active plots of the producer (only its own: plot access is per producer). */
     private List<PlotId> plotsOf(String producerId, PlotId plotId) {
         return plotId != null ? List.of(plotId) : externalOrchardService.findActivePlotIdsOfProducer(producerId);

@@ -58,7 +58,13 @@ final class FactGlossary {
                     + "claim anything about next campaign"),
             Map.entry("thinning.why_target", "where the target load comes from and where the thinning left the load"),
             Map.entry("thinning.next_sampling", "when to sample again; there is no date, only next campaign after "
-                    + "full bloom"));
+                    + "full bloom"),
+            Map.entry("campaign.vs_previous", "how the closed campaign (the last recorded harvest) compares with the "
+                    + "average of the previous ones"),
+            Map.entry("campaign.caliber_change", "how the caliber changed between campaigns; the assistant has no "
+                    + "caliber per campaign yet"),
+            Map.entry("campaign.plan_next", "what to plan for the next campaign: full bloom, sampling and the "
+                    + "thinning window; never project the next harvest"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -177,7 +183,13 @@ final class FactGlossary {
             Map.entry("removedPercent", "percentage of fruits the producer reported removing"),
             Map.entry("nextCampaignYear", "year of the next campaign"),
             Map.entry("windowOpensDaysAfterBloom", "days after full bloom the thinning window opens"),
-            Map.entry("windowClosesDaysAfterBloom", "days after full bloom the thinning window closes"));
+            Map.entry("windowClosesDaysAfterBloom", "days after full bloom the thinning window closes"),
+            Map.entry("lastCampaignTonsPerHa", "tonnes per hectare harvested in lastCampaignYear"),
+            Map.entry("previousAverageTonsPerHa", "average tonnes per hectare of the previous campaigns"),
+            Map.entry("areaHectares", "plot area in hectares, from its polygon"),
+            Map.entry("thinned", "true when a thinning was recorded in lastCampaignYear"),
+            Map.entry("thinningTimeliness", "OPTIMAL (within the window) or LATE (after it) thinning of "
+                    + "lastCampaignYear"));
 
     private FactGlossary() {
     }

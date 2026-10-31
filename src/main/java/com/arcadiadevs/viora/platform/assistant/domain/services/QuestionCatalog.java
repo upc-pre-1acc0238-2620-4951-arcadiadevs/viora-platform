@@ -26,27 +26,30 @@ public final class QuestionCatalog {
     private static final String PREFIX = "assistant.question.";
 
     /** Questions of each screen, in display order. */
-    private static final Map<ScreenKey, List<QuestionId>> QUESTIONS = Map.of(
-            ScreenKey.HOME, List.of(QuestionId.HOME_WEEK_PLAN, QuestionId.HOME_CAMPAIGN_VS_PREVIOUS,
-                    QuestionId.HOME_ALERTS_AFFECTING, QuestionId.HOME_HARVEST_ESTIMATE),
-            ScreenKey.ALTERNATION, List.of(QuestionId.ALTERNATION_WHY_INDEX, QuestionId.ALTERNATION_BREAK_CYCLE,
-                    QuestionId.ALTERNATION_VS_CAMPAIGNS, QuestionId.ALTERNATION_NEXT_YEAR),
-            ScreenKey.PLAN, List.of(QuestionId.PLAN_WHY_PERCENT, QuestionId.PLAN_IF_LESS, QuestionId.PLAN_IF_NONE,
-                    QuestionId.PLAN_BEST_TIME),
-            ScreenKey.ALERT, List.of(QuestionId.ALERT_WHAT_TO_DO, QuestionId.ALERT_FRUITSET_EFFECT,
-                    QuestionId.ALERT_WHEN_ENDS, QuestionId.ALERT_PLOTS_AT_RISK),
-            ScreenKey.CLIMATE, List.of(QuestionId.CLIMATE_IRRIGATE, QuestionId.CLIMATE_FRUITSET_EFFECT,
-                    QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY),
-            ScreenKey.WINTER_CHILL, List.of(QuestionId.CHILL_MISSING, QuestionId.CHILL_REACH_30,
-                    QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE),
-            ScreenKey.PLOT_DETAIL, List.of(QuestionId.PLOT_HOW_IS, QuestionId.PLOT_TODAY,
-                    QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST),
-            ScreenKey.SENSORS, List.of(QuestionId.SENSORS_WHAT_SAY, QuestionId.SENSORS_WHY_PAUSED,
-                    QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK),
-            ScreenKey.SAMPLING_SUMMARY, List.of(QuestionId.SAMPLING_ENOUGH_TREES, QuestionId.SAMPLING_MEANING,
-                    QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE),
-            ScreenKey.THINNING_DONE, List.of(QuestionId.THINNING_HARVEST_CHANGE, QuestionId.THINNING_WHY_TARGET,
-                    QuestionId.THINNING_NEXT_SAMPLING));
+    private static final Map<ScreenKey, List<QuestionId>> QUESTIONS = Map.ofEntries(
+            Map.entry(ScreenKey.HOME, List.of(QuestionId.HOME_WEEK_PLAN, QuestionId.HOME_CAMPAIGN_VS_PREVIOUS,
+                    QuestionId.HOME_ALERTS_AFFECTING, QuestionId.HOME_HARVEST_ESTIMATE)),
+            Map.entry(ScreenKey.ALTERNATION, List.of(QuestionId.ALTERNATION_WHY_INDEX,
+                    QuestionId.ALTERNATION_BREAK_CYCLE, QuestionId.ALTERNATION_VS_CAMPAIGNS,
+                    QuestionId.ALTERNATION_NEXT_YEAR)),
+            Map.entry(ScreenKey.PLAN, List.of(QuestionId.PLAN_WHY_PERCENT, QuestionId.PLAN_IF_LESS,
+                    QuestionId.PLAN_IF_NONE, QuestionId.PLAN_BEST_TIME)),
+            Map.entry(ScreenKey.ALERT, List.of(QuestionId.ALERT_WHAT_TO_DO, QuestionId.ALERT_FRUITSET_EFFECT,
+                    QuestionId.ALERT_WHEN_ENDS, QuestionId.ALERT_PLOTS_AT_RISK)),
+            Map.entry(ScreenKey.CLIMATE, List.of(QuestionId.CLIMATE_IRRIGATE, QuestionId.CLIMATE_FRUITSET_EFFECT,
+                    QuestionId.CLIMATE_HEAT_ENDS, QuestionId.CLIMATE_SENSORS_SAY)),
+            Map.entry(ScreenKey.WINTER_CHILL, List.of(QuestionId.CHILL_MISSING, QuestionId.CHILL_REACH_30,
+                    QuestionId.CHILL_VS_LAST_WINTER, QuestionId.CHILL_IF_INCOMPLETE)),
+            Map.entry(ScreenKey.PLOT_DETAIL, List.of(QuestionId.PLOT_HOW_IS, QuestionId.PLOT_TODAY,
+                    QuestionId.PLOT_LAST_SAMPLING, QuestionId.PLOT_NEXT_YEAR_HARVEST)),
+            Map.entry(ScreenKey.SENSORS, List.of(QuestionId.SENSORS_WHAT_SAY, QuestionId.SENSORS_WHY_PAUSED,
+                    QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK)),
+            Map.entry(ScreenKey.SAMPLING_SUMMARY, List.of(QuestionId.SAMPLING_ENOUGH_TREES,
+                    QuestionId.SAMPLING_MEANING, QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE)),
+            Map.entry(ScreenKey.THINNING_DONE, List.of(QuestionId.THINNING_HARVEST_CHANGE,
+                    QuestionId.THINNING_WHY_TARGET, QuestionId.THINNING_NEXT_SAMPLING)),
+            Map.entry(ScreenKey.CAMPAIGN_CLOSED, List.of(QuestionId.CAMPAIGN_VS_PREVIOUS,
+                    QuestionId.CAMPAIGN_CALIBER_CHANGE, QuestionId.CAMPAIGN_PLAN_NEXT)));
 
     private QuestionCatalog() {
     }
@@ -83,6 +86,7 @@ public final class QuestionCatalog {
             case SENSORS -> sensors(facts.climate());
             case SAMPLING_SUMMARY -> sampling(facts.home());
             case THINNING_DONE -> thinningDone(facts.home());
+            case CAMPAIGN_CLOSED -> campaignClosed(facts.home());
         };
     }
 
@@ -353,6 +357,36 @@ public final class QuestionCatalog {
                         hasTarget ? null : CatalogText.of("assistant.reason.facts_missing")),
                 question(QuestionId.THINNING_NEXT_SAMPLING, label(QuestionId.THINNING_NEXT_SAMPLING, "label"),
                         "calendar", null));
+    }
+
+    /**
+     * The CAMPAIGN_CLOSED screen is about the closed campaign: the latest one with a recorded harvest, whose year the
+     * labels name. Without a harvest nothing can be answered; the comparison also needs an earlier campaign.
+     * {@code caliber_change} is always disabled: no context the assistant reads has the caliber of each campaign
+     * (docs/asistente-decisiones.md, Pantalla Campaña cerrada).
+     */
+    private static List<CatalogQuestion> campaignClosed(HomeData home) {
+        var caliber = question(QuestionId.CAMPAIGN_CALIBER_CHANGE, label(QuestionId.CAMPAIGN_CALIBER_CHANGE, "label"),
+                "fruit", CatalogText.of("assistant.reason.caliber_history_unavailable"));
+        var closed = home.closedCampaignYear();
+        if (closed.isEmpty()) {
+            var missing = CatalogText.of("assistant.reason.harvest_missing");
+            return List.of(
+                    question(QuestionId.CAMPAIGN_VS_PREVIOUS,
+                            label(QuestionId.CAMPAIGN_VS_PREVIOUS, "label_without_year"), "history", missing),
+                    caliber,
+                    question(QuestionId.CAMPAIGN_PLAN_NEXT, label(QuestionId.CAMPAIGN_PLAN_NEXT, "label_without_year"),
+                            "calendar", missing));
+        }
+        int year = closed.get();
+        boolean comparable = home.plots().getFirst().yields().size() >= 2;
+        return List.of(
+                question(QuestionId.CAMPAIGN_VS_PREVIOUS,
+                        label(QuestionId.CAMPAIGN_VS_PREVIOUS, "label", String.valueOf(year)), "history",
+                        comparable ? null : CatalogText.of("assistant.reason.campaigns_missing")),
+                caliber,
+                question(QuestionId.CAMPAIGN_PLAN_NEXT,
+                        label(QuestionId.CAMPAIGN_PLAN_NEXT, "label", String.valueOf(year + 1)), "calendar", null));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

@@ -16,11 +16,13 @@ import java.util.TreeSet;
  * @param fieldScope whether the question is about the producer's whole field instead of one plot
  * @param plots      the plot asked about, or every active plot of the producer
  * @param thresholds the alert thresholds Telemetry uses; null when the forecast was not read
- * @param outcome    outcome of the confirmed thinning of the plot, read only by THINNING_DONE; null otherwise or
- *                   before the thinning is confirmed
+ * @param outcome    outcome of the confirmed thinning of the plot campaign the screen is about: the current campaign
+ *                   on THINNING_DONE, the closed campaign on CAMPAIGN_CLOSED; null on other screens or without a
+ *                   confirmed thinning
+ * @param areaHectares surface of the plot in hectares, read only by CAMPAIGN_CLOSED; null otherwise or when unknown
  */
 public record HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thresholds thresholds,
-        ThinningOutcomeData outcome) {
+        ThinningOutcomeData outcome, Double areaHectares) {
 
     /** No HOME data: the screens that are not HOME. */
     public static final HomeData NONE = new HomeData(false, List.of(), null);
@@ -29,7 +31,7 @@ public record HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thr
      * Data without a thinning outcome.
      */
     public HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thresholds thresholds) {
-        this(fieldScope, plots, thresholds, null);
+        this(fieldScope, plots, thresholds, null, null);
     }
 
     /**
@@ -39,7 +41,29 @@ public record HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thr
      * @return the data
      */
     public HomeData withOutcome(ThinningOutcomeData thinningOutcome) {
-        return new HomeData(fieldScope, plots, thresholds, thinningOutcome);
+        return new HomeData(fieldScope, plots, thresholds, thinningOutcome, areaHectares);
+    }
+
+    /**
+     * The same data with the surface of the plot.
+     *
+     * @param plotAreaHectares the surface in hectares; null when unknown
+     * @return the data
+     */
+    public HomeData withArea(Double plotAreaHectares) {
+        return new HomeData(fieldScope, plots, thresholds, outcome, plotAreaHectares);
+    }
+
+    /**
+     * The closed campaign of a plot: the latest campaign with a recorded harvest.
+     *
+     * @return its year, or empty for the field or a plot without recorded harvests
+     */
+    public Optional<Integer> closedCampaignYear() {
+        if (fieldScope || !singlePlot() || plots.getFirst().yields().isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(plots.getFirst().yields().lastKey());
     }
 
     /** Status of a caliber projection that has figures. */

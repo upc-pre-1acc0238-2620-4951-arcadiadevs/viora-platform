@@ -19,7 +19,8 @@ import java.util.TreeMap;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AnswerTexts.*;
 
 /**
- * Base of the PLOT_DETAIL and SAMPLING_SUMMARY questions, about one plot read as HOME reads it. The thinning of the campaign is judged
+ * Base of the PLOT_DETAIL, SAMPLING_SUMMARY, THINNING_DONE and CAMPAIGN_CLOSED questions, about one plot read as
+ * HOME reads it. The thinning of the campaign is judged
  * with the window rules of the PLAN screen: the days left count today, the days until it opens do not.
  */
 abstract class OnePlotFactsAssembler implements FactsAssembler {
