@@ -192,6 +192,8 @@ Implementado (2026-10-30): `GET /api/v1/assistant/daily-summary` (`AssistantDail
 
 Si el modelo falla pero existe plantilla, se responde 200 con `fallback: true` (el productor no ve error).
 
+Implementado (2026-10-30): el backend no devuelve 503 ni define `assistant.unavailable`. Toda pregunta habilitada del catálogo tiene plantilla, así que cuando el modelo falla, se rechaza su texto o el circuito está abierto, se responde con la plantilla (`fallback: true`). Si faltan los datos para armarla, la pregunta sale deshabilitada y `POST /answers` responde 409. Por eso el caso "sin plantilla posible" no ocurre hoy. Si se agrega una pregunta que solo pueda responder el modelo, hay que implementar este 503 junto con ella. La app puede mantener P127 para errores de red o del servidor.
+
 ---
 
 ## 5. Catálogo de preguntas por pantalla
