@@ -105,8 +105,8 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
 
     @Override
     public List<AssistantAnswer> findRecent(String producerId, Instant since, int limit) {
-        return answers.findByProducerIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(producerId, since,
-                        PageRequest.of(0, limit)).stream()
+        return answers.findByProducerIdAndQuestionIdNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(producerId,
+                        QuestionId.HOME_DAILY_SUMMARY.value(), since, PageRequest.of(0, limit)).stream()
                 .map(AssistantAnswerRepositoryImpl::toDomain)
                 .toList();
     }
@@ -115,8 +115,8 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
     public Optional<AssistantAnswer> findLatestOfScreen(String producerId, PlotId plotId, String questionPrefix,
             Instant since) {
         return answers
-                .findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-                        producerId, plotValue(plotId), questionPrefix, since)
+                .findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndQuestionIdNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        producerId, plotValue(plotId), questionPrefix, QuestionId.HOME_DAILY_SUMMARY.value(), since)
                 .map(AssistantAnswerRepositoryImpl::toDomain);
     }
 

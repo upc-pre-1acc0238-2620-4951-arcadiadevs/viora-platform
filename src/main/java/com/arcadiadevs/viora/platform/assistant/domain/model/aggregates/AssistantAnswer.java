@@ -28,7 +28,7 @@ import java.util.UUID;
  * @param locale          language of the texts ({@code es} or {@code en})
  * @param dataVersion     version of the facts the answer was built from
  * @param text            answer text
- * @param facts           exactly two fact cards
+ * @param facts           the fact cards: exactly two, or three for the daily summary ({@link QuestionId#factCards()})
  * @param sources         what the answer is based on
  * @param actions         links to existing screens
  * @param model           what wrote the text
@@ -69,7 +69,7 @@ public record AssistantAnswer(
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("assistant.answer.text");
         }
-        if (facts == null || facts.size() != 2) {
+        if (facts == null || facts.size() != questionId.factCards()) {
             throw new IllegalArgumentException("assistant.answer.facts");
         }
         facts = List.copyOf(facts);

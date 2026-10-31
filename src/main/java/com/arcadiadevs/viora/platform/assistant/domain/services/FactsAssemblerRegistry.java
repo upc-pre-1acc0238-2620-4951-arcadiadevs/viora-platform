@@ -13,6 +13,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.Chill
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillReachFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillVsLastWinterFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ClimateFruitsetEffectFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.DailySummaryFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HeatEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeAlertsAffectingFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.HomeCampaignVsPreviousFactsAssembler;
@@ -69,7 +70,8 @@ public final class FactsAssemblerRegistry {
 
     /**
      * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS, SAMPLING_SUMMARY,
-     * THINNING_DONE and CAMPAIGN_CLOSED questions. {@code campaign.caliber_change} has none: it is always disabled.
+     * THINNING_DONE and CAMPAIGN_CLOSED questions, and the daily summary of HOME. {@code campaign.caliber_change} has
+     * none: it is always disabled.
      *
      * @return the registry
      */
@@ -77,6 +79,7 @@ public final class FactsAssemblerRegistry {
         return new FactsAssemblerRegistry(List.of(
                 new HomeWeekPlanFactsAssembler(), new HomeCampaignVsPreviousFactsAssembler(),
                 new HomeAlertsAffectingFactsAssembler(), new HomeHarvestEstimateFactsAssembler(),
+                new DailySummaryFactsAssembler(),
                 new WhyIndexFactsAssembler(), new BreakCycleFactsAssembler(), new VsCampaignsFactsAssembler(),
                 new NextYearFactsAssembler(), new WhyPercentFactsAssembler(), new IfLessFactsAssembler(),
                 new IfNoneFactsAssembler(), new BestTimeFactsAssembler(), new AlertWhatToDoFactsAssembler(),

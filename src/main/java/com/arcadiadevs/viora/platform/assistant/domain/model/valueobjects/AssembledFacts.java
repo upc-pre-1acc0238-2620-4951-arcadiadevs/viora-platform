@@ -12,7 +12,8 @@ import java.util.TreeMap;
  *
  * @param facts   the facts, by name; every number a text may show is here
  * @param text    template of the answer text
- * @param cards   exactly two fact cards
+ * @param cards   two fact cards, or three for the daily summary; {@code AssistantAnswer} holds each question to
+ *                its own count ({@link QuestionId#factCards()})
  * @param sources what the answer is based on
  * @param actions links to existing screens; may be empty
  */
@@ -27,11 +28,14 @@ public record AssembledFacts(
     /** The app shows two bento cards of the same size. */
     public static final int CARDS = 2;
 
+    /** The daily summary shows three bento cards of the same size. */
+    public static final int SUMMARY_CARDS = 3;
+
     public AssembledFacts {
         if (facts == null || facts.isEmpty() || text == null) {
             throw new IllegalArgumentException("assistant.facts.invalid");
         }
-        if (cards == null || cards.size() != CARDS) {
+        if (cards == null || (cards.size() != CARDS && cards.size() != SUMMARY_CARDS)) {
             throw new IllegalArgumentException("assistant.facts.cards");
         }
         facts = Collections.unmodifiableSortedMap(new TreeMap<>(facts));

@@ -24,12 +24,13 @@ public interface AssistantAnswerPersistenceRepository extends JpaRepository<Assi
                     String producerId, String questionId, String plotId, String locale, String dataVersion,
                     Instant since);
 
-    List<AssistantAnswerPersistenceEntity> findByProducerIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-            String producerId, Instant since, Pageable page);
+    List<AssistantAnswerPersistenceEntity>
+            findByProducerIdAndQuestionIdNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(String producerId,
+                    String excludedQuestionId, Instant since, Pageable page);
 
     Optional<AssistantAnswerPersistenceEntity>
-            findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-                    String producerId, String plotId, String questionPrefix, Instant since);
+            findFirstByProducerIdAndPlotIdAndQuestionIdStartingWithAndQuestionIdNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                    String producerId, String plotId, String questionPrefix, String excludedQuestionId, Instant since);
 
     /** Everything of a deleted account, for the account purge, in one statement. */
     @Modifying

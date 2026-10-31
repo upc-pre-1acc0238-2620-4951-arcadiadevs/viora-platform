@@ -66,7 +66,7 @@ public class InMemoryAssistantAnswerRepository implements AssistantAnswerReposit
     public synchronized Optional<AssistantAnswer> findLatestCached(String producerId, QuestionId questionId, PlotId plotId,
             String locale, DataVersion dataVersion, Instant since) {
         return newestFirst().filter(answer -> answer.producerId().equals(producerId)
-                        && answer.questionId().equals(questionId) && answer.plotId().equals(plotId)
+                        && answer.questionId().equals(questionId) && java.util.Objects.equals(answer.plotId(), plotId)
                         && answer.locale().equals(locale) && answer.dataVersion().equals(dataVersion)
                         && answer.createdAt().isAfter(since))
                 .findFirst();
@@ -75,6 +75,7 @@ public class InMemoryAssistantAnswerRepository implements AssistantAnswerReposit
     @Override
     public synchronized List<AssistantAnswer> findRecent(String producerId, Instant since, int limit) {
         return newestFirst().filter(answer -> answer.producerId().equals(producerId)
+                        && !QuestionId.HOME_DAILY_SUMMARY.equals(answer.questionId())
                         && !answer.createdAt().isBefore(since))
                 .limit(limit)
                 .toList();
@@ -84,7 +85,8 @@ public class InMemoryAssistantAnswerRepository implements AssistantAnswerReposit
     public synchronized Optional<AssistantAnswer> findLatestOfScreen(String producerId, PlotId plotId, String questionPrefix,
             Instant since) {
         return newestFirst().filter(answer -> answer.producerId().equals(producerId)
-                        && answer.plotId().equals(plotId) && answer.questionId().value().startsWith(questionPrefix)
+                        && java.util.Objects.equals(answer.plotId(), plotId) && answer.questionId().value().startsWith(questionPrefix)
+                        && !QuestionId.HOME_DAILY_SUMMARY.equals(answer.questionId())
                         && !answer.createdAt().isBefore(since))
                 .findFirst();
     }

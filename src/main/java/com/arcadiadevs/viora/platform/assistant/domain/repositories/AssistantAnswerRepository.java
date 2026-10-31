@@ -62,7 +62,8 @@ public interface AssistantAnswerRepository {
             String locale, DataVersion dataVersion, Instant since);
 
     /**
-     * Lists the newest answers of a producer created since an instant.
+     * Lists the newest answers of a producer created since an instant: the questions it asked, never the daily
+     * summaries ({@code home.daily_summary}), which the job prepares without the producer asking.
      *
      * @param producerId the producer
      * @param since      oldest creation instant accepted
@@ -72,7 +73,8 @@ public interface AssistantAnswerRepository {
     List<AssistantAnswer> findRecent(String producerId, Instant since, int limit);
 
     /**
-     * Finds the newest answer of a producer about a plot among the questions of a screen.
+     * Finds the newest answer of a producer about a plot among the questions of a screen; a daily summary
+     * ({@code home.daily_summary}) is never one, so the HOME entry opens on a question the producer asked.
      *
      * @param producerId     the producer
      * @param plotId         the plot; null for the answers about the whole field

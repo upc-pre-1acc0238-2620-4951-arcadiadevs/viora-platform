@@ -57,6 +57,30 @@ class AssistantAnswerTest {
     }
 
     @Test
+    @DisplayName("Every catalog question keeps exactly two facts; the daily summary takes exactly three")
+    void factsPerQuestion() {
+        var three = List.of(FACTS.get(0), FACTS.get(1),
+                new AnswerFact("2", "alertas activas", "en 2 lotes", FactTone.HIGHLIGHT));
+
+        assertThat(QuestionId.HOME_WEEK_PLAN.factCards()).isEqualTo(2);
+        assertThat(QuestionId.PLAN_WHY_PERCENT.factCards()).isEqualTo(2);
+        assertThat(QuestionId.HOME_DAILY_SUMMARY.factCards()).isEqualTo(3);
+        assertThatThrownBy(() -> AssistantAnswer.create(UUID.randomUUID(), "producer-1", null,
+                QuestionId.HOME_WEEK_PLAN, "es", VERSION, "Texto.", three, List.of(), List.of(),
+                AnswerModel.TEMPLATE, NOW))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("assistant.answer.facts");
+        assertThatThrownBy(() -> AssistantAnswer.create(UUID.randomUUID(), "producer-1", null,
+                QuestionId.HOME_DAILY_SUMMARY, "es", VERSION, "Texto.", FACTS, List.of(), List.of(),
+                AnswerModel.TEMPLATE, NOW))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("assistant.answer.facts");
+        assertThat(AssistantAnswer.create(UUID.randomUUID(), "producer-1", null, QuestionId.HOME_DAILY_SUMMARY,
+                "es", VERSION, "Texto.", three, List.of(), List.of(), AnswerModel.TEMPLATE, NOW).facts())
+                .isEqualTo(three);
+    }
+
+    @Test
     @DisplayName("Is up to date while the current version matches, stale when it changed or is unknown")
     void freshness() {
         var answer = answerAt(NOW);
