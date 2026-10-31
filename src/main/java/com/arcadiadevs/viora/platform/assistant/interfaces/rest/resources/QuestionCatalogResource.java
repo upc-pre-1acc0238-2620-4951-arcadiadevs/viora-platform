@@ -16,7 +16,9 @@ import java.util.List;
 @Schema(name = "QuestionCatalogResource", description = "Questions of the assistant for a screen, in display order")
 @NullMarked
 public record QuestionCatalogResource(
-        @Schema(description = "Screen key", example = "ALTERNATION", allowableValues = {"ALTERNATION", "PLAN"})
+        @Schema(description = "Screen key", example = "ALTERNATION", allowableValues = {"HOME", "ALTERNATION", "PLAN",
+                "ALERT", "CLIMATE", "WINTER_CHILL", "PLOT_DETAIL", "SENSORS", "SAMPLING_SUMMARY", "THINNING_DONE",
+                "CAMPAIGN_CLOSED"})
         String screen,
 
         @Schema(description = "Plot identifier UUID; null for HOME about the producer's whole field",
