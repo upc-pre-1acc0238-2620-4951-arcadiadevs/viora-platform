@@ -23,6 +23,8 @@ import java.util.List;
  * @param producerId       producer who asked
  * @param plotId           plot the question was about
  * @param questionId       question asked
+ * @param question         the question as the producer read it, in the language of the answer; null only for
+ *                         answers saved before it was kept
  * @param language         language the text is written in
  * @param dataVersion      fingerprint of the figures it was written from
  * @param text             the 2-3 sentences
@@ -42,6 +44,7 @@ public record AssistantAnswer(
         String producerId,
         PlotId plotId,
         QuestionId questionId,
+        String question,
         AnswerLanguage language,
         DataVersion dataVersion,
         String text,

@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.commandser
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerTextChooser;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.ai.AnswerTextWriter;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.ratelimit.AnswerRateLimiter;
 import com.arcadiadevs.viora.platform.assistant.application.internal.queryservices.AnswerFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
@@ -41,12 +42,15 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,6 +74,9 @@ class AskQuestionCommandServiceImplTest {
     /** Off by default, as a mock answers false: every answer is its template. */
     @Mock
     private AnswerTextWriter writer;
+    /** Lets every answer through by default, as a mock answers an empty OptionalLong. */
+    @Mock
+    private AnswerRateLimiter rateLimiter;
 
     private AskQuestionCommandServiceImpl service;
 
@@ -85,7 +92,7 @@ class AskQuestionCommandServiceImplTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         service = new AskQuestionCommandServiceImpl(catalogQueryService, factsAssembler, repository,
-                new AnswerLocalizer(messages), new AnswerTextChooser(writer), CLOCK, TTL);
+                new AnswerLocalizer(messages), new AnswerTextChooser(writer), rateLimiter, CLOCK, TTL);
     }
 
     private AskQuestionCommand command(boolean forceRefresh) {
@@ -108,7 +115,7 @@ class AskQuestionCommandServiceImplTest {
     }
 
     private AssistantAnswer savedAnswer(boolean fallback) {
-        return new AssistantAnswer(AnswerId.generate(), producerId, plotId, question, AnswerLanguage.SPANISH,
+        return new AssistantAnswer(AnswerId.generate(), producerId, plotId, question, "¿Y si no aclaro?", AnswerLanguage.SPANISH,
                 new DataVersion("sha256:abc"), "Respuesta guardada",
                 List.of(new AnswerFact("1", "a", "b", FactTone.PRIMARY), new AnswerFact("2", "c", "d", FactTone.HIGHLIGHT)),
                 List.of(), List.of(), requestId, AssistantAnswer.TEMPLATE, null, fallback, null, null, NOW.minusSeconds(60));
@@ -191,6 +198,7 @@ class AskQuestionCommandServiceImplTest {
         var result = service.handle(command(false));
 
         assertThat(((Result.Success<?, ?>) result).value()).hasFieldOrPropertyWithValue("answer", saved);
+        verifyNoInteractions(rateLimiter);
         verify(repository).findReusable(producerId, plotId, question, AnswerLanguage.SPANISH,
                 AnswerComposer.dataVersionOf(ScreenKey.PLAN, prescription()), NOW.minus(TTL));
         verify(repository, never()).save(any());
@@ -244,5 +252,23 @@ class AskQuestionCommandServiceImplTest {
         var view = ((Result.Success<AnswerView, ApplicationError>) result).value();
         assertThat(view.answer()).isEqualTo(saved);
         assertThat(view.freshness()).isEqualTo(Freshness.UP_TO_DATE);
+    }
+
+    @Test
+    @DisplayName("past the limit of new answers it answers 429 with the wait, and nothing is written")
+    void limitsTheNewAnswers() {
+        givenCatalog(true);
+        when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
+        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(rateLimiter.tryAcquire(eq(producerId), anyBoolean(), eq(NOW))).thenReturn(OptionalLong.of(120));
+
+        var result = service.handle(command(true));
+
+        var error = ((Result.Failure<?, ApplicationError>) result).error();
+        assertThat(error.code()).isEqualTo("ASSISTANT_TOO_MANY_REQUESTS");
+        assertThat(error.properties()).containsEntry("retryAfterSeconds", 120L);
+        verify(rateLimiter).tryAcquire(producerId, true, NOW);
+        verify(repository, never()).save(any());
+        verifyNoInteractions(writer);
     }
 }

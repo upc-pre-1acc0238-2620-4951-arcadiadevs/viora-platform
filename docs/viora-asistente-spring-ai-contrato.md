@@ -254,6 +254,8 @@ Tabla `assistant_answers` (nombres a ajustar a la convención de tablas del repo
 
 ## 7. Límites, costos y resiliencia
 
+> **Implementado en 0.63.0** (`feature/assistant-backend-closing`): 20 respuestas nuevas por hora y productor, de las que 5 pueden ser `forceRefresh` (`viora.assistant.limits.*`), con 429 `ASSISTANT_TOO_MANY_REQUESTS` y `Retry-After`; las repeticiones y las respuestas reutilizadas no cuentan porque no llaman al modelo. El catálogo no se limita: solo lee cifras ya calculadas. Circuit breaker propio (`ModelCircuitBreaker`, sin dependencia nueva): 5 fallos seguidos pausan el modelo 2 minutos y luego se prueba una sola llamada. Retención: job diario que borra las respuestas de más de 10 días. Métricas: cada respuesta guarda proveedor, modelo, `fallback` y tokens, y el log registra el veredicto del validador sin el texto; Micrometer queda para cuando haya un sistema que lea las métricas (Render gratuito no lo tiene).
+
 - **Rate limit** con `SlidingWindowCounter` (`shared/infrastructure/ratelimit`) y `ClientAddress`: propuesta inicial **20 respuestas/hora por productor**, **5 `forceRefresh`/hora**, 60 consultas de catálogo/hora. Ajustar con datos reales. Respuesta 429 con `Retry-After`.
 - **Timeouts:** 8 s hasta el primer token, 20 s totales; reintento una vez; **circuit breaker** (Resilience4j o equivalente) que abre tras N fallos y fuerza la plantilla.
 - **Presupuesto de tokens:** entrada ≤ ~600 tokens (JSON de hechos + instrucciones), salida ≤ 150. Registrar tokens por respuesta para vigilar el costo.
@@ -270,7 +272,7 @@ Tabla `assistant_answers` (nombres a ajustar a la convención de tablas del repo
 2. `feature/assistant-template-answers`: `POST /answers` con **plantillas deterministas** + persistencia + historial + `freshness` + caché. Con esto la app ya puede integrarse de punta a punta.
 3. `feature/assistant-spring-ai`: `ChatClient` con Groq (Spring AI 2.0.2, `openai/gpt-oss-20b` por defecto (medido contra el 120b: conserva mejor el sentido y la cautela y tarda la mitad), razonamiento bajo, 8 s y un reintento), validador de cifras y de prácticas (`AnswerTextValidator`), fallback a plantilla, propiedades de modelo, pruebas con `ChatModel` falso y una evaluación en vivo opcional (`-Dviora.assistant.live=true`). Salida en texto plano: las tarjetas ya vienen del servidor, así que no hace falta salida estructurada. Una respuesta que cayó a la plantilla no se reutiliza de la caché, para reintentar con el modelo.
 4. `feature/assistant-daily-summary`: job diario + `GET /daily-summary`.
-5. `feature/assistant-limits-metrics`: rate limits, circuit breaker, métricas, retención.
+5. `feature/assistant-limits-metrics`: rate limits, circuit breaker, métricas, retención. **Hecho en 0.63.0** (`feature/assistant-backend-closing`, ver sección 7), junto con `question` en la respuesta.
 
 (La rama de streaming SSE se eliminó; ver sección 0.)
 
@@ -318,3 +320,22 @@ Las decisiones 1, 2, 3, 4, 5 y 7 de la versión anterior se cerraron en la secci
 - Antes de etiquetar, `git ls-remote --tags origin` (hubo un choque `0.16.0` vs `1.16.0` en la app).
 - Fuente de verdad de endpoints existentes: el código y `docs/mobile-backend-gaps.md` de la plataforma; la nota del informe puede estar desfasada.
 - Tipografía: en la máquina de Victor falta la fuente Caros usada por los rótulos "Flujo_NN" de Figma; el rótulo F15 de la sección 23 se armó con Roboto/Newsreader.
+
+---
+
+## 12. Pendiente del backend tras 0.63.0
+
+Estado: ALTERNATION y PLAN completos (catálogo, respuestas, modelo, historial, límites, retención). La app construye la hoja con esas dos pantallas (1.18.0) y las demás siguen en rondas backend → app.
+
+1. **Reorganizar el asistente por pantalla antes de sumar pantallas.** Hoy `PlotFacts` (catálogo) y `AnswerFacts` (respuestas) son registros planos con los campos de ALTERNATION y PLAN mezclados, y `QuestionCatalog`, `AnswerComposer` y `AnswerFactsAssembler` despachan con `switch`. Con 11 pantallas eso no escala. Propuesta: `ScreenFacts` sellado con un registro por pantalla (con su `canonical()` para `dataVersion`), un lector de hechos por pantalla en `application/internal/queryservices` y, en `domain/services`, una clase por pantalla con sus preguntas y sus plantillas. El catálogo y la respuesta leen los mismos hechos, así una pregunta habilitada siempre se puede responder.
+2. **Pantallas que faltan** (preguntas en la sección 5), con las fachadas que habría que ampliar:
+   - ALERT (T15) y CLIMATE (P90): `TelemetryContextFacade` hoy solo da cobertura; necesita el incidente activo del lote (tipo, severidad, valor y umbral, inicio, duración), el pronóstico de máximas y los umbrales de ADR-006. `climate.irrigate` va deshabilitada mientras no haya sondas reales (`IoTDevice` no distingue nodo virtual de real).
+   - WINTER_CHILL (P80): porciones de frío del `ChillAccumulationTracker` (Fenología), fecha estimada y el invierno anterior.
+   - PLOT_DETAIL (P26) y CAMPAIGN_CLOSED (P73): reutilizan vecería, prescripción y cosechas; `campaign.caliber_change` necesita el calibre de la campaña cerrada.
+   - SENSORS (P85): nodos por estado y última lectura; los datos de nodos virtuales se rotulan "dato simulado".
+   - SAMPLING_SUMMARY (P54) y THINNING_DONE (P63): resumen de la ronda y aclareo ejecutado desde `ThinningContextFacade`.
+   - Preguntas de uso de la app (`sensors.how_link`, `sampling.correct_tree`) no salen de datos: decidir si se quedan como texto fijo o se quitan del catálogo.
+3. **Inicio y resumen del día** (sección 4.4): `GET /assistant/daily-summary` con 3 tarjetas, así que no cabe en `AssistantAnswer` (exige 2): necesita su propio agregado y recurso, el job de las 06:30 de Lima y generación bajo demanda. La app lo lee con su worker y una notificación local (decidido 2026-10-30, opción A).
+4. **Validación agronómica** de la redacción (sección 10) antes de producción; se vuelve más urgente con ALERT y CLIMATE (efecto del calor en el cuajado).
+5. Micrometer, cuando exista un sistema que lea las métricas.
+
