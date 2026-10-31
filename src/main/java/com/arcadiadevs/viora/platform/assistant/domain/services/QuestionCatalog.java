@@ -44,7 +44,9 @@ public final class QuestionCatalog {
             ScreenKey.SENSORS, List.of(QuestionId.SENSORS_WHAT_SAY, QuestionId.SENSORS_WHY_PAUSED,
                     QuestionId.SENSORS_RELIABILITY, QuestionId.SENSORS_HOW_LINK),
             ScreenKey.SAMPLING_SUMMARY, List.of(QuestionId.SAMPLING_ENOUGH_TREES, QuestionId.SAMPLING_MEANING,
-                    QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE));
+                    QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE),
+            ScreenKey.THINNING_DONE, List.of(QuestionId.THINNING_HARVEST_CHANGE, QuestionId.THINNING_WHY_TARGET,
+                    QuestionId.THINNING_NEXT_SAMPLING));
 
     private QuestionCatalog() {
     }
@@ -80,6 +82,7 @@ public final class QuestionCatalog {
             case PLOT_DETAIL -> plotDetail(facts);
             case SENSORS -> sensors(facts.climate());
             case SAMPLING_SUMMARY -> sampling(facts.home());
+            case THINNING_DONE -> thinningDone(facts.home());
         };
     }
 
@@ -320,6 +323,36 @@ public final class QuestionCatalog {
                         samplingMissing),
                 question(QuestionId.SAMPLING_CORRECT_TREE, label(QuestionId.SAMPLING_CORRECT_TREE, "label"),
                         "pruning", CatalogText.of("assistant.reason.tree_correction_unavailable")));
+    }
+
+    /**
+     * The THINNING_DONE screen needs the thinning recorded this campaign. The harvest change needs the yield Thinning
+     * estimates after it (3 earlier harvests and the plot area) and the target needs the load balance of the
+     * confirmation; the next sampling is always offered once the thinning is recorded.
+     */
+    private static List<CatalogQuestion> thinningDone(HomeData home) {
+        var outcome = home.outcome();
+        if (outcome == null) {
+            var missing = CatalogText.of("assistant.reason.thinning_missing");
+            return List.of(
+                    question(QuestionId.THINNING_HARVEST_CHANGE, label(QuestionId.THINNING_HARVEST_CHANGE, "label"),
+                            "harvest", missing),
+                    question(QuestionId.THINNING_WHY_TARGET, label(QuestionId.THINNING_WHY_TARGET,
+                            "label_without_target"), "prio", missing),
+                    question(QuestionId.THINNING_NEXT_SAMPLING, label(QuestionId.THINNING_NEXT_SAMPLING, "label"),
+                            "calendar", missing));
+        }
+        boolean hasTarget = outcome.targetLoad() != null;
+        return List.of(
+                question(QuestionId.THINNING_HARVEST_CHANGE, label(QuestionId.THINNING_HARVEST_CHANGE, "label"),
+                        "harvest", outcome.kgPerHaAfterThinning() == null
+                                ? CatalogText.of("assistant.reason.yield_missing") : null),
+                question(QuestionId.THINNING_WHY_TARGET, hasTarget
+                        ? label(QuestionId.THINNING_WHY_TARGET, "label", outcome.targetLoad())
+                        : label(QuestionId.THINNING_WHY_TARGET, "label_without_target"), "prio",
+                        hasTarget ? null : CatalogText.of("assistant.reason.facts_missing")),
+                question(QuestionId.THINNING_NEXT_SAMPLING, label(QuestionId.THINNING_NEXT_SAMPLING, "label"),
+                        "calendar", null));
     }
 
     /** Why the plan questions cannot be answered, or null when the prescription is issued. */

@@ -16,11 +16,31 @@ import java.util.TreeSet;
  * @param fieldScope whether the question is about the producer's whole field instead of one plot
  * @param plots      the plot asked about, or every active plot of the producer
  * @param thresholds the alert thresholds Telemetry uses; null when the forecast was not read
+ * @param outcome    outcome of the confirmed thinning of the plot, read only by THINNING_DONE; null otherwise or
+ *                   before the thinning is confirmed
  */
-public record HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thresholds thresholds) {
+public record HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thresholds thresholds,
+        ThinningOutcomeData outcome) {
 
     /** No HOME data: the screens that are not HOME. */
     public static final HomeData NONE = new HomeData(false, List.of(), null);
+
+    /**
+     * Data without a thinning outcome.
+     */
+    public HomeData(boolean fieldScope, List<PlotHome> plots, ClimateData.Thresholds thresholds) {
+        this(fieldScope, plots, thresholds, null);
+    }
+
+    /**
+     * The same data with the outcome of the confirmed thinning.
+     *
+     * @param thinningOutcome the outcome; null before the thinning is confirmed
+     * @return the data
+     */
+    public HomeData withOutcome(ThinningOutcomeData thinningOutcome) {
+        return new HomeData(fieldScope, plots, thresholds, thinningOutcome);
+    }
 
     /** Status of a caliber projection that has figures. */
     public static final String CALIBER_ESTIMATED = "ESTIMATED";

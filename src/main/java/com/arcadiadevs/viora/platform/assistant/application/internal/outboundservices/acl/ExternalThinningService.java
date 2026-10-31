@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl;
 
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningOutcomeData;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningPlanData;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
@@ -29,6 +30,23 @@ public class ExternalThinningService {
      */
     public Optional<PrescriptionAvailability> findPrescriptionAvailability(PlotId plotId, int campaignYear) {
         return thinningContextFacade.findPrescriptionAvailability(plotId.plotId(), campaignYear);
+    }
+
+    /**
+     * Resolves the outcome of the confirmed thinning of a plot campaign.
+     *
+     * @param plotId       the assistant PlotId value object
+     * @param campaignYear the campaign year
+     * @return the outcome, or empty before the thinning is confirmed
+     */
+    public Optional<ThinningOutcomeData> findThinningOutcome(PlotId plotId, int campaignYear) {
+        return thinningContextFacade.findThinningOutcome(plotId.plotId(), campaignYear)
+                .map(outcome -> new ThinningOutcomeData(outcome.executedOn(), outcome.actualRemovalPercentage(),
+                        outcome.timeliness(), outcome.preThinningFruitsPerShoot(), outcome.residualFruitsPerShoot(),
+                        outcome.targetFruitsPerShoot(), outcome.loadState(), outcome.kgPerHaWithoutThinning(),
+                        outcome.kgPerHaAfterThinning(), outcome.yieldBasis(), outcome.harvestCampaigns(),
+                        outcome.profileStatus(), outcome.windowOpensDaysAfterBloom(),
+                        outcome.windowClosesDaysAfterBloom()));
     }
 
     /**

@@ -31,7 +31,10 @@ public enum ScreenKey {
     SENSORS,
 
     /** Summary of the sampling of a plot: enough trees, what it means, what to do next (P54, P142-P144). */
-    SAMPLING_SUMMARY;
+    SAMPLING_SUMMARY,
+
+    /** After the thinning of a plot is recorded: the harvest, the target, the next sampling (P63, P145-P147). */
+    THINNING_DONE;
 
     /**
      * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
@@ -57,10 +60,10 @@ public enum ScreenKey {
      * Whether the questions of the screen are about one plot read as HOME reads it: its thinning plan, sampling,
      * alerts, harvests and forecast.
      *
-     * @return true for PLOT_DETAIL and SAMPLING_SUMMARY
+     * @return true for PLOT_DETAIL, SAMPLING_SUMMARY and THINNING_DONE
      */
     public boolean readsOnePlot() {
-        return this == PLOT_DETAIL || this == SAMPLING_SUMMARY;
+        return this == PLOT_DETAIL || this == SAMPLING_SUMMARY || this == THINNING_DONE;
     }
 
     /**
@@ -74,7 +77,8 @@ public enum ScreenKey {
 
     /**
      * Prefix shared by the identifiers of the screen questions, such as {@code plan.}. WINTER_CHILL and PLOT_DETAIL
-     * and SAMPLING_SUMMARY questions use the shorter {@code chill.}, {@code plot.} and {@code sampling.} of the contract.
+     * SAMPLING_SUMMARY and THINNING_DONE questions use the shorter {@code chill.}, {@code plot.}, {@code sampling.} and
+     * {@code thinning.} of the contract.
      *
      * @return the prefix
      */
@@ -83,6 +87,7 @@ public enum ScreenKey {
             case WINTER_CHILL -> "chill.";
             case PLOT_DETAIL -> "plot.";
             case SAMPLING_SUMMARY -> "sampling.";
+            case THINNING_DONE -> "thinning.";
             default -> name().toLowerCase(Locale.ROOT) + ".";
         };
     }

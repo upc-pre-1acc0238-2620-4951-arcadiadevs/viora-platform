@@ -30,6 +30,9 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.NextY
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotHowIsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotLastSamplingFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.PlotTodayFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ThinningHarvestChangeFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ThinningNextSamplingFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ThinningWhyTargetFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.VsCampaignsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyIndexFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.WhyPercentFactsAssembler;
@@ -63,7 +66,7 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS and SAMPLING_SUMMARY questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS, SAMPLING_SUMMARY and THINNING_DONE questions.
      *
      * @return the registry
      */
@@ -83,7 +86,9 @@ public final class FactsAssemblerRegistry {
                 new NextYearFactsAssembler(QuestionId.PLOT_NEXT_YEAR_HARVEST),
                 new SensorsSayFactsAssembler(QuestionId.SENSORS_WHAT_SAY), new SensorsReliabilityFactsAssembler(),
                 new SensorsHowLinkFactsAssembler(), new SamplingEnoughTreesFactsAssembler(),
-                new SamplingMeaningFactsAssembler(), new SamplingNextFactsAssembler()));
+                new SamplingMeaningFactsAssembler(), new SamplingNextFactsAssembler(),
+                new ThinningHarvestChangeFactsAssembler(), new ThinningWhyTargetFactsAssembler(),
+                new ThinningNextSamplingFactsAssembler()));
     }
 
     /**

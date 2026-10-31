@@ -242,6 +242,8 @@ Implementado (2026-10-30): `sampling.enough_trees` da los árboles sobre el mín
 ### THINNING_DONE (P63, P145–P147)
 `thinning.harvest_change` (8,2 t/ha y 2027 más estable), `thinning.why_target`, `thinning.next_sampling`.
 
+Implementado (2026-10-30): `thinning.harvest_change` compara la cosecha estimada después del aclareo con la de sin aclarear y dice dónde quedó la carga frente al objetivo; no afirma "2027 más estable" porque ningún contexto proyecta la campaña siguiente. `thinning.why_target` explica que el objetivo sale del perfil de la variedad y si un agrónomo lo aprobó. `thinning.next_sampling` remite a la próxima campaña, después de la plena floración. Los datos salen de la fachada nueva de Raleo `findThinningOutcome`. Detalle en `asistente-decisiones.md` (Pantalla Aclareo registrado).
+
 ### CAMPAIGN_CLOSED (P73, P148–P150)
 `campaign.vs_previous` (8,3 t/ha, +36 % sobre el promedio), `campaign.caliber_change`, `campaign.plan_next`.
 

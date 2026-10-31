@@ -158,6 +158,32 @@ El dueño eligió "completo": HOME responde para un lote o, sin `plotId`, para t
 - **Total de kilos del campo.** Si el dueño quiere un total, decidir qué superficie usar (polígono o plantada) y si se suma kg/ha × ha.
 - **Lotes sin muestreo en "esta semana".** Decidir con el agrónomo si un lote sin ningún muestreo en temporada debe aparecer como pendiente.
 
+## Pantalla Aclareo registrado (THINNING_DONE)
+
+Preguntas del contrato: `thinning.harvest_change` (8,2 t/ha y 2027 más estable), `thinning.why_target` y `thinning.next_sampling`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`) y además el resultado del aclareo confirmado.
+
+### Fachada nueva de Raleo: `findThinningOutcome` (solo lectura, 2026-10-30)
+
+**Por qué.** Raleo ya calcula la cosecha estimada con la carga de antes del aclareo (`ThinningPrescriptionOutlookService.outlookOf`, la misma que muestra la pantalla del plan), pero `findThinningPlanDetail` solo exponía la de después. Tampoco exponía la carga que quedó, el estado de esa carga, el porcentaje que el productor dice haber quitado, el estado del perfil de la variedad ni los días de la ventana después de la floración.
+
+**Cómo.**
+
+- Se agregó `ThinningContextFacade.findThinningOutcome(plotId, campaignYear)` con el record `ThinningOutcome`. Es un método nuevo: `findThinningPlanDetail` no cambió.
+- Solo devuelve algo con el aclareo confirmado. Las cosechas sin estimación (menos de 3 cosechas anteriores o sin superficie) vienen en null.
+- Lee las mismas estimaciones que la pantalla del plan, así el asistente nunca muestra otra cifra.
+- Lo cubren dos tests nuevos en `ThinningContextFacadeImplTest`.
+
+### "2027 más estable": no se afirma (decisión menor, 2026-10-30)
+
+El mockup del contrato promete que el año siguiente será "más estable". Ningún contexto proyecta la campaña siguiente: el índice de vecería de Fenología sale solo de cosechas pasadas, y Raleo no relaciona el aclareo con ese índice. Afirmarlo sería inventar. En su lugar, `harvest_change` dice dónde quedó la carga frente al objetivo: dentro, hasta un 30 % por encima, o más de un 30 % por encima ("el árbol sigue sobrecargado"), con los umbrales de `LoadState` de Raleo. El glosario del modelo le pide no afirmar nada sobre la campaña siguiente, y un test verifica que la respuesta no nombra ese año.
+
+### Resto de la pantalla (2026-10-30)
+
+- **`thinning.harvest_change`.** Da la cosecha estimada después del aclareo frente a la de sin aclarear. Cuando la variedad no tiene modelo de calibre (`FRUIT_COUNT_ONLY`), la cifra sin aclarear es un techo, porque con más fruta el calibre baja, y la respuesta lo dice. Se deshabilita sin estimación ("Faltan cosechas registradas o la superficie del lote para estimar la cosecha").
+- **`thinning.why_target`.** El objetivo no se calcula del lote: sale del perfil de aclareo configurado para la variedad (`viora.thinning.profiles.<variedad>.*`). La respuesta lo explica, dice si el perfil está aprobado por un agrónomo, es provisional o es de demostración (`SYNTHETIC_DEMO`, el de los datos demo), y cuenta dónde quedó la carga después del aclareo.
+- **`thinning.next_sampling`.** Raleo no tiene una regla de "cuándo volver a muestrear". La respuesta dice que esta campaña ya no pide muestreos y que en la siguiente hay que registrar la plena floración y muestrear antes de que abra la ventana, que va de N a M días después de la floración según el perfil. No da fechas porque no hay datos para darlas.
+- **Antes del aclareo.** Las tres preguntas se deshabilitan con "Sin aclareo registrado en esta campaña".
+
 ## Pantalla Resumen de muestreo (SAMPLING_SUMMARY)
 
 Preguntas del contrato: `sampling.enough_trees` (5/5 y 0,59 frutos por brote vs objetivo 0,40; mínimo 5 árboles), `sampling.meaning`, `sampling.next` y `sampling.correct_tree`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`: plan de aclareo y árboles que faltan de Raleo); no se agregó nada a Raleo.

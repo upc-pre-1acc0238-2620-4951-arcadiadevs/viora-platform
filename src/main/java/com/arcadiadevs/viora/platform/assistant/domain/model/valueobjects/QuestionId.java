@@ -48,6 +48,9 @@ public record QuestionId(String value) {
     public static final QuestionId SAMPLING_MEANING = new QuestionId("sampling.meaning");
     public static final QuestionId SAMPLING_NEXT = new QuestionId("sampling.next");
     public static final QuestionId SAMPLING_CORRECT_TREE = new QuestionId("sampling.correct_tree");
+    public static final QuestionId THINNING_HARVEST_CHANGE = new QuestionId("thinning.harvest_change");
+    public static final QuestionId THINNING_WHY_TARGET = new QuestionId("thinning.why_target");
+    public static final QuestionId THINNING_NEXT_SAMPLING = new QuestionId("thinning.next_sampling");
 
     /**
      * Compact constructor validating the {@code screen.question} format.
