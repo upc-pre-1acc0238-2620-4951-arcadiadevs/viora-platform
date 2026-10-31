@@ -6,7 +6,7 @@ import java.util.List;
  * Questions the assistant offers on a screen, in display order.
  *
  * @param screen    the screen
- * @param plotId    the plot the questions are about
+ * @param plotId    the plot the questions are about; null for the producer's whole field (HOME)
  * @param questions questions in display order
  */
 public record ScreenQuestionCatalog(ScreenKey screen, PlotId plotId, List<CatalogQuestion> questions) {

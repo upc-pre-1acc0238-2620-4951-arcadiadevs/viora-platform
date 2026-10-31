@@ -7,7 +7,10 @@ import java.util.Locale;
  */
 public enum ScreenKey {
 
-    /** Home of the producer (P110-P113): the week, the campaign, the alerts and the harvest of its plots. */
+    /**
+     * Home of the producer (P110-P113): the week, the campaign, the alerts and the harvest, of one plot or, without
+     * plot, of every active plot of the producer.
+     */
     HOME,
 
     /** Alternate bearing of a plot (P40, P114-P119). */
@@ -41,12 +44,13 @@ public enum ScreenKey {
     CAMPAIGN_CLOSED;
 
     /**
-     * Whether the questions of the screen are about one plot, so the request must name it.
+     * Whether the questions of the screen are about one plot, so the request must name it. HOME has field scope:
+     * without a plot its questions are about every active plot of the producer.
      *
-     * @return true for plot screens
+     * @return true for plot screens, false for HOME
      */
     public boolean requiresPlot() {
-        return true;
+        return this != HOME;
     }
 
     /**

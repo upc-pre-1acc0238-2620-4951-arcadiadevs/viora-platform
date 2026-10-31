@@ -28,7 +28,7 @@ public final class AssistantAnswerResourceFromEntityAssembler {
                 answer.id().value(),
                 answer.questionId().value(),
                 answer.question(),
-                answer.plotId().plotId(),
+                answer.plotId() == null ? null : answer.plotId().plotId(),
                 answer.createdAt(),
                 answer.dataVersion().value(),
                 view.freshness().name(),

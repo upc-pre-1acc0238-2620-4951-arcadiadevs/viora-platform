@@ -32,7 +32,7 @@ public final class QuestionCatalogResourceFromEntityAssembler {
             Locale locale) {
         return new QuestionCatalogResource(
                 catalog.screen().name(),
-                catalog.plotId().plotId(),
+                catalog.plotId() == null ? null : catalog.plotId().plotId(),
                 catalog.questions().stream().map(question -> toResource(question, messageSource, locale)).toList());
     }
 

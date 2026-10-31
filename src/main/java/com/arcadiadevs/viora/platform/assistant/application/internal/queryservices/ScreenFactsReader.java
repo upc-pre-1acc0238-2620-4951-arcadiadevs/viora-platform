@@ -25,4 +25,17 @@ public interface ScreenFactsReader {
      * @return the figures; those the plot does not have yet are null (or empty)
      */
     ScreenFacts read(PlotId plotId, int campaignYear);
+
+    /**
+     * Reads the figures of the screen for a plot or, on a screen with field scope, for the producer's whole field.
+     * A plot screen always gets its plot, so it reads that plot.
+     *
+     * @param producerId   the producer asking; its active plots are the field
+     * @param plotId       the plot; null for the whole field
+     * @param campaignYear the current campaign year
+     * @return the figures; those the plot or the field do not have yet are null (or empty)
+     */
+    default ScreenFacts read(String producerId, PlotId plotId, int campaignYear) {
+        return read(plotId, campaignYear);
+    }
 }

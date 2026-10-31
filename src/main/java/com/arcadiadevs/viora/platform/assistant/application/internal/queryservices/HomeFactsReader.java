@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
@@ -17,13 +18,14 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Reads the figures of the home screen through the Thinning, Phenology and Telemetry facades: of each plot, its
- * thinning plan and the trees its sampling still misses, its harvests and bearing index, its open alerts and its
- * forecast.
+ * Reads the figures of the home screen through the Orchard, Thinning, Phenology and Telemetry facades: of the plot
+ * asked about, or of every active plot of the producer (its whole field). Of each plot, its thinning plan and the
+ * trees its sampling still misses, its harvests and bearing index, its open alerts and its forecast.
  */
 @Service
 public class HomeFactsReader implements ScreenFactsReader {
 
+    private final ExternalOrchardService externalOrchardService;
     private final ExternalThinningService externalThinningService;
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalTelemetryService externalTelemetryService;
@@ -32,14 +34,17 @@ public class HomeFactsReader implements ScreenFactsReader {
     /**
      * Constructs the reader.
      *
+     * @param externalOrchardService   lists the active plots of the producer, for the whole field
      * @param externalThinningService  reads the plan and the sampling of the campaign
      * @param externalPhenologyService reads the bearing index and the harvests
      * @param externalTelemetryService reads the open alerts, the thresholds and the forecast
      * @param clock                    the application clock, for the day the week is judged from
      */
-    public HomeFactsReader(ExternalThinningService externalThinningService,
+    public HomeFactsReader(ExternalOrchardService externalOrchardService,
+                           ExternalThinningService externalThinningService,
                            ExternalPhenologyService externalPhenologyService,
                            ExternalTelemetryService externalTelemetryService, Clock clock) {
+        this.externalOrchardService = externalOrchardService;
         this.externalThinningService = externalThinningService;
         this.externalPhenologyService = externalPhenologyService;
         this.externalTelemetryService = externalTelemetryService;
@@ -53,7 +58,26 @@ public class HomeFactsReader implements ScreenFactsReader {
 
     @Override
     public ScreenFacts read(PlotId plotId, int campaignYear) {
+        if (plotId == null) {
+            throw new IllegalArgumentException("assistant.plot.required");
+        }
         return facts(false, List.of(plotId), campaignYear);
+    }
+
+    /**
+     * Reads the figures of one plot or, without plot, of every active plot of the producer.
+     *
+     * @param producerId   the producer asking; only its own plots are read
+     * @param plotId       the plot; null for the whole field
+     * @param campaignYear the current campaign year
+     * @return the figures of the plot or of the field
+     */
+    @Override
+    public ScreenFacts read(String producerId, PlotId plotId, int campaignYear) {
+        if (plotId != null) {
+            return read(plotId, campaignYear);
+        }
+        return facts(true, externalOrchardService.findActivePlotIdsOfProducer(producerId), campaignYear);
     }
 
     private HomeFacts facts(boolean fieldScope, List<PlotId> plotIds, int campaignYear) {

@@ -8,7 +8,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Screen
  *
  * @param producerId producer asking, whose plan must be active
  * @param screen     screen the assistant is opened from
- * @param plotId     plot of the screen
+ * @param plotId     plot of the screen; null for the producer's whole field on a screen with field scope (HOME)
  */
 public record GetLatestAnswerQuery(String producerId, ScreenKey screen, PlotId plotId) {
 
@@ -22,7 +22,7 @@ public record GetLatestAnswerQuery(String producerId, ScreenKey screen, PlotId p
         if (screen == null) {
             throw new IllegalArgumentException("assistant.screen.invalid");
         }
-        if (plotId == null) {
+        if (plotId == null && screen.requiresPlot()) {
             throw new IllegalArgumentException("assistant.plot.required");
         }
     }

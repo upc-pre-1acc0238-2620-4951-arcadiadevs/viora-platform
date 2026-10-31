@@ -13,7 +13,7 @@ import java.util.List;
  * @param answerId    answer identifier
  * @param questionId  question answered
  * @param question    the question as the producer read it; null only for answers saved before it was kept
- * @param plotId      plot the question was about
+ * @param plotId      plot the question was about; null for HOME about the producer's whole field
  * @param createdAt   when the answer was written
  * @param dataVersion fingerprint of the figures it was written from
  * @param freshness   UP_TO_DATE while the plot has the same data, STALE once it changed
@@ -29,7 +29,7 @@ public record AssistantAnswerResource(
         @Schema(example = "0b6a5a3e-5c4f-4b8e-9a35-4b7e3e5f1a10") String answerId,
         @Schema(example = "plan.why_percent") String questionId,
         @Schema(example = "¿Por qué 30 %?", nullable = true) @Nullable String question,
-        @Schema(example = "550e8400-e29b-41d4-a716-446655440001") String plotId,
+        @Schema(example = "550e8400-e29b-41d4-a716-446655440001", nullable = true) @Nullable String plotId,
         @Schema(example = "2026-10-30T20:00:00Z") Instant createdAt,
         @Schema(example = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08") String dataVersion,
         @Schema(allowableValues = {"UP_TO_DATE", "STALE"}) String freshness,

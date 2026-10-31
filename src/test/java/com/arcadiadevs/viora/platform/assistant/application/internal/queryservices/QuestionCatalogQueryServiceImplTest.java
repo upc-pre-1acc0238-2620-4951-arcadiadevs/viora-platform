@@ -63,7 +63,8 @@ class QuestionCatalogQueryServiceImplTest {
     @BeforeEach
     void setUp() {
         var factsAssembler = new AnswerFactsAssembler(List.of(
-                new HomeFactsReader(externalThinningService, externalPhenologyService, externalTelemetryService, CLOCK),
+                new HomeFactsReader(externalOrchardService, externalThinningService, externalPhenologyService,
+                        externalTelemetryService, CLOCK),
                 new AlternationFactsReader(externalOrchardService, externalPhenologyService, externalThinningService),
                 new PlanFactsReader(externalThinningService),
                 new AlertFactsReader(externalTelemetryService, externalOrchardService),

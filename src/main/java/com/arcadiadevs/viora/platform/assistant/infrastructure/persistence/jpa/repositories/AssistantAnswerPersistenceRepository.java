@@ -37,6 +37,23 @@ public interface AssistantAnswerPersistenceRepository extends JpaRepository<Assi
                                                         @Param("since") Instant since,
                                                         Pageable page);
 
+    /**
+     * Newest answer to a question about the producer's whole field (no plot), written in a language from the same
+     * data, not older than a moment. It never matches an answer about one plot.
+     */
+    @Query("""
+            select a from AssistantAnswerPersistenceEntity a
+            where a.producerId = :producerId and a.plotId is null and a.questionId = :questionId
+              and a.language = :language and a.dataVersion = :dataVersion and a.createdAt >= :since
+            order by a.createdAt desc
+            """)
+    List<AssistantAnswerPersistenceEntity> findReusableOfField(@Param("producerId") String producerId,
+                                                               @Param("questionId") String questionId,
+                                                               @Param("language") String language,
+                                                               @Param("dataVersion") String dataVersion,
+                                                               @Param("since") Instant since,
+                                                               Pageable page);
+
     List<AssistantAnswerPersistenceEntity> findByProducerIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
             String producerId, Instant since, Pageable page);
 
@@ -52,6 +69,18 @@ public interface AssistantAnswerPersistenceRepository extends JpaRepository<Assi
                                                               @Param("prefix") String prefix,
                                                               @Param("since") Instant since,
                                                               Pageable page);
+
+    /** Newest answer of a producer about its whole field (no plot) to a question of a screen. */
+    @Query("""
+            select a from AssistantAnswerPersistenceEntity a
+            where a.producerId = :producerId and a.plotId is null and a.questionId like concat(:prefix, '%')
+              and a.createdAt >= :since
+            order by a.createdAt desc
+            """)
+    List<AssistantAnswerPersistenceEntity> findLatestOfScreenOfField(@Param("producerId") String producerId,
+                                                                     @Param("prefix") String prefix,
+                                                                     @Param("since") Instant since,
+                                                                     Pageable page);
 
     @Modifying
     @Query("delete from AssistantAnswerPersistenceEntity a where a.producerId = :producerId")

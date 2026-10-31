@@ -175,7 +175,7 @@ class AskQuestionCommandServiceImplTest {
     void rejectsWhenTheFiguresAreMissing() {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId))
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId))
                 .thenReturn(new PlanFacts(2026, null, null, null, null, null, 0, false, null, 0));
         when(repository.findReusable(anyString(), any(), any(), any(), any(), any())).thenReturn(Optional.empty());
 
@@ -190,7 +190,7 @@ class AskQuestionCommandServiceImplTest {
     void reusesTheSavedAnswer() {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId)).thenReturn(prescription());
         var saved = savedAnswer();
         when(repository.findReusable(anyString(), any(), any(), any(), any(), any())).thenReturn(Optional.of(saved));
 
@@ -208,7 +208,7 @@ class AskQuestionCommandServiceImplTest {
     void doesNotReuseAFallback() {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId)).thenReturn(prescription());
         when(repository.findReusable(anyString(), any(), any(), any(), any(), any()))
                 .thenReturn(Optional.of(savedAnswer(true)));
 
@@ -224,7 +224,7 @@ class AskQuestionCommandServiceImplTest {
     void forceRefreshWritesANewAnswer() {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId)).thenReturn(prescription());
 
         var result = service.handle(command(true));
 
@@ -241,7 +241,7 @@ class AskQuestionCommandServiceImplTest {
         when(repository.findByClientRequestId(anyString(), any()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(saved));
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId)).thenReturn(prescription());
         when(repository.findReusable(anyString(), any(), any(), any(), any(), any())).thenReturn(Optional.empty());
         doThrow(new DataIntegrityViolationException("uq_assistant_answer_request"))
                 .when(repository).save(any());
@@ -258,7 +258,7 @@ class AskQuestionCommandServiceImplTest {
     void limitsTheNewAnswers() {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
-        when(factsAssembler.assemble(ScreenKey.PLAN, plotId)).thenReturn(prescription());
+        when(factsAssembler.assemble(ScreenKey.PLAN, producerId, plotId)).thenReturn(prescription());
         when(rateLimiter.tryAcquire(eq(producerId), anyBoolean(), eq(NOW))).thenReturn(OptionalLong.of(120));
 
         var result = service.handle(command(true));

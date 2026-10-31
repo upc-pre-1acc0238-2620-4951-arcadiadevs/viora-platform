@@ -49,12 +49,13 @@ public class AnswerFactsAssembler {
     /**
      * Reads the figures the questions of a screen need.
      *
-     * @param screen the screen
-     * @param plotId the plot
+     * @param screen     the screen
+     * @param producerId the producer asking; its active plots are the field of a screen with field scope
+     * @param plotId     the plot; null for the producer's whole field on a screen with field scope (HOME)
      * @return the figures of that screen
      */
-    public ScreenFacts assemble(ScreenKey screen, PlotId plotId) {
+    public ScreenFacts assemble(ScreenKey screen, String producerId, PlotId plotId) {
         int campaignYear = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
-        return readers.get(screen).read(plotId, campaignYear);
+        return readers.get(screen).read(producerId, plotId, campaignYear);
     }
 }

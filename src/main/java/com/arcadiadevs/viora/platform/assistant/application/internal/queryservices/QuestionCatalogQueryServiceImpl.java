@@ -47,10 +47,11 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
         if (!externalSubscriptionService.hasActivePlan(query.producerId())) {
             return Result.failure(ApplicationError.forbidden("assistant", "assistant.subscription.inactive"));
         }
-        if (!externalOrchardService.existsActivePlot(query.plotId())) {
+        // Without plot (HOME about the producer's whole field) there is no plot to verify
+        if (query.plotId() != null && !externalOrchardService.existsActivePlot(query.plotId())) {
             return Result.failure(ApplicationError.notFound("plot", query.plotId().plotId()));
         }
-        var facts = factsAssembler.assemble(query.screen(), query.plotId());
+        var facts = factsAssembler.assemble(query.screen(), query.producerId(), query.plotId());
         return Result.success(new ScreenQuestionCatalog(query.screen(), query.plotId(),
                 QuestionCatalog.questionsFor(facts)));
     }

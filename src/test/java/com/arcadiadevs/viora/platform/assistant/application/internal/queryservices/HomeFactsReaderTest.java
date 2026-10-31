@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
@@ -8,6 +9,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeFa
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningPlanData;
+import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade;
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade.PlotBearingIndex;
 import com.arcadiadevs.viora.platform.telemetry.interfaces.acl.TelemetryContextFacade;
@@ -34,16 +36,21 @@ import java.util.TreeMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@DisplayName("HomeFactsReader: the figures of the home screen, through the Thinning, Phenology and Telemetry facades")
+@DisplayName("HomeFactsReader: the figures of the home screen, through the Orchard, Thinning, Phenology and Telemetry "
+        + "facades")
 class HomeFactsReaderTest {
 
     /** 03:00 UTC on 31 October is still 30 October in Lima. */
     private static final Instant NOW = Instant.parse("2026-10-31T03:00:00Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 30);
     private static final String PLOT = "550e8400-e29b-41d4-a716-446655440001";
+    private static final String OTHER_PLOT = "550e8400-e29b-41d4-a716-446655440002";
+    private static final String PRODUCER = "producer-1";
 
+    private final OrchardContextFacade orchard = mock(OrchardContextFacade.class);
     private final ThinningContextFacade thinning = mock(ThinningContextFacade.class);
     private final PhenologyContextFacade phenology = mock(PhenologyContextFacade.class);
     private final TelemetryContextFacade telemetry = mock(TelemetryContextFacade.class);
@@ -51,7 +58,7 @@ class HomeFactsReaderTest {
 
     @BeforeEach
     void setUp() {
-        reader = new HomeFactsReader(new ExternalThinningService(thinning), new ExternalPhenologyService(phenology),
+        reader = new HomeFactsReader(new ExternalOrchardService(orchard), new ExternalThinningService(thinning), new ExternalPhenologyService(phenology),
                 new ExternalTelemetryService(telemetry), Clock.fixed(NOW, ZoneOffset.UTC));
         when(telemetry.findClimateThresholds()).thenReturn(new ClimateThresholds(32.0, 36.0, 1.5));
     }
@@ -102,6 +109,56 @@ class HomeFactsReaderTest {
         assertThat(plot.bearingCategory()).isNull();
         assertThat(plot.openAlerts()).isEmpty();
         assertThat(plot.forecast()).isNull();
+    }
+
+    @Test
+    @DisplayName("a plot named by the request is read alone, without listing the producer's plots")
+    void readsThePlotAsked() {
+        stubPlot(PLOT);
+
+        var facts = (HomeFacts) reader.read(PRODUCER, new PlotId(PLOT), 2026);
+
+        assertThat(facts.fieldScope()).isFalse();
+        assertThat(facts.plots()).hasSize(1);
+        verifyNoInteractions(orchard);
+        assertThatThrownBy(() -> reader.read(null, 2026))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("assistant.plot.required");
+    }
+
+    @Test
+    @DisplayName("without plot: every active plot of the producer asking, in the order Orchard lists them")
+    void readsTheWholeField() {
+        when(orchard.findActivePlotIdsByProducerId(PRODUCER)).thenReturn(List.of(PLOT, OTHER_PLOT));
+        stubPlot(PLOT);
+        when(thinning.findThinningPlanDetail(OTHER_PLOT, 2026)).thenReturn(Optional.empty());
+        when(thinning.findPrescriptionAvailability(OTHER_PLOT, 2026)).thenReturn(Optional.empty());
+        when(phenology.findBiennialBearingIndex(OTHER_PLOT)).thenReturn(Optional.empty());
+        when(phenology.findHistoricalYields(OTHER_PLOT)).thenReturn(new TreeMap<>(Map.of(2025, 2000.0)));
+        when(telemetry.findOpenIncidents(OTHER_PLOT)).thenReturn(List.of());
+        when(telemetry.findForecastOutlook(OTHER_PLOT)).thenReturn(Optional.empty());
+
+        var facts = (HomeFacts) reader.read(PRODUCER, null, 2026);
+
+        assertThat(facts.fieldScope()).isTrue();
+        assertThat(facts.today()).isEqualTo(TODAY);
+        assertThat(facts.plots()).hasSize(2);
+        assertThat(facts.plots().get(0).bearingIndex()).isEqualTo(0.5123);
+        assertThat(facts.plots().get(1).plan()).isNull();
+        assertThat(facts.plots().get(1).yields()).containsExactly(Map.entry(2025, 2000.0));
+        assertThat(facts.activePlots()).isEqualTo(2);
+        assertThat(facts.plotsWithAlerts()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("without plot and without active plots: an empty field")
+    void readsAnEmptyField() {
+        when(orchard.findActivePlotIdsByProducerId(PRODUCER)).thenReturn(List.of());
+
+        var facts = (HomeFacts) reader.read(PRODUCER, null, 2026);
+
+        assertThat(facts.fieldScope()).isTrue();
+        assertThat(facts.plots()).isEmpty();
+        verifyNoInteractions(thinning, phenology);
     }
 
     @Test

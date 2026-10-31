@@ -94,11 +94,16 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         return clock.instant().minus(historyWindow);
     }
 
-    /** Several answers of one screen and plot share one read of the figures. */
+    /**
+     * Several answers of one screen and plot share one read of the figures; those about the producer's whole field
+     * share the read of its field.
+     */
     private AnswerView view(AssistantAnswer answer, Map<String, DataVersion> versions) {
         var screen = answer.questionId().screen();
-        var current = versions.computeIfAbsent(screen + "|" + answer.plotId().plotId(),
-                key -> AnswerComposer.dataVersionOf(screen, factsAssembler.assemble(screen, answer.plotId())));
+        var scope = answer.plotId() == null ? "field" : answer.plotId().plotId();
+        var current = versions.computeIfAbsent(screen + "|" + scope,
+                key -> AnswerComposer.dataVersionOf(screen,
+                        factsAssembler.assemble(screen, answer.producerId(), answer.plotId())));
         return new AnswerView(answer, answer.freshness(current));
     }
 

@@ -21,7 +21,8 @@ import java.util.List;
  *
  * @param id               identifier
  * @param producerId       producer who asked
- * @param plotId           plot the question was about
+ * @param plotId           plot the question was about; null for a question about the producer's whole field on a
+ *                         screen with field scope (HOME)
  * @param questionId       question asked
  * @param question         the question as the producer read it, in the language of the answer; null only for
  *                         answers saved before it was kept
@@ -67,9 +68,9 @@ public record AssistantAnswer(
      * Compact constructor validating the answer.
      */
     public AssistantAnswer {
-        if (id == null || producerId == null || producerId.isBlank() || plotId == null || questionId == null
+        if (id == null || producerId == null || producerId.isBlank() || questionId == null
                 || language == null || dataVersion == null || clientRequestId == null || provider == null
-                || provider.isBlank() || createdAt == null) {
+                || provider.isBlank() || createdAt == null || (plotId == null && questionId.screen().requiresPlot())) {
             throw new IllegalArgumentException("assistant.answer.invalid");
         }
         if (text == null || text.isBlank()) {
