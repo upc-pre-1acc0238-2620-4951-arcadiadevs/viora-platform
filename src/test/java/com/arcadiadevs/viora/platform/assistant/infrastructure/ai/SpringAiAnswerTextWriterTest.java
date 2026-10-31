@@ -16,6 +16,10 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -53,8 +57,16 @@ class SpringAiAnswerTextWriterTest {
                 ChatResponseMetadata.builder().usage(new DefaultUsage(210, 52)).build());
     }
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-30T20:00:00Z"), ZoneOffset.UTC);
+
     private static SpringAiAnswerTextWriter writer(ChatModel model, boolean enabled, String apiKey) {
-        return new SpringAiAnswerTextWriter(ChatClient.builder(model), enabled, apiKey, "GROQ", "openai/gpt-oss-120b");
+        return writer(model, enabled, apiKey, new ModelCircuitBreaker(5, Duration.ofMinutes(2), CLOCK));
+    }
+
+    private static SpringAiAnswerTextWriter writer(ChatModel model, boolean enabled, String apiKey,
+                                                   ModelCircuitBreaker circuitBreaker) {
+        return new SpringAiAnswerTextWriter(ChatClient.builder(model), circuitBreaker, enabled, apiKey, "GROQ",
+                "openai/gpt-oss-120b");
     }
 
     @Test
@@ -118,4 +130,19 @@ class SpringAiAnswerTextWriterTest {
         assertThat(model.prompts).isEmpty();
     }
 
+    @Test
+    @DisplayName("after failures in a row the model is paused and not called, so the template comes at once")
+    void pausedAfterFailures() {
+        var model = new FakeChatModel(prompt -> {
+            throw new IllegalStateException("503 Service Unavailable");
+        });
+        var writer = writer(model, true, "gsk_test", new ModelCircuitBreaker(2, Duration.ofMinutes(2), CLOCK));
+
+        writer.rewrite(REQUEST);
+        writer.rewrite(REQUEST);
+        var paused = writer.rewrite(REQUEST);
+
+        assertThat(paused).isEmpty();
+        assertThat(model.prompts).hasSize(2);
+    }
 }
