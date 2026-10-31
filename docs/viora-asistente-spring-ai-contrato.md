@@ -247,6 +247,8 @@ Implementado (2026-10-30): `thinning.harvest_change` compara la cosecha estimada
 ### CAMPAIGN_CLOSED (P73, P148–P150)
 `campaign.vs_previous` (8,3 t/ha, +36 % sobre el promedio), `campaign.caliber_change`, `campaign.plan_next`.
 
+Implementado (2026-10-30): la campaña cerrada es la última con cosecha registrada en Fenología. `campaign.vs_previous` compara esa cosecha con el promedio de las anteriores, en t/ha con la superficie del polígono del lote (y los kilos entre paréntesis); el porcentaje sale de los kilos. `campaign.caliber_change` se ofrece siempre deshabilitada ("El calibre de cada campaña aún no llega al asistente"): el calibre liquidado por campaña solo vive en Liquidación, que no tiene fachada. `campaign.plan_next` da la banda de vecería, si la campaña cerrada tuvo aclareo (y si fue a tiempo) y los pasos de la campaña siguiente; nunca proyecta la cosecha. No se agregó nada a Raleo ni a Fenología. Detalle en `asistente-decisiones.md` (Pantalla Campaña cerrada).
+
 > Las cifras de este documento son las de los mockups (plausibles, no validadas por un agrónomo). Los hechos reales siempre salen del ensamblador.
 
 ---
