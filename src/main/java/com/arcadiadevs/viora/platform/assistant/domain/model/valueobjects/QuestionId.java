@@ -17,6 +17,11 @@ public record QuestionId(String value) {
     public static final QuestionId HOME_CAMPAIGN_VS_PREVIOUS = new QuestionId("home.campaign_vs_previous");
     public static final QuestionId HOME_ALERTS_AFFECTING = new QuestionId("home.alerts_affecting");
     public static final QuestionId HOME_HARVEST_ESTIMATE = new QuestionId("home.harvest_estimate");
+    /**
+     * The daily summary of the home screen: never offered in the catalog, served only by
+     * {@code GET /assistant/daily-summary} as its own {@code DailySummary}, with three fact cards.
+     */
+    public static final QuestionId HOME_DAILY_SUMMARY = new QuestionId("home.daily_summary");
     public static final QuestionId ALTERNATION_WHY_INDEX = new QuestionId("alternation.why_index");
     public static final QuestionId ALTERNATION_BREAK_CYCLE = new QuestionId("alternation.break_cycle");
     public static final QuestionId ALTERNATION_VS_CAMPAIGNS = new QuestionId("alternation.vs_campaigns");

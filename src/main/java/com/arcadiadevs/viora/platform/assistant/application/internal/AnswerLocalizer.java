@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Answer
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerSource;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.DailySummaryDraft;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactDraft;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
 import org.springframework.context.MessageSource;
@@ -42,7 +43,7 @@ public class AnswerLocalizer {
      * An answer draft written in one language.
      *
      * @param text    the sentences
-     * @param facts   the two cards
+     * @param facts   the cards: two for an answer, three for a daily summary
      * @param sources what the answer is based on
      * @param actions the buttons
      */
@@ -58,12 +59,28 @@ public class AnswerLocalizer {
      * @return the draft written in that language
      */
     public Localized localize(AnswerDraft draft, AnswerLanguage language) {
+        return localize(draft.text(), draft.facts(), draft.source(), draft.actions(), language);
+    }
+
+    /**
+     * Writes a daily summary draft, with its three cards and no buttons.
+     *
+     * @param draft    the draft
+     * @param language the language
+     * @return the draft written in that language
+     */
+    public Localized localize(DailySummaryDraft draft, AnswerLanguage language) {
+        return localize(draft.text(), draft.facts(), draft.source(), List.of(), language);
+    }
+
+    private Localized localize(CatalogText text, List<FactDraft> facts, CatalogText source,
+                               List<ActionDraft> actions, AnswerLanguage language) {
         var locale = language.locale();
         return new Localized(
-                resolve(draft.text(), locale),
-                draft.facts().stream().map(fact -> fact(fact, locale)).toList(),
-                List.of(new AnswerSource(resolve(draft.source(), locale))),
-                draft.actions().stream().map(action -> action(action, locale)).toList());
+                resolve(text, locale),
+                facts.stream().map(fact -> fact(fact, locale)).toList(),
+                List.of(new AnswerSource(resolve(source, locale))),
+                actions.stream().map(action -> action(action, locale)).toList());
     }
 
     /**

@@ -146,14 +146,8 @@ public final class HomeQuestions {
         var today = facts.today();
         boolean single = facts.singlePlot();
         int active = facts.activePlots();
-        var weekEnd = today.plusDays(WEEK_DAYS - 1L);
-        var open = plansIn(facts, ThinningWindow.OPEN).stream()
-                .sorted(Comparator.comparing(ThinningPlanData::windowClosesOn))
-                .toList();
-        var opening = plansIn(facts, ThinningWindow.BEFORE).stream()
-                .filter(plan -> !plan.windowOpensOn().isAfter(weekEnd))
-                .sorted(Comparator.comparing(ThinningPlanData::windowOpensOn))
-                .toList();
+        var open = openWindows(facts);
+        var opening = windowsOpeningThisWeek(facts);
         var halfway = facts.plots().stream()
                 .filter(plot -> ThinningWindow.of(today, plot.plan()) == ThinningWindow.SAMPLING
                         && plot.treesNeeded() > 0)
@@ -177,6 +171,32 @@ public final class HomeQuestions {
                     : text(q, "thinning.sampling.field", halfway.size(), active);
         }
         return single ? text(q, "thinning.none") : text(q, "thinning.none.field", active);
+    }
+
+    /**
+     * The plans whose thinning window is open today, the one that closes first leading.
+     *
+     * @param facts the figures of the plot or the field
+     * @return the plans, by closing day
+     */
+    static List<ThinningPlanData> openWindows(HomeFacts facts) {
+        return plansIn(facts, ThinningWindow.OPEN).stream()
+                .sorted(Comparator.comparing(ThinningPlanData::windowClosesOn))
+                .toList();
+    }
+
+    /**
+     * The plans whose thinning window opens this week (today included), the one that opens first leading.
+     *
+     * @param facts the figures of the plot or the field
+     * @return the plans, by opening day
+     */
+    static List<ThinningPlanData> windowsOpeningThisWeek(HomeFacts facts) {
+        var weekEnd = facts.today().plusDays(WEEK_DAYS - 1L);
+        return plansIn(facts, ThinningWindow.BEFORE).stream()
+                .filter(plan -> !plan.windowOpensOn().isAfter(weekEnd))
+                .sorted(Comparator.comparing(ThinningPlanData::windowOpensOn))
+                .toList();
     }
 
     private static List<ThinningPlanData> plansIn(HomeFacts facts, ThinningWindow state) {

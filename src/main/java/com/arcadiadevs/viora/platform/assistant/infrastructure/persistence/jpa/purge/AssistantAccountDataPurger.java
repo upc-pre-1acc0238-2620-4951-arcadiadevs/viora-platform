@@ -1,25 +1,30 @@
 package com.arcadiadevs.viora.platform.assistant.infrastructure.persistence.jpa.purge;
 
 import com.arcadiadevs.viora.platform.assistant.domain.repositories.AssistantAnswerRepository;
+import com.arcadiadevs.viora.platform.assistant.domain.repositories.DailySummaryRepository;
 import com.arcadiadevs.viora.platform.iam.domain.model.events.UserAccountDeletedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Removes the answers of a deleted account. They hold figures of the producer's plots, so they leave with it.
+ * Removes the answers and the daily summaries of a deleted account. They hold figures of the producer's plots, so
+ * they leave with it.
  */
 @Component
 public class AssistantAccountDataPurger {
 
     private final AssistantAnswerRepository answers;
+    private final DailySummaryRepository summaries;
 
     /**
      * Creates the purger.
      *
-     * @param answers the saved answers
+     * @param answers   the saved answers
+     * @param summaries the stored daily summaries
      */
-    public AssistantAccountDataPurger(AssistantAnswerRepository answers) {
+    public AssistantAccountDataPurger(AssistantAnswerRepository answers, DailySummaryRepository summaries) {
         this.answers = answers;
+        this.summaries = summaries;
     }
 
     /**
@@ -30,5 +35,6 @@ public class AssistantAccountDataPurger {
     @EventListener
     public void on(UserAccountDeletedEvent event) {
         answers.deleteAllByProducerId(event.userId());
+        summaries.deleteAllByProducerId(event.userId());
     }
 }
