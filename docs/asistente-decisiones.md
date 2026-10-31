@@ -158,6 +158,65 @@ El dueño eligió "completo": HOME responde para un lote o, sin `plotId`, para t
 - **Total de kilos del campo.** Si el dueño quiere un total, decidir qué superficie usar (polígono o plantada) y si se suma kg/ha × ha.
 - **Lotes sin muestreo en "esta semana".** Decidir con el agrónomo si un lote sin ningún muestreo en temporada debe aparecer como pendiente.
 
+## Pantalla Campaña cerrada (CAMPAIGN_CLOSED)
+
+Preguntas del contrato: `campaign.vs_previous` (8,3 t/ha, +36 % sobre el promedio), `campaign.caliber_change` y `campaign.plan_next`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`: cosechas, índice de vecería, plan de aclareo) y, solo al responder, la superficie del lote y el aclareo de la campaña cerrada. No se agregó nada a las fachadas de Raleo ni de Fenología: `findThinningOutcome` y `findPlotAreaHectares` ya existían.
+
+### Qué es la campaña cerrada (decisión menor, 2026-10-30)
+
+- Es la última campaña con cosecha registrada en Fenología (`POST /api/v1/plots/{plotId}/harvest-records`), no el año calendario. Fenología solo acepta cosechas de años que ya pasaron o del año en curso, así que registrar la cosecha es lo que cierra la campaña.
+- No se usa la liquidación (`HarvestSettlement`) para decidirlo: no todos los productores liquidan y Liquidación no tiene fachada para otros contextos.
+- Sin cosecha registrada, `vs_previous` y `plan_next` se deshabilitan con "Sin cosecha registrada · registra la cosecha de la campaña" (`assistant.reason.harvest_missing`). Las etiquetas nombran el año de la campaña cerrada (`vs_previous`) y el de la siguiente (`plan_next`); sin cosecha usan una etiqueta sin año.
+- Si ya empezó la campaña siguiente (por ejemplo, ya registraste la floración), `plan_next` igual repite los pasos: la pantalla es la del cierre y no mezcla datos de la campaña en curso.
+
+### `campaign.vs_previous` en t/ha (decisión menor, 2026-10-30)
+
+- Compara la cosecha de la campaña cerrada con el promedio de todas las campañas anteriores, igual que `alternation.vs_campaigns`, y no solo con la anterior (eso lo hace `home.campaign_vs_previous`). Así sale el "+36 % sobre el promedio" del contrato.
+- El contrato pide t/ha. La superficie sale de `OrchardContextFacade.findPlotAreaHectares`: es el área del polígono del lote, la misma que usan el expediente agronómico (su tabla de cosechas en t/ha) y la estimación de cosecha de Raleo. En HOME no se usó para el campo porque sumar lotes es una decisión de negocio; para un solo lote no hay suma, así que aquí sí se usa. La fuente de la respuesta lo dice: "Superficie del lote según su polígono: N ha".
+- Las t/ha van con un decimal y los kilos entre paréntesis. El porcentaje se calcula con los kilos, así el redondeo de las toneladas nunca lo cambia.
+- Sin superficie (un lote activo siempre la tiene, pero se cubre igual) la respuesta queda en kilos.
+- Se deshabilita con menos de 2 campañas ("Registra al menos 2 campañas", el motivo que ya usaba `alternation.vs_campaigns`).
+
+### `campaign.caliber_change`: se ofrece siempre deshabilitada (decisión menor, 2026-10-30)
+
+**Por qué.** El contrato pide comparar el calibre de la campaña cerrada con el de las anteriores, pero el asistente no tiene ese dato:
+
+- El calibre real de cada campaña (`commercialFruitsPerKg`) solo se guarda en Liquidación (`HarvestSettlement`), cuando el productor liquida la cosecha. Liquidación no expone una fachada de solo lectura a otros contextos, y este cambio no podía tocar ese módulo.
+- Fenología no guarda calibre en sus registros de cosecha.
+- Raleo guarda observaciones de calibración (`CaliberCalibrationObservation`) con ese mismo calibre, pero solo de campañas con aclareo a tiempo, y las busca por variedad. Compararlas sería comparar un subconjunto sesgado de campañas como si fueran todas.
+- La proyección de calibre de Raleo es una estimación de la campaña en curso, no el calibre de una campaña cerrada.
+
+Responder con cualquiera de esos datos obligaría a inventar o a sesgar la comparación. Se evaluaron dos caminos:
+
+- **A (elegido):** mostrar la pregunta deshabilitada con un motivo, como `sensors.why_paused` y `sampling.correct_tree`.
+- **B:** responder con las observaciones de calibración de Raleo. Se descartó porque deja fuera las campañas sin aclareo o con aclareo tardío y no lo diría la cifra.
+
+**Cómo.**
+
+- `QuestionCatalog.campaignClosed` ofrece la pregunta con `enabled: false` y `disabledReason` "El calibre de cada campaña aún no llega al asistente" (`assistant.reason.caliber_history_unavailable`), con o sin cosechas.
+- No hay ensamblador registrado para ella. Si la app la pide igual, la API responde 409 con ese mismo motivo.
+- Lo fijan `CampaignClosedQuestionCatalogTest`, `CampaignClosedFactsAssemblersTest.registeredAndNeedTheHarvest` y `AssistantCampaignClosedScreenIntegrationTest`.
+
+**Para qué.**
+
+- La app muestra el catálogo completo del contrato, con la pregunta en su lugar, sin una respuesta falsa.
+- El equipo ve en un solo lugar qué falta para activarla.
+
+**Cuándo activarla.** Cuando el calibre liquidado llegue al asistente:
+
+1. una fachada de solo lectura en Liquidación (por ejemplo `settlement/interfaces/acl/SettlementContextFacade.java`, nueva) que devuelva el calibre (`commercialFruitsPerKg` y su categoría comercial) por lote y campaña;
+2. en el asistente, un servicio ACL que la lea, habilitar la pregunta solo cuando la campaña cerrada tenga calibre y al menos una campaña anterior también, y agregar su ensamblador (calibre de la cerrada frente al de las anteriores, en frutos por kilo y categoría).
+
+### `campaign.plan_next` (decisión menor, 2026-10-30)
+
+- Solo dice lo que Viora ya sabe; nunca proyecta la cosecha de la campaña siguiente, porque ningún contexto lo hace (igual que en THINNING_DONE). Un test verifica que la respuesta no trae kilos.
+- Tres partes:
+  - **Vecería.** El índice y su banda, de Fenología. Con alternancia moderada o severa agrega que la herramienta del plan es el aclareo según la carga de frutos, la misma idea de `alternation.break_cycle`. Con producción regular solo da el índice. Sin índice (menos de 2 campañas) se omite esta parte.
+  - **Aclareo de la campaña cerrada.** Lo lee de `findThinningOutcome(lote, año cerrado)`: si se registró, en qué fecha y si fue dentro de la ventana o fuera de ella. Fuera de la ventana dice que su efecto sobre la vecería es menor, como el aviso que Raleo ya muestra al registrarlo tarde. Sin aclareo confirmado lo dice.
+  - **Pasos de la campaña siguiente.** Registrar la plena floración y muestrear para que Viora calcule el plan. Si el aclareo de la campaña cerrada trae los días de la ventana del perfil de la variedad, los da (de N a M días después de la floración); no da fechas porque no hay datos para darlas.
+- Se ofrece siempre que haya una cosecha registrada.
+- Tarjetas: la campaña siguiente ("próximo muestreo", "tras la plena floración") y el índice de vecería; sin índice, el aclareo de la campaña cerrada ("Registrado" con su fecha o "Sin aclareo").
+
 ## Pantalla Aclareo registrado (THINNING_DONE)
 
 Preguntas del contrato: `thinning.harvest_change` (8,2 t/ha y 2027 más estable), `thinning.why_target` y `thinning.next_sampling`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`) y además el resultado del aclareo confirmado.

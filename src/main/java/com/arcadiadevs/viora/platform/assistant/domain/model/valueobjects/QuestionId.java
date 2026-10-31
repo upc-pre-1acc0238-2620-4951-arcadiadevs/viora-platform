@@ -51,6 +51,9 @@ public record QuestionId(String value) {
     public static final QuestionId THINNING_HARVEST_CHANGE = new QuestionId("thinning.harvest_change");
     public static final QuestionId THINNING_WHY_TARGET = new QuestionId("thinning.why_target");
     public static final QuestionId THINNING_NEXT_SAMPLING = new QuestionId("thinning.next_sampling");
+    public static final QuestionId CAMPAIGN_VS_PREVIOUS = new QuestionId("campaign.vs_previous");
+    public static final QuestionId CAMPAIGN_CALIBER_CHANGE = new QuestionId("campaign.caliber_change");
+    public static final QuestionId CAMPAIGN_PLAN_NEXT = new QuestionId("campaign.plan_next");
 
     /**
      * Compact constructor validating the {@code screen.question} format.

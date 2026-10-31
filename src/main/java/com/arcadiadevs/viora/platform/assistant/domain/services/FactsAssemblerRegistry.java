@@ -6,6 +6,8 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.Alert
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhatToDoFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.AlertWhenEndsFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.BestTimeFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.CampaignPlanNextFactsAssembler;
+import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.CampaignVsPreviousFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillIfIncompleteFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillMissingFactsAssembler;
 import com.arcadiadevs.viora.platform.assistant.domain.services.assemblers.ChillReachFactsAssembler;
@@ -66,7 +68,8 @@ public final class FactsAssemblerRegistry {
     }
 
     /**
-     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS, SAMPLING_SUMMARY and THINNING_DONE questions.
+     * The assemblers of the HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS, SAMPLING_SUMMARY,
+     * THINNING_DONE and CAMPAIGN_CLOSED questions. {@code campaign.caliber_change} has none: it is always disabled.
      *
      * @return the registry
      */
@@ -88,7 +91,8 @@ public final class FactsAssemblerRegistry {
                 new SensorsHowLinkFactsAssembler(), new SamplingEnoughTreesFactsAssembler(),
                 new SamplingMeaningFactsAssembler(), new SamplingNextFactsAssembler(),
                 new ThinningHarvestChangeFactsAssembler(), new ThinningWhyTargetFactsAssembler(),
-                new ThinningNextSamplingFactsAssembler()));
+                new ThinningNextSamplingFactsAssembler(), new CampaignVsPreviousFactsAssembler(),
+                new CampaignPlanNextFactsAssembler()));
     }
 
     /**

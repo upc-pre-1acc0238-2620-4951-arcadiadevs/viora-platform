@@ -5,9 +5,11 @@ import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacad
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Outbound ACL service used by the assistant to verify the plot it is asked about and list its owner's plots.
+ * Outbound ACL service used by the assistant to verify the plot it is asked about, list its owner's plots and read
+ * its surface.
  */
 @Service("assistantExternalOrchardService")
 public class ExternalOrchardService {
@@ -39,6 +41,17 @@ public class ExternalOrchardService {
         return orchardContextFacade.findPlotProducerId(plotId.plotId())
                 .map(orchardContextFacade::findActivePlotIdsByProducerId)
                 .orElse(List.of());
+    }
+
+    /**
+     * Reads the surface of an active plot: the area of its polygon, the same one the agronomic dossier and the
+     * thinning yield use.
+     *
+     * @param plotId the assistant PlotId value object
+     * @return the area in hectares, or empty when the plot is unknown or not active
+     */
+    public Optional<Double> findPlotAreaHectares(PlotId plotId) {
+        return plotId == null ? Optional.empty() : orchardContextFacade.findPlotAreaHectares(plotId.plotId());
     }
 
     /**

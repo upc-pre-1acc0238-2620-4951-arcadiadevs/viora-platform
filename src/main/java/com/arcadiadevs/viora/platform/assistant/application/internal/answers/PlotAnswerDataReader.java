@@ -55,6 +55,9 @@ public class PlotAnswerDataReader {
             if (screen == ScreenKey.THINNING_DONE) {
                 // Also the outcome of the confirmed thinning
                 plot = plot.withOutcome(externalThinningService.findThinningOutcome(plotId, campaignYear).orElse(null));
+            } else if (screen == ScreenKey.CAMPAIGN_CLOSED) {
+                // Also the surface and the thinning of the closed campaign
+                plot = homeDataReader.withClosedCampaign(plot, plotId);
             }
             return PlotAnswerData.ofOnePlot(plotId, today, campaignYear, plot);
         }
