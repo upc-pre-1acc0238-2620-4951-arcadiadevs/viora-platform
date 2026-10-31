@@ -47,6 +47,10 @@ public class AssistantAnswerPersistenceEntity implements Persistable<UUID> {
     @Column(name = "question_id", nullable = false, updatable = false, length = 60)
     private String questionId;
 
+    // Nullable: answers saved before the question was kept have none, and the column is added to existing tables
+    @Column(name = "question", updatable = false, length = 300)
+    private String question;
+
     @Column(name = "language", nullable = false, updatable = false, length = 2)
     private String language;
 

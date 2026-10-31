@@ -16,7 +16,8 @@ import java.util.stream.Collectors;
  * adapter reports itself disabled and is never called.
  *
  * <p>The messages are built here as plain text, not with the prompt template engine, because the cards may carry
- * characters the engine would read as placeholders.</p>
+ * characters the engine would read as placeholders. After several failures in a row the {@link ModelCircuitBreaker}
+ * pauses the calls, and the answers keep their template meanwhile.</p>
  */
 @Component
 public class SpringAiAnswerTextWriter implements AnswerTextWriter {
@@ -54,6 +55,7 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
             - At most 280 characters. When in doubt, return BASE TEXT unchanged.""";
 
     private final ChatClient chatClient;
+    private final ModelCircuitBreaker circuitBreaker;
     private final boolean enabled;
     private final String provider;
     private final String model;
@@ -62,6 +64,7 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
      * Creates the adapter.
      *
      * @param chatClientBuilder the chat client of the configured model
+     * @param circuitBreaker    pauses the model after failures in a row
      * @param enabledByConfig   {@code viora.assistant.model.enabled}: lets an environment turn the model off
      * @param apiKey            the key of the provider; blank leaves the model off
      * @param provider          {@code viora.assistant.model.provider}, for example GROQ
@@ -69,12 +72,14 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
      */
     public SpringAiAnswerTextWriter(
             ChatClient.Builder chatClientBuilder,
+            ModelCircuitBreaker circuitBreaker,
             @Value("${viora.assistant.model.enabled:true}") boolean enabledByConfig,
             @Value("${GROQ_API_KEY:}") String apiKey,
             @Value("${viora.assistant.model.provider:GROQ}") String provider,
             @Value("${spring.ai.openai.chat.model:}") String model
     ) {
         this.chatClient = chatClientBuilder.build();
+        this.circuitBreaker = circuitBreaker;
         this.enabled = enabledByConfig && apiKey != null && !apiKey.isBlank();
         this.provider = provider;
         this.model = model;
@@ -101,6 +106,10 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
         if (!enabled) {
             return Optional.empty();
         }
+        if (!circuitBreaker.tryCall()) {
+            LOG.info("Assistant language model paused after failures in a row: the answer keeps its template");
+            return Optional.empty();
+        }
         try {
             var response = chatClient.prompt()
                     .system(english(request) ? SYSTEM_ENGLISH : SYSTEM_SPANISH)
@@ -108,14 +117,17 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
                     .call()
                     .chatResponse();
             if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                circuitBreaker.onFailure();
                 return Optional.empty();
             }
+            circuitBreaker.onSuccess();
             var usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
             return Optional.of(new Written(
                     response.getResult().getOutput().getText(),
                     usage == null ? null : usage.getPromptTokens(),
                     usage == null ? null : usage.getCompletionTokens()));
         } catch (RuntimeException e) {
+            circuitBreaker.onFailure();
             // Only the kind of failure: the request carries the figures of a producer's plot
             LOG.warn("Assistant language model failed: {}", e.getClass().getSimpleName());
             return Optional.empty();

@@ -27,6 +27,7 @@ public final class AssistantAnswerResourceFromEntityAssembler {
         return new AssistantAnswerResource(
                 answer.id().value(),
                 answer.questionId().value(),
+                answer.question(),
                 answer.plotId().plotId(),
                 answer.createdAt(),
                 answer.dataVersion().value(),
