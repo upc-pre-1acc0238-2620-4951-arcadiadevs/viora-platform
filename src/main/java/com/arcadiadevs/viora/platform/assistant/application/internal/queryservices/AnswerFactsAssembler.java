@@ -1,48 +1,48 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
-import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
-import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
-import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
-import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.CampaignThinningPlan;
-import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Year;
-import java.util.Collections;
-import java.util.Optional;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Reads, through the ACL of the other contexts, the figures a screen's answers are written from. It reads only what
- * those contexts already computed and only what the screen needs, so asking a question never recalculates anything.
- * A plot that no longer exists simply has no figures.
+ * Reads, through the reader of each screen, the figures its catalog and its answers are evaluated against. It reads
+ * only what the other contexts already computed and only what the screen needs, so asking a question never
+ * recalculates anything. A plot that no longer exists simply has no figures.
  */
 @Service
 public class AnswerFactsAssembler {
 
-    private final ExternalOrchardService externalOrchardService;
-    private final ExternalPhenologyService externalPhenologyService;
-    private final ExternalThinningService externalThinningService;
+    private final Map<ScreenKey, ScreenFactsReader> readers;
     private final Clock clock;
 
     /**
      * Constructs the assembler.
      *
-     * @param externalOrchardService   reads the area of the plot
-     * @param externalPhenologyService reads the harvest history and the bearing index
-     * @param externalThinningService  reads the prescription of the campaign
-     * @param clock                    the application clock, for the current campaign
+     * @param readers one reader per screen
+     * @param clock   the application clock, for the current campaign
+     * @throws IllegalStateException when a screen has no reader or more than one
      */
-    public AnswerFactsAssembler(ExternalOrchardService externalOrchardService,
-                                ExternalPhenologyService externalPhenologyService,
-                                ExternalThinningService externalThinningService, Clock clock) {
-        this.externalOrchardService = externalOrchardService;
-        this.externalPhenologyService = externalPhenologyService;
-        this.externalThinningService = externalThinningService;
+    public AnswerFactsAssembler(List<ScreenFactsReader> readers, Clock clock) {
+        var byScreen = new EnumMap<ScreenKey, ScreenFactsReader>(ScreenKey.class);
+        for (var reader : readers) {
+            if (byScreen.putIfAbsent(reader.screen(), reader) != null) {
+                throw new IllegalStateException("Two readers for the screen " + reader.screen());
+            }
+        }
+        for (var screen : ScreenKey.values()) {
+            if (!byScreen.containsKey(screen)) {
+                throw new IllegalStateException("No reader for the screen " + screen);
+            }
+        }
+        this.readers = byScreen;
         this.clock = clock;
     }
 
@@ -51,42 +51,10 @@ public class AnswerFactsAssembler {
      *
      * @param screen the screen
      * @param plotId the plot
-     * @return the figures; those the screen does not use are left empty
+     * @return the figures of that screen
      */
-    public AnswerFacts assemble(ScreenKey screen, PlotId plotId) {
+    public ScreenFacts assemble(ScreenKey screen, PlotId plotId) {
         int campaignYear = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
-        return switch (screen) {
-            case ALTERNATION -> alternation(plotId, campaignYear);
-            case PLAN -> plan(plotId, campaignYear);
-        };
-    }
-
-    private AnswerFacts alternation(PlotId plotId, int campaignYear) {
-        var bearing = externalPhenologyService.findBearing(plotId);
-        return new AnswerFacts(
-                campaignYear,
-                externalOrchardService.findAreaHectares(plotId).orElse(null),
-                externalPhenologyService.findHistoricalYields(plotId),
-                bearing.map(b -> b.value()).orElse(null),
-                bearing.map(b -> b.category()).orElse(null),
-                null, null, null, null, null, 0);
-    }
-
-    private AnswerFacts plan(PlotId plotId, int campaignYear) {
-        Optional<CampaignThinningPlan> plan = externalThinningService.findCampaignThinningPlan(plotId, campaignYear);
-        Optional<PrescriptionAvailability> availability =
-                externalThinningService.findPrescriptionAvailability(plotId, campaignYear);
-        return new AnswerFacts(
-                campaignYear,
-                null,
-                Collections.emptySortedMap(),
-                null,
-                null,
-                plan.map(CampaignThinningPlan::preThinningFruitsPerShoot).orElse(null),
-                plan.map(CampaignThinningPlan::targetFruitsPerShoot).orElse(null),
-                plan.map(CampaignThinningPlan::percentageToRemove).orElse(null),
-                plan.map(CampaignThinningPlan::windowOpensOn).orElse(null),
-                plan.map(CampaignThinningPlan::windowClosesOn).orElse(null),
-                availability.map(PrescriptionAvailability::sampledTrees).orElse(0));
+        return readers.get(screen).read(plotId, campaignYear);
     }
 }

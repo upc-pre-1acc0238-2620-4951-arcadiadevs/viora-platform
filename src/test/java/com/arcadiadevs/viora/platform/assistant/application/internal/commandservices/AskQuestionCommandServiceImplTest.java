@@ -9,7 +9,6 @@ import com.arcadiadevs.viora.platform.assistant.application.queryservices.Questi
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.AskQuestionCommand;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFact;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerView;
@@ -19,6 +18,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Client
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.DataVersion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Freshness;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlanFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -43,7 +43,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -106,8 +105,8 @@ class AskQuestionCommandServiceImplTest {
                 new ScreenQuestionCatalog(ScreenKey.PLAN, plotId, List.of(offered))));
     }
 
-    private static AnswerFacts prescription() {
-        return new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 30.0, null, null, 5);
+    private static PlanFacts prescription() {
+        return new PlanFacts(2026, 0.60, 0.40, 30.0, null, null, 5, false, null, 0);
     }
 
     private AssistantAnswer savedAnswer() {
@@ -177,7 +176,7 @@ class AskQuestionCommandServiceImplTest {
         givenCatalog(true);
         when(repository.findByClientRequestId(anyString(), any())).thenReturn(Optional.empty());
         when(factsAssembler.assemble(ScreenKey.PLAN, plotId))
-                .thenReturn(new AnswerFacts(2026, null, new TreeMap<>(), null, null, null, null, null, null, null, 0));
+                .thenReturn(new PlanFacts(2026, null, null, null, null, null, 0, false, null, 0));
         when(repository.findReusable(anyString(), any(), any(), any(), any(), any())).thenReturn(Optional.empty());
 
         var result = service.handle(command(false));

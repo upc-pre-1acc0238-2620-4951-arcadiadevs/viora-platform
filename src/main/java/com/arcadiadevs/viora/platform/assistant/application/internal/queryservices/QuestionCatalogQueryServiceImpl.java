@@ -1,62 +1,42 @@
 package com.arcadiadevs.viora.platform.assistant.application.internal.queryservices;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
-import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
-import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.application.queryservices.QuestionCatalogQueryService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotFacts;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenQuestionCatalog;
 import com.arcadiadevs.viora.platform.assistant.domain.services.QuestionCatalog;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
-import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
-import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
 import org.springframework.stereotype.Service;
-
-import java.time.Clock;
-import java.time.Year;
-import java.util.Optional;
 
 /**
  * Application query service evaluating the question catalog of a screen against the data of the plot. It only
- * reads figures other contexts already computed, so the catalog stays cheap and never calls the model.
+ * reads figures other contexts already computed, the same ones the answers are written from, so the catalog stays
+ * cheap and never calls the model.
  */
 @Service
 public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryService {
 
-    private static final String CALIBER_ESTIMATED = "ESTIMATED";
-
     private final ExternalSubscriptionService externalSubscriptionService;
     private final ExternalOrchardService externalOrchardService;
-    private final ExternalPhenologyService externalPhenologyService;
-    private final ExternalThinningService externalThinningService;
-    private final Clock clock;
+    private final AnswerFactsAssembler factsAssembler;
 
     /**
      * Constructs the query service.
      *
      * @param externalSubscriptionService tells whether the producer's plan is active
      * @param externalOrchardService      verifies the plot
-     * @param externalPhenologyService    reads the harvest history and the bearing index
-     * @param externalThinningService     reads the prescription and the caliber projection
-     * @param clock                       the application clock, for the current campaign
+     * @param factsAssembler              reads the figures of the screen
      */
     public QuestionCatalogQueryServiceImpl(
             ExternalSubscriptionService externalSubscriptionService,
             ExternalOrchardService externalOrchardService,
-            ExternalPhenologyService externalPhenologyService,
-            ExternalThinningService externalThinningService,
-            Clock clock
+            AnswerFactsAssembler factsAssembler
     ) {
         this.externalSubscriptionService = externalSubscriptionService;
         this.externalOrchardService = externalOrchardService;
-        this.externalPhenologyService = externalPhenologyService;
-        this.externalThinningService = externalThinningService;
-        this.clock = clock;
+        this.factsAssembler = factsAssembler;
     }
 
     @Override
@@ -70,30 +50,8 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
         if (!externalOrchardService.existsActivePlot(query.plotId())) {
             return Result.failure(ApplicationError.notFound("plot", query.plotId().plotId()));
         }
-        var facts = factsFor(query.screen(), query.plotId());
+        var facts = factsAssembler.assemble(query.screen(), query.plotId());
         return Result.success(new ScreenQuestionCatalog(query.screen(), query.plotId(),
-                QuestionCatalog.questionsFor(query.screen(), facts)));
-    }
-
-    /** Reads only the data the screen needs. */
-    private PlotFacts factsFor(ScreenKey screen, PlotId plotId) {
-        int campaignYear = Year.now(clock.withZone(ProducerTimeZone.ZONE)).getValue();
-        Optional<PrescriptionAvailability> prescription =
-                externalThinningService.findPrescriptionAvailability(plotId, campaignYear);
-        Double bearingIndex = null;
-        int historicalCampaigns = 0;
-        if (screen == ScreenKey.ALTERNATION) {
-            bearingIndex = externalPhenologyService.findBiennialBearingIndex(plotId).orElse(null);
-            historicalCampaigns = externalPhenologyService.countHistoricalCampaigns(plotId);
-        }
-        return new PlotFacts(
-                campaignYear,
-                bearingIndex,
-                historicalCampaigns,
-                prescription.map(p -> CALIBER_ESTIMATED.equals(p.caliberProjectionStatus())).orElse(false),
-                prescription.map(PrescriptionAvailability::issued).orElse(false),
-                prescription.map(PrescriptionAvailability::percentageToRemove).orElse(null),
-                prescription.map(PrescriptionAvailability::sampledTrees).orElse(0),
-                prescription.map(PrescriptionAvailability::treesNeeded).orElse(0));
+                QuestionCatalog.questionsFor(facts)));
     }
 }

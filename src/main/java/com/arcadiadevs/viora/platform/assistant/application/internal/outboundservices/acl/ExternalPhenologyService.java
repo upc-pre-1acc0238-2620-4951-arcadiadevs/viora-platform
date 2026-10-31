@@ -31,16 +31,6 @@ public class ExternalPhenologyService {
     }
 
     /**
-     * Counts the campaigns with a registered harvest.
-     *
-     * @param plotId the assistant PlotId value object
-     * @return number of historical campaigns
-     */
-    public int countHistoricalCampaigns(PlotId plotId) {
-        return findHistoricalYields(plotId).size();
-    }
-
-    /**
      * Reads the kilograms harvested per campaign.
      *
      * @param plotId the assistant PlotId value object
