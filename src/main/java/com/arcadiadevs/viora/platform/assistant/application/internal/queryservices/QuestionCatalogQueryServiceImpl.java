@@ -118,9 +118,9 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
             // Only the state of the plot (PLOT_DETAIL) shows the bearing index
             return PlotFacts.ofOnePlot(campaignYear, screen == ScreenKey.PLOT_DETAIL
                             ? externalPhenologyService.findBiennialBearingIndex(plotId).orElse(null) : null,
-                    homeDataReader == null
+                    withOutcome(screen, plotId, campaignYear, homeDataReader == null
                             ? new HomeData(false, List.of(), null)
-                            : homeDataReader.readForCatalog(producerId, plotId, campaignYear));
+                            : homeDataReader.readForCatalog(producerId, plotId, campaignYear)));
         }
         if (screen.readsChill()) {
             return PlotFacts.ofChill(campaignYear, externalPhenologyService.findChillData(plotId));
@@ -146,5 +146,12 @@ public class QuestionCatalogQueryServiceImpl implements QuestionCatalogQueryServ
                 prescription.map(PrescriptionAvailability::percentageToRemove).orElse(null),
                 prescription.map(PrescriptionAvailability::sampledTrees).orElse(0),
                 prescription.map(PrescriptionAvailability::treesNeeded).orElse(0));
+    }
+
+    /** THINNING_DONE also reads the outcome of the confirmed thinning. */
+    private HomeData withOutcome(ScreenKey screen, PlotId plotId, int campaignYear, HomeData plot) {
+        return screen == ScreenKey.THINNING_DONE
+                ? plot.withOutcome(externalThinningService.findThinningOutcome(plotId, campaignYear).orElse(null))
+                : plot;
     }
 }

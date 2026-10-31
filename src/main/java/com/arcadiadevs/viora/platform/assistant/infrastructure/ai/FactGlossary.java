@@ -53,7 +53,12 @@ final class FactGlossary {
             Map.entry("sampling.enough_trees", "whether the trees sampled reach the minimum, with the load and target"),
             Map.entry("sampling.meaning", "what the measured load against the target means for the thinning"),
             Map.entry("sampling.next", "the next step after the sampling"),
-            Map.entry("sampling.correct_tree", "how to correct a sampled tree; Thinning cannot do it yet"));
+            Map.entry("sampling.correct_tree", "how to correct a sampled tree; Thinning cannot do it yet"),
+            Map.entry("thinning.harvest_change", "the yield estimated after the thinning against without it; never "
+                    + "claim anything about next campaign"),
+            Map.entry("thinning.why_target", "where the target load comes from and where the thinning left the load"),
+            Map.entry("thinning.next_sampling", "when to sample again; there is no date, only next campaign after "
+                    + "full bloom"));
 
     private static final Map<String, String> FACTS = Map.ofEntries(
             Map.entry("bearingIndex", "alternate bearing index; higher means stronger alternation"),
@@ -162,7 +167,17 @@ final class FactGlossary {
             Map.entry("microclimateNodes", "linked microclimate (air) nodes"),
             Map.entry("soilProbes", "linked soil moisture probes"),
             Map.entry("minimumTrees", "distinct trees Thinning needs for a representative sampling"),
-            Map.entry("representative", "true when the sampling reaches minimumTrees"));
+            Map.entry("representative", "true when the sampling reaches minimumTrees"),
+            Map.entry("kgPerHaWithoutThinning", "yield estimated with the load before the thinning, kg/ha"),
+            Map.entry("yieldBasis", "CALIBER_ADJUSTED, or FRUIT_COUNT_ONLY: then the yield without thinning is a "
+                    + "ceiling"),
+            Map.entry("residualLoad", "fruits per shoot left after the thinning"),
+            Map.entry("loadState", "BALANCED, MODERATE_OVERLOAD (up to 30 % over target) or SEVERE_OVERLOAD"),
+            Map.entry("profileStatus", "AGRONOMIST_APPROVED, PROVISIONAL or SYNTHETIC_DEMO profile of the target"),
+            Map.entry("removedPercent", "percentage of fruits the producer reported removing"),
+            Map.entry("nextCampaignYear", "year of the next campaign"),
+            Map.entry("windowOpensDaysAfterBloom", "days after full bloom the thinning window opens"),
+            Map.entry("windowClosesDaysAfterBloom", "days after full bloom the thinning window closes"));
 
     private FactGlossary() {
     }
