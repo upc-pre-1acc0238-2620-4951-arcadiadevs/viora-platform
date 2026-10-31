@@ -55,7 +55,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:assistantdailysummary;DB_CLOSE_DELAY=-1",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "viora.assistant.daily-summary.enabled=true"
 })
 @DisplayName("Assistant daily summary (GET /daily-summary and the daily job)")
 class AssistantDailySummaryIntegrationTest {

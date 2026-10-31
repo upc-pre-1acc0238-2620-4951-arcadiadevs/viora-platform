@@ -105,7 +105,7 @@ public class AssistantDailySummaryScheduler {
                 }
             } catch (RuntimeException exception) {
                 failed++;
-                LOG.warn("Assistant daily summary of a producer failed: {}", exception.getMessage());
+                LOG.warn("Assistant daily summary of a producer failed: {}", exception.getClass().getSimpleName());
             }
         }
         if (producers.size() > maxProducers) {
