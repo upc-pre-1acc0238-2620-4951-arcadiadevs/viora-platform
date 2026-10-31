@@ -107,6 +107,58 @@ public interface ThinningContextFacade {
      * @param commercialSizeGrade           commercial size grade of that caliber, only when estimated
      * @param estimatedKgPerHaAfterThinning campaign yield estimated with the load left by the thinning
      */
+    /**
+     * Retrieves the outcome of the confirmed thinning of a plot campaign, for the assistant screen shown after it:
+     * the load before and after it against the target, the yield estimated with and without it, the profile the
+     * target comes from and the window offsets of that profile. Read-only.
+     *
+     * @param plotId       the plot identifier string (UUID)
+     * @param campaignYear the campaign year
+     * @return the outcome, or empty without a prescription, without a confirmed thinning or for a malformed plot id
+     */
+    Optional<ThinningOutcome> findThinningOutcome(String plotId, int campaignYear);
+
+    /**
+     * Outcome of a confirmed thinning.
+     *
+     * @param executedOn                 day the thinning was done
+     * @param actualRemovalPercentage    percentage of fruits the producer reported removing; null when not reported
+     * @param timeliness                 {@code OPTIMAL} or {@code LATE} (after the window closed); null when unknown
+     * @param preThinningFruitsPerShoot  load measured before the thinning; null without load balance
+     * @param residualFruitsPerShoot     load left after the thinning; null without load balance
+     * @param targetFruitsPerShoot       sustainable target load; null without load balance
+     * @param loadState                  {@code BALANCED}, {@code MODERATE_OVERLOAD} or {@code SEVERE_OVERLOAD} of the
+     *                                   residual load; null without load balance
+     * @param kgPerHaWithoutThinning     yield estimated with the load before the thinning, kg/ha; null when it
+     *                                   cannot be estimated (fewer than 3 earlier harvests, unknown area)
+     * @param kgPerHaAfterThinning       yield estimated with the residual load, kg/ha; null when it cannot be estimated
+     * @param yieldBasis                 {@code CALIBER_ADJUSTED} or {@code FRUIT_COUNT_ONLY} (a ceiling with more fruit
+     *                                   than the target); null without estimate
+     * @param harvestCampaigns           earlier harvests the estimate averages
+     * @param profileStatus              {@code AGRONOMIST_APPROVED}, {@code PROVISIONAL} or {@code SYNTHETIC_DEMO} of
+     *                                   the profile the target comes from; null when unknown
+     * @param windowOpensDaysAfterBloom  days after full bloom the thinning window opens in that profile; null when
+     *                                   unknown
+     * @param windowClosesDaysAfterBloom days after full bloom it closes; null when unknown
+     */
+    record ThinningOutcome(
+            LocalDate executedOn,
+            Double actualRemovalPercentage,
+            String timeliness,
+            Double preThinningFruitsPerShoot,
+            Double residualFruitsPerShoot,
+            Double targetFruitsPerShoot,
+            String loadState,
+            Double kgPerHaWithoutThinning,
+            Double kgPerHaAfterThinning,
+            String yieldBasis,
+            int harvestCampaigns,
+            String profileStatus,
+            Integer windowOpensDaysAfterBloom,
+            Integer windowClosesDaysAfterBloom
+    ) {
+    }
+
     record ThinningPlanDetail(
             boolean issued,
             Double percentageToRemove,

@@ -1,11 +1,14 @@
 package com.arcadiadevs.viora.platform.thinning.application.acl;
 
 import com.arcadiadevs.viora.platform.thinning.application.internal.queryservices.ThinningPrescriptionOutlookService;
+import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CaliberProjectionStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CommercialSizeScale;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.PrescriptionStatus;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.YieldEstimate;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.YieldEstimateStatus;
 import com.arcadiadevs.viora.platform.thinning.domain.repositories.FruitThinningPrescriptionRepository;
 import com.arcadiadevs.viora.platform.thinning.domain.services.SamplingCoverageEvaluator;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade;
@@ -137,5 +140,51 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
                     estimated ? CommercialSizeScale.gradeOf(projection.mostLikelyFruitsPerKg()) : null,
                     yieldAfter == null ? null : yieldAfter.estimatedKgPerHa());
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ThinningOutcome> findThinningOutcome(String plotId, int campaignYear) {
+        final PlotId id;
+        final CampaignYear year;
+        try {
+            id = new PlotId(plotId);
+            year = new CampaignYear(campaignYear);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        return prescriptionRepository.findByPlotIdAndCampaignYear(id, year)
+                .map(FruitThinningPrescription::snapshot)
+                .filter(snapshot -> snapshot.executionConfirmation() != null)
+                .map(snapshot -> {
+                    var confirmation = snapshot.executionConfirmation();
+                    var balance = confirmation.loadBalance();
+                    // The same estimates the thinning plan screen shows: with the sampled load and with the residual
+                    var outlook = outlookService.outlookOf(snapshot);
+                    var without = available(outlook.yieldEstimate());
+                    var after = available(outlookService.yieldAfterThinning(snapshot));
+                    var load = snapshot.sustainableLoad();
+                    return new ThinningOutcome(
+                            confirmation.executionDate(),
+                            confirmation.actualRemovalPercentage(),
+                            confirmation.timeliness() == null ? null : confirmation.timeliness().name(),
+                            balance == null ? null : balance.preThinningFruitsPerShoot(),
+                            balance == null ? null : balance.residualFruitsPerShoot(),
+                            balance == null ? null : balance.targetFruitsPerShoot(),
+                            balance == null || balance.loadState() == null ? null : balance.loadState().name(),
+                            without == null ? null : without.estimatedKgPerHa(),
+                            after == null ? null : after.estimatedKgPerHa(),
+                            after == null || after.basis() == null ? null : after.basis().name(),
+                            after == null ? 0 : after.harvestCampaigns(),
+                            load == null ? null : load.profileStatus(),
+                            outlook.windowOpensDaysAfterBloom(),
+                            outlook.windowClosesDaysAfterBloom());
+                });
+    }
+
+    /** The estimate when it has a figure, or null. */
+    private static YieldEstimate available(YieldEstimate estimate) {
+        return estimate == null || estimate.status() != YieldEstimateStatus.AVAILABLE
+                || estimate.estimatedKgPerHa() == null ? null : estimate;
     }
 }
