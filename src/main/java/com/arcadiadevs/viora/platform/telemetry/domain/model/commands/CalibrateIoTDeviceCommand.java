@@ -17,8 +17,18 @@ public record CalibrateIoTDeviceCommand(
         Double calibrationMultiplier,
         String soilTextureType,
         Integer depthCm,
-        Long expectedRevision
+        Long expectedRevision,
+        String name,
+        Boolean transmitting
 ) {
+
+    /**
+     * Calibration only, keeping the name and the state of the node.
+     */
+    public CalibrateIoTDeviceCommand(String plotId, String deviceId, Double calibrationMultiplier,
+                                     String soilTextureType, Integer depthCm, Long expectedRevision) {
+        this(plotId, deviceId, calibrationMultiplier, soilTextureType, depthCm, expectedRevision, null, null);
+    }
 
     /**
      * Compact constructor enforcing non-null presence of mandatory command attributes.

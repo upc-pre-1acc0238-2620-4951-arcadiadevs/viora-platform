@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -399,5 +400,43 @@ class IoTDeviceTest {
 
         assertThatThrownBy(() -> device.unlink(99L))
                 .isInstanceOf(DeviceRevisionMismatchException.class);
+    }
+
+    @Test
+    @DisplayName("pause keeps the day it was paused, a second pause keeps the first date, resume clears it")
+    void pauseAndResume() {
+        var device = IoTDevice.register(plotId, new DeviceName("Sonda Norte"), DeviceType.SOIL_PROBE,
+                SensorDepth.of(30), SoilTextureType.LOAM, null);
+        var first = Instant.parse("2026-10-20T14:00:00Z");
+
+        device.pause(first);
+        device.pause(Instant.parse("2026-10-22T14:00:00Z"));
+        assertThat(device.snapshot().status()).isEqualTo(DeviceStatus.PAUSED);
+        assertThat(device.snapshot().pausedAt()).isEqualTo(first);
+
+        // A paused node is still configured and renamed from the app
+        device.calibrate(SensorDepth.of(45), SoilTextureType.LOAM, new CalibrationMultiplier(1.1));
+        device.rename(new DeviceName("Sonda Sur"));
+        assertThat(device.snapshot().depth().depthCm()).isEqualTo(45);
+        assertThat(device.snapshot().name().value()).isEqualTo("Sonda Sur");
+
+        device.resume();
+        device.resume();
+        assertThat(device.snapshot().status()).isEqualTo(DeviceStatus.ACTIVE);
+        assertThat(device.snapshot().pausedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("an unlinked node can be neither paused, resumed, configured nor renamed")
+    void unlinkedNodeRefusesThePause() {
+        var device = IoTDevice.register(plotId, new DeviceName("Nodo"), DeviceType.MICROCLIMATE,
+                SensorDepth.none(), SoilTextureType.NOT_APPLICABLE, null);
+        device.unlink();
+
+        assertThatThrownBy(() -> device.pause(Instant.now())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(device::resume).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> device.rename(new DeviceName("Otro"))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> device.calibrate(SensorDepth.none(), SoilTextureType.NOT_APPLICABLE,
+                new CalibrationMultiplier(1.0))).isInstanceOf(IllegalStateException.class);
     }
 }

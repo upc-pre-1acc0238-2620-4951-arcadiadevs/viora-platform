@@ -48,6 +48,7 @@ public final class IoTDevicePersistenceAssembler {
         entity.setCalibrationMultiplier(snap.calibrationMultiplier());
         entity.setStatus(snap.status());
         entity.setLastReadingTimestamp(snap.lastReadingTimestamp());
+        entity.setPausedAt(snap.pausedAt());
         if (snap.revision() != null && snap.revision() > 0L) {
             entity.setRevision(snap.revision());
         }
@@ -74,6 +75,7 @@ public final class IoTDevicePersistenceAssembler {
         target.setCalibrationMultiplier(snap.calibrationMultiplier());
         target.setStatus(snap.status());
         target.setLastReadingTimestamp(snap.lastReadingTimestamp());
+        target.setPausedAt(snap.pausedAt());
         return target;
     }
 
@@ -108,7 +110,8 @@ public final class IoTDevicePersistenceAssembler {
                 entity.getCalibrationMultiplier() != null ? entity.getCalibrationMultiplier() : CalibrationMultiplier.defaultMultiplier(),
                 entity.getStatus(),
                 entity.getLastReadingTimestamp(),
-                entity.getRevision()
+                entity.getRevision(),
+                entity.getPausedAt()
         );
 
         return IoTDevice.reconstitute(snapshot);

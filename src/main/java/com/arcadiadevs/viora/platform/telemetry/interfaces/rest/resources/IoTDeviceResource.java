@@ -55,6 +55,9 @@ public record IoTDeviceResource(
         @Nullable Instant lastReadingTimestamp,
 
         @Schema(description = "Optimistic locking revision number", example = "0")
-        Long revision
+        Long revision,
+
+        @Schema(description = "When the producer paused the node; null unless status is PAUSED", example = "2026-10-20T14:00:00Z")
+        @Nullable Instant pausedAt
 ) {
 }

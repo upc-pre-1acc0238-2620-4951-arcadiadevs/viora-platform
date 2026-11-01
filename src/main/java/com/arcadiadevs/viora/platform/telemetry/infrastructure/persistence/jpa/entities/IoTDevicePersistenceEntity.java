@@ -54,6 +54,10 @@ public class IoTDevicePersistenceEntity extends AuditableAbstractPersistenceEnti
     @Column(name = "last_reading_timestamp")
     private Instant lastReadingTimestamp;
 
+    /** When the producer paused the node; null unless it is paused. */
+    @Column(name = "paused_at")
+    private Instant pausedAt;
+
     @Version
     @Column(name = "revision", nullable = false)
     private Long revision;

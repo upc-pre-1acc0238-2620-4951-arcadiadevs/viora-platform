@@ -31,7 +31,8 @@ public final class IoTDeviceResourceFromEntityAssembler {
                 snap.calibrationMultiplier().value(),
                 snap.status().name(),
                 snap.lastReadingTimestamp(),
-                snap.revision()
+                snap.revision(),
+                snap.pausedAt()
         );
     }
 

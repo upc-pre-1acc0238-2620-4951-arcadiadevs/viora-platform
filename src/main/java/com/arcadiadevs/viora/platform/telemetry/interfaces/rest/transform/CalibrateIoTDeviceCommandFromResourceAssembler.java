@@ -32,7 +32,9 @@ public final class CalibrateIoTDeviceCommandFromResourceAssembler {
                 resource.calibrationMultiplier(),
                 resource.soilTextureType(),
                 resource.depthCm(),
-                expectedRevision
+                expectedRevision,
+                resource.name(),
+                resource.transmitting()
         );
     }
 }
