@@ -80,7 +80,7 @@ class AssistantSamplingSummaryScreenIntegrationTest {
     }
 
     @Test
-    @DisplayName("contract example: 5/5 trees, 0,59 fruits per shoot against 0,40, window open; correct_tree disabled")
+    @DisplayName("contract example: 5/5 trees, 0,59 fruits per shoot against 0,40, window open; correct_tree says the plan is calculated")
     void representativeSampling() throws Exception {
         var plotId = createPlot();
         stubPlan(plotId, new ThinningPlanDetail(true, 32.0, 0.59, 0.4, today.minusDays(10), today.plusDays(11), 5,
@@ -106,12 +106,11 @@ class AssistantSamplingSummaryScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[0].enabled").value(true))
                 .andExpect(jsonPath("$.questions[1].enabled").value(true))
                 .andExpect(jsonPath("$.questions[2].enabled").value(true))
-                .andExpect(jsonPath("$.questions[3].enabled").value(false))
-                .andExpect(jsonPath("$.questions[3].disabledReason")
-                        .value("Corregir un árbol todavía no está disponible"));
+                .andExpect(jsonPath("$.questions[3].enabled").value(true))
+                .andExpect(jsonPath("$.questions[3].disabledReason").doesNotExist());
         catalog(plotId, "en")
                 .andExpect(jsonPath("$.questions[0].label").value("Are these enough trees?"))
-                .andExpect(jsonPath("$.questions[3].disabledReason").value("Correcting a tree is not available yet"));
+                .andExpect(jsonPath("$.questions[3].enabled").value(true));
 
         answer("sampling.enough_trees", plotId, "es")
                 .andExpect(status().isOk())
@@ -149,13 +148,16 @@ class AssistantSamplingSummaryScreenIntegrationTest {
                 .andExpect(jsonPath("$.actions[0].label").value("Registrar aclareo"))
                 .andExpect(jsonPath("$.actions[0].target").value("thinning/execute?plotId=" + plotId));
         answer("sampling.correct_tree", plotId, "es")
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("ASSISTANT_CONFLICT"))
-                .andExpect(jsonPath("$.detail").value(NOT_ENOUGH_DATA));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.text").value("Tu plan de aclareo ya se calculó con los 5 árboles muestreados, "
+                        + "así que el muestreo ya no acepta rondas nuevas ni correcciones. Si un árbol quedó mal "
+                        + "registrado, revísalo con tu técnico antes de aclarear."))
+                .andExpect(jsonPath("$.facts[1].value").value("Cerrada"))
+                .andExpect(jsonPath("$.actions", hasSize(0)));
 
         mvc.perform(get(ANSWERS + "/latest").param("screen", "SAMPLING_SUMMARY").param("plotId", plotId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.questionId").value("sampling.next"))
+                .andExpect(jsonPath("$.questionId").value("sampling.correct_tree"))
                 .andExpect(jsonPath("$.freshness").value("UP_TO_DATE"));
     }
 
@@ -172,7 +174,11 @@ class AssistantSamplingSummaryScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[1].enabled").value(false))
                 .andExpect(jsonPath("$.questions[1].disabledReason").value("Sin plan de aclareo activo"))
                 .andExpect(jsonPath("$.questions[2].enabled").value(true))
-                .andExpect(jsonPath("$.questions[3].enabled").value(false));
+                .andExpect(jsonPath("$.questions[3].enabled").value(true));
+        answer("sampling.correct_tree", plotId, "es")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.text").value(startsWith("Vuelve a registrar el árbol con la misma etiqueta")))
+                .andExpect(jsonPath("$.facts[1].value").value("Abierta"));
         answer("sampling.enough_trees", plotId, "es")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.text").value("Aún no: muestreaste 3 árboles y el mínimo para una muestra "
@@ -196,7 +202,7 @@ class AssistantSamplingSummaryScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[0].disabledReason")
                         .value("Sin muestreo en esta campaña · registra un muestreo"))
                 .andExpect(jsonPath("$.questions[3].disabledReason")
-                        .value("Corregir un árbol todavía no está disponible"));
+                        .value("Sin muestreo en esta campaña · registra un muestreo"));
         catalog(never, "en")
                 .andExpect(jsonPath("$.questions[0].disabledReason")
                         .value("No sampling this campaign · record a sampling"));
