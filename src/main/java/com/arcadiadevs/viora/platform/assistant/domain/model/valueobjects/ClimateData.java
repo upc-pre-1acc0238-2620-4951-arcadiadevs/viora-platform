@@ -127,6 +127,20 @@ public final class ClimateData {
     }
 
     /**
+     * A node the producer paused from the app. It produces no new readings and keeps the measured ones.
+     *
+     * @param type     {@code MICROCLIMATE} or {@code SOIL_PROBE}
+     * @param depthCm  installation depth; null when not set
+     * @param pausedOn day it was paused, in the producers' time zone
+     */
+    public record PausedNode(String type, Integer depthCm, LocalDate pausedOn) {
+
+        String canonical() {
+            return type + "/" + depthCm + "/" + pausedOn;
+        }
+    }
+
+    /**
      * Latest reading of the plot.
      *
      * @param temperature  air temperature, °C

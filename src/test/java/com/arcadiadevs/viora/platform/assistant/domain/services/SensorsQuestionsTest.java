@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Answer
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData.Coverage;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ClimateData.PausedNode;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,7 +61,7 @@ class SensorsQuestionsTest {
     }
 
     @Test
-    @DisplayName("catalog with nodes reading recently: every question enabled but why_paused, always disabled")
+    @DisplayName("catalog with nodes reading recently and none paused: every question enabled but why_paused")
     void catalogWithNodesReading() {
         var questions = QuestionCatalog.questionsFor(sensors(List.of(virtualMicroclimate(), virtualProbe()),
                 reading(), coverage(5)));
@@ -280,7 +282,58 @@ class SensorsQuestionsTest {
     }
 
     @Test
-    @DisplayName("why_paused has no answer, and a question of another screen has none here")
+    @DisplayName("why_paused: one paused soil probe, the day it was paused and how to resume it, es and en")
+    void whyPausedOneProbe() {
+        var facts = new SensorsFacts(List.of(virtualMicroclimate()), reading(), coverage(5),
+                List.of(new PausedNode("SOIL_PROBE", 30, LocalDate.of(2026, 10, 20))));
+
+        var question = QuestionCatalog.questionsFor(facts).get(1);
+        assertThat(question.questionId()).isEqualTo(QuestionId.SENSORS_WHY_PAUSED);
+        assertThat(question.enabled()).isTrue();
+        assertThat(question.disabledReason()).isNull();
+
+        var es = answer(QuestionId.SENSORS_WHY_PAUSED, facts, ES);
+        assertThat(es.text()).isEqualTo("Tu sonda de suelo a 30 cm está en pausa desde el 20 de octubre: la pausaste "
+                + "en la app al apagar Transmitir lecturas. En pausa no genera lecturas nuevas y conserva las que ya "
+                + "midió; para reanudarla, enciende Transmitir lecturas en su configuración.");
+        assertThat(es.facts()).extracting(AnswerFact::value, AnswerFact::label, AnswerFact::pill).containsExactly(
+                tuple("1", "nodo en pausa", "desde el 20 de octubre"),
+                tuple("1", "nodo transmitiendo", "en este lote"));
+        assertThat(es.facts()).extracting(AnswerFact::tone).containsExactly(FactTone.PRIMARY, FactTone.HIGHLIGHT);
+        assertThat(es.sources()).extracting(source -> source.label())
+                .containsExactly("Basado en la configuración de tus nodos");
+        var en = answer(QuestionId.SENSORS_WHY_PAUSED, facts, EN);
+        assertThat(en.text()).isEqualTo("Your soil probe at 30 cm is paused since October 20: you paused it in the "
+                + "app by turning Transmit readings off. While paused it makes no new readings and keeps the ones it "
+                + "measured; to resume it, turn Transmit readings on in its settings.");
+        for (var localized : List.of(es, en)) {
+            var language = localized == es ? ES : EN;
+            assertThat(AnswerTextValidator.validate(localized.text(), localized.text(), localized.facts(), language))
+                    .isEqualTo(Verdict.ACCEPTED);
+        }
+    }
+
+    @Test
+    @DisplayName("why_paused: a paused microclimate node, and several paused nodes from the oldest pause")
+    void whyPausedMicroclimateAndMany() {
+        var microclimate = new SensorsFacts(List.of(), null, coverage(0),
+                List.of(new PausedNode("MICROCLIMATE", null, LocalDate.of(2026, 10, 25))));
+        assertThat(answer(QuestionId.SENSORS_WHY_PAUSED, microclimate, ES).text())
+                .startsWith("Tu nodo de microclima está en pausa desde el 25 de octubre: lo pausaste en la app")
+                .endsWith("para reanudarlo, enciende Transmitir lecturas en su configuración.");
+
+        var many = new SensorsFacts(List.of(), null, coverage(0), List.of(
+                new PausedNode("SOIL_PROBE", 30, LocalDate.of(2026, 10, 20)),
+                new PausedNode("MICROCLIMATE", null, LocalDate.of(2026, 10, 25))));
+        var es = answer(QuestionId.SENSORS_WHY_PAUSED, many, ES);
+        assertThat(es.text()).startsWith("2 nodos de tu lote están en pausa, el primero desde el 20 de octubre: "
+                + "los pausaste en la app al apagar Transmitir lecturas.");
+        assertThat(es.facts()).extracting(AnswerFact::value, AnswerFact::label).containsExactly(
+                tuple("2", "nodos en pausa"), tuple("0", "nodos transmitiendo"));
+    }
+
+    @Test
+    @DisplayName("why_paused without a paused node has no answer, and a question of another screen has none here")
     void whyPausedHasNoAnswer() {
         var facts = sensors(List.of(virtualProbe()), reading(), coverage(5));
 

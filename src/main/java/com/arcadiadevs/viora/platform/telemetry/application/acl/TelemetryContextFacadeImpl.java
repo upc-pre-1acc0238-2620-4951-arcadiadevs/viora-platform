@@ -4,9 +4,11 @@ import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerT
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.telemetry.application.internal.outboundservices.meteo.WeatherForecastProvider;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.AgroclimaticIncidentSnapshot;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDevice;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.IoTDeviceSnapshot;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.aggregates.WeatherForecastDay;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.entities.MitigationStepSnapshot;
+import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceStatus;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.DeviceType;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.IncidentStatus;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.IncidentType;
@@ -25,6 +27,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -174,9 +177,16 @@ public class TelemetryContextFacadeImpl implements TelemetryContextFacade {
         var nodes = deviceRepository.findActiveByPlotId(id.get()).stream()
                 .map(device -> toLinkedNode(device.snapshot(), soilMoisture))
                 .toList();
+        var paused = deviceRepository.findAllByPlotId(id.get()).stream()
+                .map(IoTDevice::snapshot)
+                .filter(device -> device.status() == DeviceStatus.PAUSED && device.pausedAt() != null)
+                .sorted(Comparator.comparing(IoTDeviceSnapshot::pausedAt))
+                .map(device -> new PausedNode(device.type().name(),
+                        device.depth() == null ? null : device.depth().depthCm(), device.pausedAt()))
+                .toList();
         return new PlotSensors(nodes, latest == null ? null : new LatestReading(latest.timestamp().timestamp(),
                 latest.temperature().celsius(), latest.relativeHumidity().percentage(),
-                latest.soilMoisture().percentage()));
+                latest.soilMoisture().percentage()), paused);
     }
 
     /** The same open statuses the incidents summary counts as active. */

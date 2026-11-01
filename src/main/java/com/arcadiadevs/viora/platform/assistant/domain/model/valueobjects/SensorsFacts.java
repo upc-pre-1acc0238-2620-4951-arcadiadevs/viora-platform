@@ -17,11 +17,21 @@ import java.util.stream.Collectors;
 public record SensorsFacts(
         List<ClimateData.SensorNode> nodes,
         ClimateData.Reading latestReading,
-        ClimateData.Coverage coverage
+        ClimateData.Coverage coverage,
+        List<ClimateData.PausedNode> pausedNodes
 ) implements ScreenFacts {
 
     public SensorsFacts {
         nodes = nodes == null ? List.of() : List.copyOf(nodes);
+        pausedNodes = pausedNodes == null ? List.of() : List.copyOf(pausedNodes);
+    }
+
+    /**
+     * The figures without paused nodes.
+     */
+    public SensorsFacts(List<ClimateData.SensorNode> nodes, ClimateData.Reading latestReading,
+                        ClimateData.Coverage coverage) {
+        this(nodes, latestReading, coverage, null);
     }
 
     /**
@@ -42,7 +52,10 @@ public record SensorsFacts(
     public String canonical() {
         return "SENSORS|" + nodes.stream().map(ClimateData.SensorNode::canonical).collect(Collectors.joining(","))
                 + "|" + (latestReading == null ? null : latestReading.canonical()) + "|"
-                + (coverage == null ? null : coverage.canonical());
+                + (coverage == null ? null : coverage.canonical())
+                // Appended only when present, so the answers written before pauses existed keep their version
+                + (pausedNodes.isEmpty() ? "" : "|" + pausedNodes.stream().map(ClimateData.PausedNode::canonical)
+                        .collect(Collectors.joining(",")));
     }
 
     @Override

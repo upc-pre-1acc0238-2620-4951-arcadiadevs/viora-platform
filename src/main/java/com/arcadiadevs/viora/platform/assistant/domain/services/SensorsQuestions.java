@@ -32,8 +32,7 @@ public final class SensorsQuestions {
     /**
      * Evaluates the questions of the screen against the figures of the plot. What the nodes say needs a linked node
      * reading recently, as {@code climate.sensors_say}; the reliability needs a linked node; how to link one is
-     * always offered. {@code why_paused} is always disabled: Telemetry has no way to pause a node yet, so no node can
-     * be paused (docs/asistente-decisiones.md, Pantalla Sensores).
+     * always offered. {@code why_paused} needs a node the producer paused from the app.
      *
      * @param facts the figures of the plot
      * @return the questions in display order
@@ -48,14 +47,14 @@ public final class SensorsQuestions {
                 question(QuestionId.SENSORS_WHAT_SAY, label(QuestionId.SENSORS_WHAT_SAY, "label"), "sensor",
                         whatSayMissing),
                 question(QuestionId.SENSORS_WHY_PAUSED, label(QuestionId.SENSORS_WHY_PAUSED, "label"), "alert",
-                        CatalogText.of("assistant.reason.no_paused_nodes")),
+                        facts.pausedNodes().isEmpty() ? CatalogText.of("assistant.reason.no_paused_nodes") : null),
                 question(QuestionId.SENSORS_RELIABILITY, label(QuestionId.SENSORS_RELIABILITY, "label"), "history",
                         nodesMissing),
                 question(QuestionId.SENSORS_HOW_LINK, label(QuestionId.SENSORS_HOW_LINK, "label"), "lote", null));
     }
 
     /**
-     * Writes the answer to a question of the screen. {@code why_paused} has no answer.
+     * Writes the answer to a question of the screen.
      *
      * @param questionId the question
      * @param facts      the figures of the plot
@@ -64,6 +63,8 @@ public final class SensorsQuestions {
     public static Optional<AnswerDraft> answer(QuestionId questionId, SensorsFacts facts) {
         if (questionId.equals(QuestionId.SENSORS_WHAT_SAY)) {
             return whatSay(facts);
+        } else if (questionId.equals(QuestionId.SENSORS_WHY_PAUSED)) {
+            return whyPaused(facts);
         } else if (questionId.equals(QuestionId.SENSORS_RELIABILITY)) {
             return reliability(facts);
         } else if (questionId.equals(QuestionId.SENSORS_HOW_LINK)) {
@@ -94,6 +95,37 @@ public final class SensorsQuestions {
                 new FactDraft(shared("value.measure", soil, "%"), shared("card.soil_moisture.label"),
                         shared("card.air_humidity.pill", humidity), FactTone.HIGHLIGHT)),
                 nodesSource(simulated, nodes), List.of()));
+    }
+
+    /**
+     * "¿Por qué hay un nodo en pausa?": a node is paused only when the producer turns "Transmitir lecturas" off in
+     * the app, so that is the reason, with the day of the pause and what the pause means. The node is named by its
+     * type and depth, never by the name the producer gave it.
+     */
+    private static Optional<AnswerDraft> whyPaused(SensorsFacts facts) {
+        var q = "sensors.why_paused";
+        var paused = facts.pausedNodes();
+        if (paused.isEmpty()) {
+            return Optional.empty();
+        }
+        var first = paused.getFirst();
+        var since = TextDate.of(first.pausedOn());
+        final CatalogText text;
+        if (paused.size() == 1) {
+            boolean probe = ClimateData.SOIL_PROBE.equals(first.type());
+            text = probe && first.depthCm() != null
+                    ? text(q, "text.probe", first.depthCm(), since)
+                    : text(q, probe ? "text.probe_no_depth" : "text.microclimate", since);
+        } else {
+            text = text(q, "text.many", paused.size(), since);
+        }
+        return Optional.of(new AnswerDraft(text, List.of(
+                new FactDraft(shared("value.integer", paused.size()), shared("card.paused_nodes.label", paused.size()),
+                        shared("card.since.pill", since), FactTone.PRIMARY),
+                new FactDraft(shared("value.integer", facts.nodes().size()),
+                        shared("card.transmitting_nodes.label", facts.nodes().size()), shared("card.this_plot.pill"),
+                        FactTone.HIGHLIGHT)),
+                shared("source.node_settings"), List.of()));
     }
 
     /**

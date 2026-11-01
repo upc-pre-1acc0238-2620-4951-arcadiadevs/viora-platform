@@ -34,7 +34,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -42,6 +44,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -229,6 +232,55 @@ class AssistantSensorsScreenIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
         answer("sensors.how_link", plotId, "es").andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a probe paused from the app (PUT with transmitting false and a new name) is explained, then resumed")
+    void pausedFromTheApp() throws Exception {
+        var plotId = createPlot();
+        registerMicroclimate(plotId);
+        var created = mvc.perform(post("/api/v1/plots/{plotId}/iot-devices", plotId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Sonda Norte","type":"SOIL_PROBE","depthCm":30,"soilTextureType":"LOAM",
+                                 "calibrationMultiplier":1.0}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String deviceId = JsonPath.read(created, "$.id");
+
+        // The body the app sends from "Configurar nodo", with the switch off and a new name
+        mvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Sonda Sur","depthCm":30,"calibrationMultiplier":1.0,"transmitting":false}
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/plots/{plotId}/iot-devices", plotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')].status".formatted(deviceId)).value("PAUSED"))
+                .andExpect(jsonPath("$[?(@.id == '%s')].name".formatted(deviceId)).value("Sonda Sur"))
+                .andExpect(jsonPath("$[?(@.id == '%s')].pausedAt".formatted(deviceId)).isNotEmpty());
+
+        catalog(plotId, "es")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.questions[1].questionId").value("sensors.why_paused"))
+                .andExpect(jsonPath("$.questions[1].enabled").value(true))
+                .andExpect(jsonPath("$.questions[1].disabledReason").doesNotExist());
+        answer("sensors.why_paused", plotId, "es")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.text", startsWith("Tu sonda de suelo a 30 cm está en pausa desde el ")))
+                .andExpect(jsonPath("$.text", not(containsString("Sonda Sur"))))
+                .andExpect(jsonPath("$.facts[0].label").value("nodo en pausa"))
+                .andExpect(jsonPath("$.facts[1].label").value("nodo transmitiendo"));
+
+        mvc.perform(put("/api/v1/plots/{plotId}/iot-devices/{deviceId}", plotId, deviceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"calibrationMultiplier\":1.0,\"transmitting\":true}"))
+                .andExpect(status().isOk());
+        catalog(plotId, "es")
+                .andExpect(jsonPath("$.questions[1].enabled").value(false))
+                .andExpect(jsonPath("$.questions[1].disabledReason").value("Ningún nodo de este lote está pausado"));
     }
 
     private ResultActions catalog(String plotId, String language) throws Exception {
