@@ -2,8 +2,10 @@ package com.arcadiadevs.viora.platform.assistant.infrastructure.scheduling;
 
 import com.arcadiadevs.viora.platform.assistant.application.commandservices.DailySummaryCommandService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
+import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.AssistantAnswer;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.PrepareDailySummaryCommand;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.ai.ModelCircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -25,6 +28,11 @@ import java.util.List;
  * {@code viora.assistant.daily-summary.max-producers}; producers past it get their summary on demand. A missed run (the
  * instance asleep) only means the first request of the day writes it. Disable it with
  * {@code viora.assistant.daily-summary.enabled=false}.</p>
+ *
+ * <p>The run respects the limits of the model provider (Groq: requests and tokens per minute and per day): it pauses
+ * {@code viora.assistant.daily-summary.pause-between} after each new summary the model wrote, and it stops as soon as the model is
+ * paused by its circuit breaker, so it never writes templates in a row that the producers would then replace on
+ * demand with their own answers. The producers left out get their summary on demand.</p>
  */
 @Configuration
 @EnableScheduling
@@ -36,6 +44,8 @@ public class AssistantDailySummaryScheduler {
     private final ExternalOrchardService externalOrchardService;
     private final DailySummaryCommandService summaries;
     private final int maxProducers;
+    private final ModelCircuitBreaker circuitBreaker;
+    private final Duration pauseBetween;
 
     /**
      * Outcome of one run.
@@ -54,16 +64,25 @@ public class AssistantDailySummaryScheduler {
      * @param externalOrchardService finds the producers with active plots
      * @param summaries              prepares each summary
      * @param maxProducers           most producers prepared in one run
+     * @param circuitBreaker         tells when the model is paused, which stops the run
+     * @param pauseBetween           wait after each new summary, to stay under the provider's limits
      */
     public AssistantDailySummaryScheduler(ExternalOrchardService externalOrchardService,
             DailySummaryCommandService summaries,
-            @Value("${viora.assistant.daily-summary.max-producers:1000}") int maxProducers) {
+            @Value("${viora.assistant.daily-summary.max-producers:300}") int maxProducers,
+            ModelCircuitBreaker circuitBreaker,
+            @Value("${viora.assistant.daily-summary.pause-between:PT5S}") Duration pauseBetween) {
         if (maxProducers < 1) {
             throw new IllegalArgumentException("assistant.daily_summary.max_producers");
+        }
+        if (pauseBetween == null || pauseBetween.isNegative()) {
+            throw new IllegalArgumentException("assistant.daily_summary.pause_between");
         }
         this.externalOrchardService = externalOrchardService;
         this.summaries = summaries;
         this.maxProducers = maxProducers;
+        this.circuitBreaker = circuitBreaker;
+        this.pauseBetween = pauseBetween;
     }
 
     /** Runs the precomputation at the configured time in Lima. */
@@ -90,6 +109,10 @@ public class AssistantDailySummaryScheduler {
         int skipped = 0;
         int failed = 0;
         for (var producerId : producers.stream().limit(maxProducers).toList()) {
+            if (circuitBreaker.isOpen()) {
+                LOG.info("Assistant daily summaries stopped: the language model is paused");
+                break;
+            }
             try {
                 var outcome = summaries.handle(
                         new PrepareDailySummaryCommand(producerId, null, AnswerLanguage.SPANISH, true)).success();
@@ -97,6 +120,10 @@ public class AssistantDailySummaryScheduler {
                     skipped++;
                 } else if (outcome.get().created()) {
                     created++;
+                    // Only a summary written by the model spent a call to the provider
+                    if (!AssistantAnswer.TEMPLATE.equals(outcome.get().summary().provider()) && !pause()) {
+                        break;
+                    }
                 } else {
                     current++;
                 }
@@ -111,5 +138,19 @@ public class AssistantDailySummaryScheduler {
         LOG.info("Assistant daily summaries: {} created, {} current, {} skipped, {} failed", created, current,
                 skipped, failed);
         return new Run(created, current, skipped, failed);
+    }
+
+    /** Waits between two new summaries; false when the thread is interrupted, which ends the run. */
+    private boolean pause() {
+        if (pauseBetween.isZero()) {
+            return true;
+        }
+        try {
+            Thread.sleep(pauseBetween);
+            return true;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 }
