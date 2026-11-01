@@ -16,7 +16,7 @@ El backend del asistente se escribió primero en ramas locales; mientras tanto, 
 - **CLIMATE nunca menciona riego en el texto del modelo** (lista de términos prohibidos de producción); la versión local lo permitía con alerta crítica.
 - **Vigencia por pantalla.** HOME y PLOT_DETAIL incluyen el día en su `dataVersion`: sus respuestas pasan a `STALE` al día siguiente.
 - **Inicio sin lote.** La respuesta del campo se guarda con `plot_id` nulo y solo se reutiliza o devuelve como última para ese productor y ese ámbito (consultas propias con `plot_id is null`). Las demás pantallas siguen exigiendo `plotId` (400 "Indica el lote de esta pantalla"). La columna se relaja con `scripts/sql/2026-10-30-assistant-answers-field-scope.sql`, que hay que correr a mano antes del release: `ddl-auto=update` nunca quita un `NOT NULL`.
-- **Resumen del día con su propio agregado.** `DailySummary` (exactamente 3 tarjetas), recurso `AssistantDailySummaryResource` con `summaryId` y tabla `assistant_daily_summaries` (script `scripts/sql/2026-10-31-assistant-daily-summaries.sql`, opcional porque `ddl-auto` crea la tabla). No se guarda en `assistant_answers`, así que no se reabre por `GET /answers/{id}`. Un resumen de plantilla no se reutiliza; servir uno existente no gasta cupo y escribir uno nuevo gasta una respuesta. El job de las 06:30 no gasta cupo. Retención por `history-days` con su propio job, y la purga de cuenta borra también los resúmenes. Pendiente para el dueño: si se vuelve a una pausa antes de reintentar el modelo tras una plantilla.
+- **Resumen del día con su propio agregado.** `DailySummary` (exactamente 3 tarjetas), recurso `AssistantDailySummaryResource` con `summaryId` y tabla `assistant_daily_summaries` (script `scripts/sql/2026-10-31-assistant-daily-summaries.sql`, opcional porque `ddl-auto` crea la tabla). No se guarda en `assistant_answers`, así que no se reabre por `GET /answers/{id}`. Un resumen de plantilla no se reutiliza; servir uno existente no gasta cupo y escribir uno nuevo gasta una respuesta. El job de las 06:30 no gasta cupo. Retención por `history-days` con su propio job, y la purga de cuenta borra también los resúmenes. La pausa antes de reintentar el modelo tras una plantilla se cerró el 2026-11-01 (ver "Cierre del backend").
 - **Forma de trabajo de esta ronda.** Ramas `feature/assistant-*` encadenadas desde `origin/develop` y publicadas como ramas propias; `develop` y `main` no se tocan. Reemplaza las dos entradas de "Forma de trabajo".
 
 ## Forma de trabajo
@@ -212,7 +212,9 @@ Preguntas del contrato: `campaign.vs_previous` (8,3 t/ha, +36 % sobre el promedi
 - Sin superficie (un lote activo siempre la tiene, pero se cubre igual) la respuesta queda en kilos.
 - Se deshabilita con menos de 2 campañas ("Registra al menos 2 campañas", el motivo que ya usaba `alternation.vs_campaigns`).
 
-### `campaign.caliber_change`: se ofrece siempre deshabilitada (decisión menor, 2026-10-30)
+### `campaign.caliber_change`: se ofrecía siempre deshabilitada (decisión menor, 2026-10-30)
+
+> **Resuelto el 2026-11-01** (ver "Cierre del backend" al final): la pregunta ya se responde con datos reales. Lo que sigue queda como historia de por qué estuvo deshabilitada.
 
 **Por qué.** El contrato pide comparar el calibre de la campaña cerrada con el de las anteriores, pero el asistente no tiene ese dato:
 
@@ -282,7 +284,9 @@ El mockup del contrato promete que el año siguiente será "más estable". Ning�
 
 Preguntas del contrato: `sampling.enough_trees` (5/5 y 0,59 frutos por brote vs objetivo 0,40; mínimo 5 árboles), `sampling.meaning`, `sampling.next` y `sampling.correct_tree`. La pantalla lee el lote como PLOT_DETAIL (`ScreenKey.readsOnePlot`: plan de aclareo y árboles que faltan de Raleo); no se agregó nada a Raleo.
 
-### `sampling.correct_tree`: se ofrece siempre deshabilitada (decisión del dueño, 2026-10-30)
+### `sampling.correct_tree`: se ofrecía siempre deshabilitada (decisión del dueño, 2026-10-30)
+
+> **Resuelto el 2026-11-01** (ver "Cierre del backend" al final): la pregunta ya se responde con datos reales. Lo que sigue queda como historia de por qué estuvo deshabilitada.
 
 **Por qué.** El contrato pide explicar cómo corregir un árbol mal registrado, pero Raleo no lo permite:
 
@@ -330,7 +334,9 @@ Decirle al productor "vuelve a registrarlo" sería un mal consejo. Se evaluaron 
 
 Preguntas del contrato: `sensors.what_say` (2 nodos activos, 27,4 °C), `sensors.why_paused`, `sensors.reliability` y `sensors.how_link`. Todo sale de Telemetría por la fachada (`findPlotSensors` y `findTelemetryCoverage`, ambas de solo lectura y ya existentes); no se agregó nada a Telemetría.
 
-### `sensors.why_paused`: se ofrece siempre deshabilitada (decisión del dueño, 2026-10-30)
+### `sensors.why_paused`: se ofrecía siempre deshabilitada (decisión del dueño, 2026-10-30)
+
+> **Resuelto el 2026-11-01** (ver "Cierre del backend" al final): la pregunta ya se responde con datos reales. Lo que sigue queda como historia de por qué estuvo deshabilitada.
 
 **Por qué.** El contrato pide explicar por qué un nodo está en pausa, pero hoy ningún nodo puede estarlo:
 
@@ -400,3 +406,24 @@ El verificador independiente aprobó la rama `feature/assistant-winter-chill` si
 - **Mapa de locks sin limpieza.** `seasonLocks` en `PhenologyContextFacadeImpl` guarda un lock por lote y temporada consultada durante toda la vida del proceso (acotado por lotes reales, unas 2 por lote al año).
 - **Desfase por la caché.** Hasta 30 minutos después de medianoche o del 31 de agosto la fachada puede mostrar un día menos evaluado o el estado anterior que la métrica.
 - **Temporadas antiguas.** `findChillSeason` acepta cualquier temporada pasada de un lote real y la guarda; hoy solo se piden la actual y la anterior.
+
+## Cierre del backend (2026-11-01)
+
+Rama `feature/assistant-backend-closing-round`, sobre el port ya fusionado en `develop`.
+
+- **2026-11-01 · Pausa tras un resumen de plantilla.** Un resumen que cayó a la plantilla se sirve 10 minutos (`viora.assistant.daily-summary.fallback-retry-after`, `PT10M`) antes de volver a llamar al modelo. Sin la pausa, cada visita a Inicio con el modelo caído escribía otro resumen y gastaba una de las 20 respuestas por hora del productor, así que podía dejarlo sin respuestas para sus preguntas.
+- **2026-11-01 · Job y límites de Groq.** `gpt-oss-20b` en Groq tiene 1K pedidos por día y unos 8K tokens por minuto, y un resumen gasta unos 500. El job espera `pause-between` (`PT5S`) después de cada resumen que escribió el modelo (no tras uno de plantilla, que no llama al proveedor), se detiene cuando `ModelCircuitBreaker` está abierto y prepara como mucho 300 productores (`max-producers`, antes 1000), para dejar cupo diario a las preguntas.
+- **2026-11-01 · Evaluación en vivo de todas las pantallas.** `AssistantModelLiveEvaluationTest` recorre cada pregunta habilitada de las 11 pantallas (`AssistantScreenSamples`) y el resumen del día, en es y en, y escribe el informe en `target/assistant-live-evaluation.txt` para leerlo. Filtros: `-Dviora.assistant.live.screens=...` y `-Dviora.assistant.live.languages=...`.
+- **2026-11-01 · Validador.** La primera corrida aceptó 64 de 68, pero al leerlos aparecieron valoraciones inventadas, "aclara" por "aclarea" y "llegaría" convertido en "alcanzará". Se agregaron: `ADDED_JUDGMENT` (raíces de valoración es/en que la plantilla no usa), el verbo "aclarar" como término prohibido (aclarar es explicar; quitar frutos es aclarear) y el condicional (es: formas en -aría/-ería/-iría/-dría/-bría; en: would/could/might) dentro de `LOST_HEDGE`. El prompt nombra las tres reglas. Segunda corrida: 63 de 68, los otros 5 caen a la plantilla (2 por el año de `plot.next_year_harvest`, 2 por las reglas nuevas y 1 respuesta vacía porque el modelo gastó sus 400 tokens razonando).
+- **2026-11-01 · Cosecha sin año en la etiqueta.** `plot.next_year_harvest` y `home.harvest_estimate` dicen "¿Cuánto cosecharé esta campaña?". La cifra es la cosecha que Raleo proyecta para la campaña en curso; antes Detalle del lote la titulaba con el año siguiente y Inicio con "este año", y el modelo nunca podía responderla (el año de la etiqueta no estaba en la plantilla). Decisión de Victor. El identificador `plot.next_year_harvest` no cambia, para no romper la app.
+
+### Las tres preguntas que salían siempre deshabilitadas (2026-11-01)
+
+Victor pidió responderlas con los datos que faltaban, sin inventar nada. En cada caso el dato existía o el diseño de la app ya lo pedía; faltaba llevarlo al asistente.
+
+- **`campaign.caliber_change`: el calibre de cada campaña.** Liquidación guardaba el calibre que pesó el molino (`commercialFruitsPerKg`) al liquidar, pero no lo exponía. Nueva fachada de solo lectura `settlement/interfaces/acl/SettlementContextFacade.findSettledCalibers` (una cifra por campaña: la última liquidación del año, con su categoría comercial de Raleo), leída por `ExternalSettlementService` y guardada en `CampaignClosedFacts.calibers`. La pregunta compara la campaña cerrada con la liquidación anterior más reciente, en frutos por kilo y categoría; menos frutos por kilo es fruta más grande y el texto dice solo eso, nunca por qué cambió. Se deshabilita con el motivo exacto: "Liquida la cosecha {año} para conocer su calibre" o "Falta el calibre liquidado de una campaña anterior". Se descartó otra vez usar las observaciones de calibración de Raleo (sesgadas a campañas con aclareo a tiempo).
+- **`sensors.why_paused`: la pausa del nodo.** La app ya tenía el interruptor "Transmitir lecturas" en Configurar nodo (y "Pausado desde…" en Sensores), pero el `PUT` no lo enviaba y el backend no tenía pausa; tampoco guardaba el nombre (renombrar no hacía nada). Ahora `IoTDevice` tiene `pause(at)`/`resume()` con `pausedAt` (columna `paused_at`, script `scripts/sql/2026-11-01-iot-devices-paused-at.sql`), `PUT /plots/{id}/iot-devices/{deviceId}` acepta `name` y `transmitting` opcionales (409 `device.name.duplicate` si el nombre ya existe en el lote) y el recurso devuelve `pausedAt`. Un nodo en pausa se sigue configurando y renombrando; solo uno desvinculado lo rechaza. El simulador ya leía solo nodos activos, así que un nodo en pausa deja de generar lecturas sin más cambios. La fachada `findPlotSensors` agrega los nodos en pausa (tipo, profundidad y fecha, sin el nombre: es texto libre del productor y el texto pasa por el modelo). La respuesta da el motivo verdadero, el único camino a la pausa: el productor apagó "Transmitir lecturas" en la app, desde qué día, qué significa y cómo reanudarlo.
+- **`sampling.correct_tree`: corregir un árbol.** Raleo sumaba dos veces un árbol registrado de nuevo (el registro malo y el bueno entraban en la carga, aunque contaba una vez para la cobertura). Ahora `SamplingCoverageEvaluator` cuenta solo el último registro de cada etiqueta, tomando las rondas en el orden en que se enviaron (`latestRecords` / `latestRecordsFromSnapshots`), en la carga, los brotes y los frutos; el resumen del muestreo lista solo el registro vigente de cada árbol. Corregir es volver a registrar el árbol con la misma etiqueta en una ronda nueva, como la app ya permite. Con el plan ya calculado Raleo rechaza rondas nuevas (regla previa, no cambia) y la respuesta lo dice: revisarlo con el técnico antes de aclarear. Se habilita con cualquier árbol muestreado en la campaña.
+- **Respuestas que son pasos de la app.** En la evaluación en vivo el modelo cambió "el muestreo ya no acepta correcciones" por "no se necesitan correcciones": ninguna regla de cifras lo detecta y es un mal consejo. `QuestionId.writtenAsIs()` marca `sampling.correct_tree`, `sensors.why_paused` y `sensors.how_link`; `AnswerTextChooser` las responde con la plantilla sin llamar al modelo (`model.provider = TEMPLATE`, `fallback = false`). Las explicaciones siguen pasando por el modelo.
+- **Evaluación en vivo** de las pantallas tocadas (SENSORS, SAMPLING_SUMMARY, CAMPAIGN_CLOSED, es y en): `campaign.caliber_change` aceptada tal cual en los dos idiomas; las tres de pasos de la app ya no se envían al modelo.
+
