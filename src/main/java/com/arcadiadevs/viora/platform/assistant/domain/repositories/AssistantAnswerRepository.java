@@ -49,7 +49,7 @@ public interface AssistantAnswerRepository {
      * moment.
      *
      * @param producerId  producer who asked
-     * @param plotId      the plot
+     * @param plotId      the plot; null for the producer's whole field, which never matches an answer about a plot
      * @param questionId  the question
      * @param language    language of the text
      * @param dataVersion fingerprint of the data
@@ -73,7 +73,7 @@ public interface AssistantAnswerRepository {
      * Finds the newest answer of a producer about a plot to a question of a screen.
      *
      * @param producerId     producer who asked
-     * @param plotId         the plot
+     * @param plotId         the plot; null for the answers about the producer's whole field only
      * @param questionPrefix prefix of the questions of the screen, for example {@code plan.}
      * @param since          oldest creation time accepted
      * @return the answer, or empty

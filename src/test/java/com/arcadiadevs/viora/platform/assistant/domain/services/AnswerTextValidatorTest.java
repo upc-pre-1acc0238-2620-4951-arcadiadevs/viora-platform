@@ -63,6 +63,48 @@ class AnswerTextValidatorTest {
     }
 
     @Test
+    @DisplayName("a rating the template does not make keeps the template (live evaluation, 2026-11-01)")
+    void rejectsAddedJudgments() {
+        var sampling = "Yes: you sampled 5 trees and the minimum is 5. The sample gives 0.59 fruits per shoot against a "
+                + "target of 0.40.";
+        assertThat(AnswerTextValidator.validate("You sampled 5 trees, which meets the minimum of 5. The sample shows "
+                + "0.59 fruits per shoot, above the target of 0.40. This indicates a good yield.", sampling, List.of(),
+                EN)).isEqualTo(Verdict.ADDED_JUDGMENT);
+        var campaign = "Your 2025 campaign closed at 6.2 t/ha, 36% above the average of your 3 previous campaigns.";
+        assertThat(AnswerTextValidator.validate("Your 2025 campaign closed at 6.2 t/ha, 36 % above the average of your "
+                + "3 previous campaigns. This shows a significant improvement.", campaign, List.of(), EN))
+                .isEqualTo(Verdict.ADDED_JUDGMENT);
+        assertThat(AnswerTextValidator.validate("Tu carga de 0,60 frutos por brote es preocupante; quita el 30 %.",
+                TEMPLATE, FACTS, ES)).isEqualTo(Verdict.ADDED_JUDGMENT);
+    }
+
+    @Test
+    @DisplayName("aclarar (to clarify) instead of aclarear (to thin) keeps the template")
+    void rejectsTheWrongThinningVerb() {
+        var template = "Para la campaña 2026, muestrea tus árboles y aclarea dentro de la ventana.";
+
+        assertThat(AnswerTextValidator.validate("Para la campaña 2026, muestrea tus árboles. Aclara dentro de la ventana.",
+                template, List.of(), ES)).isEqualTo(Verdict.FORBIDDEN_TERM);
+        assertThat(AnswerTextValidator.validate("Para la campaña 2026, muestrea tus árboles y aclarea en la ventana.",
+                template, List.of(), ES)).isEqualTo(Verdict.ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("an estimate in the conditional told as a fact keeps the template")
+    void rejectsAConditionalTurnedIntoAFact() {
+        var spanish = "Al ritmo reciente, tu lote llegaría a las 30 porciones el 4 de agosto. Es una estimación: una "
+                + "racha de días cálidos la puede retrasar.";
+        assertThat(AnswerTextValidator.validate("Al ritmo actual, tu lote alcanzará las 30 porciones el 4 de agosto. Es "
+                + "una estimación: una racha de días cálidos la puede retrasar.", spanish, List.of(), ES))
+                .isEqualTo(Verdict.LOST_HEDGE);
+        assertThat(AnswerTextValidator.validate("A este ritmo, tu lote llegaría a las 30 porciones el 4 de agosto; una "
+                + "racha de días cálidos la puede retrasar.", spanish, List.of(), ES)).isEqualTo(Verdict.ACCEPTED);
+        var english = "At the recent pace your plot would reach 30 portions on August 4. A run of warm days can delay it.";
+        assertThat(AnswerTextValidator.validate("At the current pace, your plot will reach 30 portions on August 4. A run "
+                + "of warm days can delay it.", english, List.of(), EN)).isEqualTo(Verdict.LOST_HEDGE);
+    }
+
+    @Test
     @DisplayName("a practice the template does mention is allowed")
     void allowsPracticesOfTheTemplate() {
         var template = "Sin sondas reales no puedo recomendar riego: la humedad de 18 % es un dato simulado.";
@@ -116,9 +158,9 @@ class AnswerTextValidatorTest {
         assertThat(AnswerTextValidator.validate("Con tu historial, 2027 será un año de carga baja; tus campañas bajas "
                 + "rondaron 4,5 t/ha.", nextYear, List.of(), ES)).isEqualTo(Verdict.LOST_HEDGE);
         var ifNone = "Sin aclarear te quedas en 0,60 frutos por brote. Con esa carga se espera una cosecha más baja.";
-        assertThat(AnswerTextValidator.validate("Si no aclaras, tendrás 0,60 frutos por brote. Esa carga reduce la "
+        assertThat(AnswerTextValidator.validate("Si no aclareas, tendrás 0,60 frutos por brote. Esa carga reduce la "
                 + "cosecha.", ifNone, List.of(), ES)).isEqualTo(Verdict.LOST_HEDGE);
-        assertThat(AnswerTextValidator.validate("Si no aclaras, tendrás 0,60 frutos por brote y se espera una cosecha "
+        assertThat(AnswerTextValidator.validate("Si no aclareas, tendrás 0,60 frutos por brote y se espera una cosecha "
                 + "más baja.", ifNone, List.of(), ES)).isEqualTo(Verdict.ACCEPTED);
         assertThat(AnswerTextValidator.validate("In 2026 the tree will carry more fruit.",
                 "In 2026 the tree tends to carry more fruit.", List.of(), EN)).isEqualTo(Verdict.LOST_HEDGE);

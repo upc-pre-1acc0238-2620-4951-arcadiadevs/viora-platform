@@ -34,6 +34,7 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
     private DeviceStatus status;
     private Instant lastReadingTimestamp;
     private Long revision;
+    private Instant pausedAt;
 
     private IoTDevice(
             DeviceId id,
@@ -45,7 +46,8 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
             CalibrationMultiplier calibrationMultiplier,
             DeviceStatus status,
             Instant lastReadingTimestamp,
-            Long revision
+            Long revision,
+            Instant pausedAt
     ) {
         this.id = id;
         this.plotId = plotId;
@@ -57,6 +59,7 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
         this.status = status;
         this.lastReadingTimestamp = lastReadingTimestamp;
         this.revision = revision;
+        this.pausedAt = pausedAt;
     }
 
     /**
@@ -123,7 +126,8 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
                 effectiveMultiplier,
                 DeviceStatus.ACTIVE,
                 null,
-                initialRevision
+                initialRevision,
+                null
         );
 
         device.registerDomainEvent(new IoTDeviceRegisteredEvent(
@@ -158,7 +162,8 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
                 snapshot.calibrationMultiplier(),
                 snapshot.status(),
                 snapshot.lastReadingTimestamp(),
-                snapshot.revision()
+                snapshot.revision(),
+                snapshot.pausedAt()
         );
     }
 
@@ -171,7 +176,7 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
      * @param newTexture       the updated soil textural type (for soil probes, or null to keep current)
      * @param newMultiplier    the updated calibration multiplier
      * @param expectedRevision the expected optimistic concurrency revision (optional, null to bypass check)
-     * @throws IllegalStateException if device is not in ACTIVE status
+     * @throws IllegalStateException if the device is unlinked
      * @throws DeviceRevisionMismatchException if expectedRevision does not match aggregate revision
      */
     public void calibrate(
@@ -180,7 +185,8 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
             CalibrationMultiplier newMultiplier,
             Long expectedRevision
     ) {
-        if (this.status != DeviceStatus.ACTIVE) {
+        // A paused node is still configured from the app; only an unlinked one is out of the inventory
+        if (this.status == DeviceStatus.UNLINKED) {
             throw new IllegalStateException("device.status.not_active");
         }
         if (expectedRevision != null && (this.revision == null || !this.revision.equals(expectedRevision))) {
@@ -254,7 +260,50 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
         if (newName == null) {
             throw new IllegalArgumentException("device.name.blank");
         }
+        if (this.status == DeviceStatus.UNLINKED) {
+            throw new IllegalStateException("device.status.not_active");
+        }
         this.name = newName;
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+    }
+
+    /**
+     * Pauses the node at the producer's request ("Transmitir lecturas" off in the app): it stops producing new
+     * readings and keeps the ones it already measured. Pausing a paused node keeps the original date.
+     *
+     * @param at when the node was paused
+     * @throws IllegalStateException if the device is unlinked
+     */
+    public void pause(Instant at) {
+        if (at == null) {
+            throw new IllegalArgumentException("device.paused_at.null");
+        }
+        if (this.status == DeviceStatus.UNLINKED) {
+            throw new IllegalStateException("device.status.not_active");
+        }
+        if (this.status == DeviceStatus.PAUSED) {
+            return;
+        }
+        this.status = DeviceStatus.PAUSED;
+        this.pausedAt = at;
+        this.revision = (this.revision == null ? 0L : this.revision) + 1L;
+    }
+
+    /**
+     * Resumes a paused node ("Transmitir lecturas" on again): it produces readings again. Resuming an active node
+     * does nothing.
+     *
+     * @throws IllegalStateException if the device is unlinked
+     */
+    public void resume() {
+        if (this.status == DeviceStatus.UNLINKED) {
+            throw new IllegalStateException("device.status.not_active");
+        }
+        if (this.status != DeviceStatus.PAUSED) {
+            return;
+        }
+        this.status = DeviceStatus.ACTIVE;
+        this.pausedAt = null;
         this.revision = (this.revision == null ? 0L : this.revision) + 1L;
     }
 
@@ -309,7 +358,8 @@ public class IoTDevice extends AbstractDomainAggregateRoot<IoTDevice> {
                 calibrationMultiplier,
                 status,
                 lastReadingTimestamp,
-                revision
+                revision,
+                pausedAt
         );
     }
 }

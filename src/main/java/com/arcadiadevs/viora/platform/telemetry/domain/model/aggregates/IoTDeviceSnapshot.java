@@ -18,6 +18,7 @@ import java.time.Instant;
  * @param status                the operational status
  * @param lastReadingTimestamp  the timestamp of the most recent telemetry reading
  * @param revision              the optimistic locking revision number
+ * @param pausedAt              when the producer paused the node; null unless it is paused
  */
 public record IoTDeviceSnapshot(
         DeviceId id,
@@ -29,6 +30,18 @@ public record IoTDeviceSnapshot(
         CalibrationMultiplier calibrationMultiplier,
         DeviceStatus status,
         Instant lastReadingTimestamp,
-        Long revision
+        Long revision,
+        Instant pausedAt
 ) {
+
+    /**
+     * Snapshot of a node that is not paused.
+     */
+    public IoTDeviceSnapshot(DeviceId id, PlotId plotId, DeviceName name, DeviceType type, SensorDepth depth,
+                             SoilTextureType soilTextureType, CalibrationMultiplier calibrationMultiplier,
+                             DeviceStatus status, Instant lastReadingTimestamp, Long revision) {
+        this(id, plotId, name, type, depth, soilTextureType, calibrationMultiplier, status, lastReadingTimestamp,
+                revision, null);
+    }
+
 }

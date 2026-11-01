@@ -81,7 +81,7 @@ public class AssistantQuestionController {
     })
     public ResponseEntity<?> listQuestions(
             @Parameter(description = "Screen key", example = "ALTERNATION") @RequestParam(required = false) @Nullable String screen,
-            @Parameter(description = "Plot UUID; required by ALTERNATION and PLAN") @RequestParam(required = false) @Nullable String plotId
+            @Parameter(description = "Plot UUID; required by every screen but HOME, which without it lists the questions about the producer's whole field") @RequestParam(required = false) @Nullable String plotId
     ) {
         final GetQuestionCatalogQuery query;
         try {

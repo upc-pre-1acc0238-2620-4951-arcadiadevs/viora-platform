@@ -97,4 +97,25 @@ class AnswerTextChooserTest {
         assertThat(chosen).isEqualTo(new AnswerTextChooser.Chosen(TEMPLATE, "GROQ", "openai/gpt-oss-120b", true,
                 180, 30));
     }
+
+    @Test
+    @DisplayName("steps of the app go out as written: the model is never asked for them, even when it is on")
+    void appInstructionsAreNotRephrased() {
+        var writer = new FakeWriter(true, Optional.of(new AnswerTextWriter.Written(
+                "Your plan was calculated, so no new rounds or corrections are needed.", 100, 20)));
+        var steps = "Tu plan de aclareo ya se calculó con los 5 árboles muestreados, así que el muestreo ya no acepta "
+                + "rondas nuevas ni correcciones.";
+
+        for (var question : List.of(QuestionId.SAMPLING_CORRECT_TREE, QuestionId.SENSORS_WHY_PAUSED,
+                QuestionId.SENSORS_HOW_LINK)) {
+            var chosen = new AnswerTextChooser(writer).choose(question, "¿Cómo corrijo un árbol?",
+                    AnswerLanguage.SPANISH, steps, FACTS);
+
+            assertThat(question.writtenAsIs()).isTrue();
+            assertThat(chosen).isEqualTo(new AnswerTextChooser.Chosen(steps, AssistantAnswer.TEMPLATE, null, false,
+                    null, null));
+        }
+        assertThat(writer.requests).isEmpty();
+        assertThat(QuestionId.SAMPLING_MEANING.writtenAsIs()).isFalse();
+    }
 }

@@ -16,7 +16,8 @@ import java.util.List;
 /**
  * Decides whose text an answer keeps. The model rephrases the template and its text is kept only when the validator
  * accepts it; a model that fails, or writes a figure the server did not compute, leaves the template, so the producer
- * always gets a correct answer and never an error caused by the model.
+ * always gets a correct answer and never an error caused by the model. The answers that are steps of the app
+ * ({@link QuestionId#writtenAsIs()}) are never sent to the model.
  */
 @Component
 public class AnswerTextChooser {
@@ -60,7 +61,8 @@ public class AnswerTextChooser {
      */
     public Chosen choose(QuestionId questionId, String question, AnswerLanguage language, String template,
                          List<AnswerFact> facts) {
-        if (!writer.enabled()) {
+        // Steps of the app go out exactly as written: the model is not asked
+        if (!writer.enabled() || questionId.writtenAsIs()) {
             return new Chosen(template, AssistantAnswer.TEMPLATE, null, false, null, null);
         }
         var written = writer.rewrite(new AnswerTextWriter.Request(language, question, template, facts));

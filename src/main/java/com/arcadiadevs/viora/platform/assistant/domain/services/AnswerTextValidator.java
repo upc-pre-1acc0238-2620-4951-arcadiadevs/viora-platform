@@ -40,6 +40,24 @@ public final class AnswerTextValidator {
             "pesticid", "fungicid", "insecticid", "herbicid", "fumig", "spray", "garantiz", "guarantee");
 
     /** Short words that only one of the two languages uses, to tell a text written in the other language. */
+    /**
+     * Stems of judgments the model must not add: a template states figures, and a rating such as "good yield" can
+     * read the other way round (an overload is not a good yield).
+     */
+    private static final List<String> JUDGMENT_STEMS = List.of(
+            "buen", "mal ", "mala ", "malo", "excelent", "significativ", "notabl", "positiv", "negativ",
+            "preocup", "favorabl", "desfavorabl", "mejora", "empeor", "saludabl", "excepcional", "optim",
+            "good", "great", "excellent", "significant", "improv", "positive", "negative", "worr",
+            "healthy", "strong", "poor", "remarkabl", "outstanding", "impressive", "optimal");
+
+    /** "Aclarar" means to clarify: thinning fruit is "aclarear". */
+    private static final Pattern WRONG_THINNING_VERB =
+            Pattern.compile("\\baclar(?:a|as|o|ar|e|en|an|amos|ando|ado|ados)\\b");
+
+    /** A verb in the conditional (llegaría, podría, sería; would, could, might): an estimate, not a fact. */
+    private static final Pattern SPANISH_CONDITIONAL = Pattern.compile("\\b\\p{L}+(?:ar|er|ir|dr|br)ian?\\b");
+    private static final Pattern ENGLISH_CONDITIONAL = Pattern.compile("\\b(?:would|could|might)\\b");
+
     private static final List<String> SPANISH_WORDS = List.of("el", "la", "los", "las", "de", "del", "que", "tu", "es",
             "con", "por", "y", "en", "un", "una");
     private static final List<String> ENGLISH_WORDS = List.of("the", "and", "your", "is", "of", "to", "with", "you",
@@ -70,7 +88,10 @@ public final class AnswerTextValidator {
         UNKNOWN_NUMBER,
         /** A practice the template does not mention. */
         FORBIDDEN_TERM,
-        /** The template is cautious ("tends to", "can") and the text states it as a certainty. */
+
+        /** A rating ("good", "mejora") the template does not make. */
+        ADDED_JUDGMENT,
+        /** The template is cautious ("tends to", "can", a conditional) and the text states it as a certainty. */
         LOST_HEDGE
     }
 
@@ -131,6 +152,18 @@ public final class AnswerTextValidator {
             if (plainText.contains(stem) && !plainTemplate.contains(stem)) {
                 return Verdict.FORBIDDEN_TERM;
             }
+        }
+        if (WRONG_THINNING_VERB.matcher(plainText).find() && !WRONG_THINNING_VERB.matcher(plainTemplate).find()) {
+            return Verdict.FORBIDDEN_TERM;
+        }
+        for (var stem : JUDGMENT_STEMS) {
+            if (plainText.contains(stem) && !plainTemplate.contains(stem)) {
+                return Verdict.ADDED_JUDGMENT;
+            }
+        }
+        var conditional = "en".equals(language.code()) ? ENGLISH_CONDITIONAL : SPANISH_CONDITIONAL;
+        if (conditional.matcher(plainTemplate).find() && !conditional.matcher(plainText).find()) {
+            return Verdict.LOST_HEDGE;
         }
         var hedges = "en".equals(language.code()) ? ENGLISH_HEDGES : SPANISH_HEDGES;
         if (hedges.stream().anyMatch(plainTemplate::contains) && hedges.stream().noneMatch(plainText::contains)) {

@@ -12,6 +12,8 @@ import jakarta.validation.constraints.Positive;
  * @param calibrationMultiplier the empirical adjustment factor between 0.50 and 2.00
  * @param soilTextureType       the soil textural classification string (optional, for soil probes)
  * @param depthCm               the installation depth in centimeters (optional, for soil probes)
+ * @param name                  the new name of the node (optional; null keeps it)
+ * @param transmitting          false pauses the node, true resumes it (optional; null keeps its state)
  */
 @Schema(
         name = "CalibrateIoTDeviceResource",
@@ -30,6 +32,20 @@ public record CalibrateIoTDeviceResource(
 
         @Positive(message = "device.depth.invalid")
         @Schema(description = "Sensor installation depth in centimeters", example = "45")
-        Integer depthCm
+        Integer depthCm,
+
+        @Schema(description = "New name of the node; omit it to keep the current one", example = "Sonda Norte")
+        String name,
+
+        @Schema(description = "false pauses the node (no new readings, the measured ones are kept), true resumes it; "
+                + "omit it to keep its state", example = "true")
+        Boolean transmitting
 ) {
+
+    /**
+     * Calibration only, keeping the name and the state of the node.
+     */
+    public CalibrateIoTDeviceResource(Double calibrationMultiplier, String soilTextureType, Integer depthCm) {
+        this(calibrationMultiplier, soilTextureType, depthCm, null, null);
+    }
 }

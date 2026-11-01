@@ -158,7 +158,7 @@ public class AssistantAnswerController {
     })
     public ResponseEntity<?> latestAnswer(
             @Parameter(description = "Screen key", example = "PLAN") @RequestParam(required = false) @Nullable String screen,
-            @Parameter(description = "Plot UUID") @RequestParam(required = false) @Nullable String plotId
+            @Parameter(description = "Plot UUID; required by every screen but HOME, which without it reopens the last answer about the producer's whole field") @RequestParam(required = false) @Nullable String plotId
     ) {
         final GetLatestAnswerQuery query;
         try {

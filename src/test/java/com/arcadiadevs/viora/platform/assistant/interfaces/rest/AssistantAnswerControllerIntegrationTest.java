@@ -228,7 +228,7 @@ class AssistantAnswerControllerIntegrationTest {
         ask("alternation.nothing", plotId, UUID.randomUUID(), "es", false)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("La pregunta no es válida para esta pantalla"));
-        ask("home.week_plan", plotId, UUID.randomUUID(), "es", false).andExpect(status().isBadRequest());
+        ask("dashboard.week_plan", plotId, UUID.randomUUID(), "es", false).andExpect(status().isBadRequest());
         ask("Not a question", plotId, UUID.randomUUID(), "es", false).andExpect(status().isBadRequest());
         mvc.perform(post(ANSWERS).contentType(MediaType.APPLICATION_JSON).header(HttpHeaders.ACCEPT_LANGUAGE, "es")
                         .content("{\"questionId\":\"alternation.why_index\",\"plotId\":\"%s\",\"clientRequestId\":\"nope\"}"
