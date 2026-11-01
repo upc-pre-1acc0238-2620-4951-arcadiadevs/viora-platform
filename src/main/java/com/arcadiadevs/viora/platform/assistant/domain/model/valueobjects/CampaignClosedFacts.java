@@ -18,16 +18,39 @@ import java.util.stream.Collectors;
  * @param bearingCategory alternation band of that index
  * @param outcome         outcome of the confirmed thinning of the closed campaign; null when it was not thinned
  * @param areaHectares    area of the plot polygon; null when unknown
+ * @param calibers        caliber the mill weighed for each settled campaign, by campaign year, ascending
  */
 public record CampaignClosedFacts(
         SortedMap<Integer, Double> yieldsKg,
         Double bearingIndex,
         String bearingCategory,
         ThinningOutcomeData outcome,
-        Double areaHectares
+        Double areaHectares,
+        SortedMap<Integer, SettledCaliber> calibers
 ) implements ScreenFacts {
 
+    /**
+     * The caliber of one settled campaign, as Settlement recorded it.
+     *
+     * @param fruitsPerKg         commercial caliber in fruits per kilogram
+     * @param commercialSizeGrade commercial size grade of that caliber (for example {@code 171/190}); null when the
+     *                            scale has no grade for it
+     */
+    public record SettledCaliber(double fruitsPerKg, String commercialSizeGrade) {
+    }
+
+    /**
+     * The figures without settled calibers.
+     */
+    public CampaignClosedFacts(SortedMap<Integer, Double> yieldsKg, Double bearingIndex, String bearingCategory,
+                               ThinningOutcomeData outcome, Double areaHectares) {
+        this(yieldsKg, bearingIndex, bearingCategory, outcome, areaHectares, null);
+    }
+
     public CampaignClosedFacts {
+        calibers = calibers == null
+                ? Collections.emptySortedMap()
+                : Collections.unmodifiableSortedMap(new TreeMap<>(calibers));
         yieldsKg = yieldsKg == null
                 ? Collections.emptySortedMap()
                 : Collections.unmodifiableSortedMap(new TreeMap<>(yieldsKg));
@@ -52,7 +75,12 @@ public record CampaignClosedFacts(
         return "CAMPAIGN_CLOSED|" + yieldsKg.entrySet().stream()
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .collect(Collectors.joining(",")) + "|" + bearingIndex + "|" + bearingCategory + "|"
-                + (outcome == null ? null : outcome.canonical()) + "|" + areaHectares;
+                + (outcome == null ? null : outcome.canonical()) + "|" + areaHectares
+                // Appended only when present, so the answers written before calibers existed keep their version
+                + (calibers.isEmpty() ? "" : "|" + calibers.entrySet().stream()
+                        .map(entry -> entry.getKey() + "=" + entry.getValue().fruitsPerKg() + "/"
+                                + entry.getValue().commercialSizeGrade())
+                        .collect(Collectors.joining(",")));
     }
 
     @Override

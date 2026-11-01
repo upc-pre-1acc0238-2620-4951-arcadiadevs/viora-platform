@@ -9,6 +9,7 @@ import com.arcadiadevs.viora.platform.assistant.application.internal.outboundser
 import com.arcadiadevs.viora.platform.assistant.domain.model.aggregates.DailySummary;
 import com.arcadiadevs.viora.platform.assistant.domain.model.commands.PrepareDailySummaryCommand;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
+import com.arcadiadevs.viora.platform.assistant.infrastructure.ai.ModelCircuitBreaker;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +25,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -45,6 +47,8 @@ class AssistantDailySummarySchedulerTest {
 
     @Mock private ExternalOrchardService orchard;
     @Mock private DailySummaryCommandService summaries;
+    /** Closed by default, as a mock answers false. */
+    @Mock private ModelCircuitBreaker circuitBreaker;
 
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
     private final Logger logger = (Logger) LoggerFactory.getLogger(AssistantDailySummaryScheduler.class);
@@ -116,6 +120,28 @@ class AssistantDailySummarySchedulerTest {
     }
 
     @Test
+    @DisplayName("stops as soon as the language model is paused, so it never writes templates in a row")
+    void stopsWhileTheModelIsPaused() {
+        when(orchard.findProducersWithActivePlots()).thenReturn(List.of(FIRST, SECOND, THIRD));
+        when(summaries.handle(any())).thenReturn(outcome(true));
+        when(circuitBreaker.isOpen()).thenReturn(false, true);
+
+        var run = scheduler(1000).precompute();
+
+        assertThat(run).isEqualTo(new AssistantDailySummaryScheduler.Run(1, 0, 0, 0));
+        verify(summaries, times(1)).handle(any());
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage)
+                .contains("Assistant daily summaries stopped: the language model is paused");
+    }
+
+    @Test
+    @DisplayName("refuses a negative pause between summaries")
+    void negativePause() {
+        assertThatThrownBy(() -> new AssistantDailySummaryScheduler(orchard, summaries, 1, circuitBreaker,
+                Duration.ofSeconds(-1))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("runs once a day at 06:30 in Lima, on by default in production and off in the tests")
     void limaScheduleOnInProductionOffInTests() throws Exception {
         var scheduled = AssistantDailySummaryScheduler.class.getMethod("run").getAnnotation(Scheduled.class);
@@ -136,7 +162,7 @@ class AssistantDailySummarySchedulerTest {
     }
 
     private AssistantDailySummaryScheduler scheduler(int maxProducers) {
-        return new AssistantDailySummaryScheduler(orchard, summaries, maxProducers);
+        return new AssistantDailySummaryScheduler(orchard, summaries, maxProducers, circuitBreaker, Duration.ZERO);
     }
 
     private static Result<Outcome, ApplicationError> outcome(boolean created) {

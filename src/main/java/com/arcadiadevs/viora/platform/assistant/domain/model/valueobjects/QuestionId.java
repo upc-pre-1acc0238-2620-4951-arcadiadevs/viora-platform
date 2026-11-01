@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -62,12 +63,29 @@ public record QuestionId(String value) {
     public static final QuestionId CAMPAIGN_PLAN_NEXT = new QuestionId("campaign.plan_next");
 
     /**
+     * Questions answered with steps of the app (how to correct a tree, why a node is paused and how to resume it, how
+     * to link a node). Their template goes out as written: a rephrasing can turn "no longer takes corrections" into
+     * "needs no corrections", which no number check catches, and a wrong step sends the producer the wrong way.
+     */
+    private static final Set<QuestionId> APP_INSTRUCTIONS = Set.of(SENSORS_HOW_LINK, SENSORS_WHY_PAUSED,
+            SAMPLING_CORRECT_TREE);
+
+    /**
      * Compact constructor validating the {@code screen.question} format.
      */
     public QuestionId {
         if (value == null || !FORMAT.matcher(value).matches()) {
             throw new IllegalArgumentException("assistant.question.invalid");
         }
+    }
+
+    /**
+     * Whether the answer is steps of the app, sent as the template wrote them and never rephrased by the model.
+     *
+     * @return true for the questions answered with steps of the app
+     */
+    public boolean writtenAsIs() {
+        return APP_INSTRUCTIONS.contains(this);
     }
 
     /**

@@ -129,8 +129,29 @@ public interface TelemetryContextFacade {
      *
      * @param nodes         active nodes linked to the plot
      * @param latestReading latest reading of the last week; null when there is none
+     * @param pausedNodes   nodes the producer paused from the app, oldest pause first
      */
-    record PlotSensors(List<LinkedNode> nodes, LatestReading latestReading) {
+    record PlotSensors(List<LinkedNode> nodes, LatestReading latestReading, List<PausedNode> pausedNodes) {
+
+        public PlotSensors {
+            pausedNodes = pausedNodes == null ? List.of() : List.copyOf(pausedNodes);
+        }
+
+        /** Nodes and latest reading, without paused nodes. */
+        public PlotSensors(List<LinkedNode> nodes, LatestReading latestReading) {
+            this(nodes, latestReading, List.of());
+        }
+    }
+
+    /**
+     * A node the producer paused ("Transmitir lecturas" off): it produces no new readings and keeps the measured
+     * ones. Its name is left out on purpose: it is free text of the producer.
+     *
+     * @param type     {@code MICROCLIMATE} or {@code SOIL_PROBE}
+     * @param depthCm  installation depth; null when not set
+     * @param pausedAt when it was paused
+     */
+    record PausedNode(String type, Integer depthCm, Instant pausedAt) {
     }
 
     /**

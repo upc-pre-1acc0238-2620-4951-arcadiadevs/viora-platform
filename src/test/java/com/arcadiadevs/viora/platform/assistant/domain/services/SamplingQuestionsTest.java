@@ -36,6 +36,7 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.SamplingS
 import static com.arcadiadevs.viora.platform.assistant.domain.services.SamplingSamples.within;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DisplayName("SamplingQuestions: the questions and answers of the sampling summary screen")
 class SamplingQuestionsTest {
@@ -45,8 +46,6 @@ class SamplingQuestionsTest {
     private static final AnswerLanguage EN = new AnswerLanguage("en");
     private static final List<QuestionId> QUESTIONS = List.of(QuestionId.SAMPLING_ENOUGH_TREES,
             QuestionId.SAMPLING_MEANING, QuestionId.SAMPLING_NEXT, QuestionId.SAMPLING_CORRECT_TREE);
-    private static final CatalogText CORRECTION_UNAVAILABLE =
-            CatalogText.of("assistant.reason.tree_correction_unavailable");
     private static final CatalogText SAMPLING_MISSING = CatalogText.of("assistant.reason.sampling_missing");
 
     private final AnswerLocalizer localizer = new AnswerLocalizer(messages());
@@ -77,7 +76,7 @@ class SamplingQuestionsTest {
     }
 
     @Test
-    @DisplayName("catalog with the issued prescription: three questions enabled, correct_tree always disabled")
+    @DisplayName("catalog with the issued prescription: every question enabled")
     void catalogWithPrescription() {
         var questions = QuestionCatalog.questionsFor(sampling(representative(), 0));
 
@@ -90,9 +89,8 @@ class SamplingQuestionsTest {
                 CatalogText.of("assistant.question.sampling.meaning.label"),
                 CatalogText.of("assistant.question.sampling.next.label"),
                 CatalogText.of("assistant.question.sampling.correct_tree.label"));
-        assertThat(questions).extracting(CatalogQuestion::enabled).containsExactly(true, true, true, false);
-        assertThat(questions).extracting(CatalogQuestion::disabledReason)
-                .containsExactly(null, null, null, CORRECTION_UNAVAILABLE);
+        assertThat(questions).extracting(CatalogQuestion::enabled).containsExactly(true, true, true, true);
+        assertThat(questions).extracting(CatalogQuestion::disabledReason).containsExactly(null, null, null, null);
     }
 
     @Test
@@ -101,9 +99,9 @@ class SamplingQuestionsTest {
         for (var facts : List.of(sampling(halfway(3), 2), sampling(unissued(), 0))) {
             var questions = QuestionCatalog.questionsFor(facts);
 
-            assertThat(questions).extracting(CatalogQuestion::enabled).containsExactly(true, false, true, false);
+            assertThat(questions).extracting(CatalogQuestion::enabled).containsExactly(true, false, true, true);
             assertThat(questions).extracting(CatalogQuestion::disabledReason).containsExactly(null,
-                    CatalogText.of("assistant.reason.plan_missing"), null, CORRECTION_UNAVAILABLE);
+                    CatalogText.of("assistant.reason.plan_missing"), null, null);
         }
     }
 
@@ -117,16 +115,46 @@ class SamplingQuestionsTest {
             assertThat(facts.sampled()).isFalse();
             assertThat(questions).noneMatch(CatalogQuestion::enabled);
             assertThat(questions).extracting(CatalogQuestion::disabledReason).containsExactly(
-                    SAMPLING_MISSING, SAMPLING_MISSING, SAMPLING_MISSING, CORRECTION_UNAVAILABLE);
+                    SAMPLING_MISSING, SAMPLING_MISSING, SAMPLING_MISSING, SAMPLING_MISSING);
             assertThat(QUESTIONS).allSatisfy(id -> assertThat(AnswerComposer.compose(id, facts, PLOT)).isEmpty());
         }
     }
 
     @Test
-    @DisplayName("correct_tree has no answer, whatever the sampling")
-    void correctTreeNeverAnswers() {
-        for (var facts : List.of(sampling(representative(), 0), sampling(halfway(3), 2), sampling(done(), 0))) {
-            assertThat(AnswerComposer.compose(QuestionId.SAMPLING_CORRECT_TREE, facts, PLOT)).isEmpty();
+    @DisplayName("correct_tree while the plan is not calculated: register the tree again with the same tag, es and en")
+    void correctTreeWhileOpen() {
+        var facts = sampling(halfway(3), 2);
+        var draft = AnswerComposer.compose(QuestionId.SAMPLING_CORRECT_TREE, facts, PLOT).orElseThrow();
+        var es = localizer.localize(draft, ES);
+        var en = localizer.localize(draft, EN);
+
+        assertThat(es.text()).isEqualTo("Vuelve a registrar el árbol con la misma etiqueta en una ronda nueva: Viora "
+                + "se queda con el último registro de cada árbol y vuelve a calcular la carga con él. Tu muestreo de "
+                + "esta campaña lleva 3 árboles, el último el 31 de octubre.");
+        assertThat(en.text()).isEqualTo("Register the tree again with the same tag in a new round: Viora keeps the "
+                + "latest record of each tree and calculates the load again with it. Your sampling this campaign has "
+                + "3 trees, the latest on October 31.");
+        assertThat(es.facts()).extracting(AnswerFact::value, AnswerFact::label, AnswerFact::pill).containsExactly(
+                tuple("3/5", "árboles muestreados", "faltan 2"),
+                tuple("Abierta", "corrección de árboles", "hasta calcular el plan"));
+        assertThat(draft.actions()).isEmpty();
+        for (var localized : List.of(es, en)) {
+            var language = localized == es ? ES : EN;
+            assertThat(AnswerTextValidator.validate(localized.text(), localized.text(), localized.facts(), language))
+                    .isEqualTo(AnswerTextValidator.Verdict.ACCEPTED);
+        }
+    }
+
+    @Test
+    @DisplayName("correct_tree once the plan is calculated: no more rounds, check it with the technician")
+    void correctTreeOnceCalculated() {
+        for (var facts : List.of(sampling(representative(), 0), sampling(done(), 0))) {
+            var es = localizer.localize(AnswerComposer.compose(QuestionId.SAMPLING_CORRECT_TREE, facts, PLOT)
+                    .orElseThrow(), ES);
+            assertThat(es.text()).isEqualTo("Tu plan de aclareo ya se calculó con los 5 árboles muestreados, así que "
+                    + "el muestreo ya no acepta rondas nuevas ni correcciones. Si un árbol quedó mal registrado, "
+                    + "revísalo con tu técnico antes de aclarear.");
+            assertThat(es.facts()).extracting(AnswerFact::value).containsExactly("5/5", "Cerrada");
         }
     }
 
@@ -435,8 +463,8 @@ class SamplingQuestionsTest {
                 }
             }
         }
-        // enough_trees: 3, meaning: 2, next: 6
-        assertThat(variants).hasSize(11);
+        // enough_trees: 3, meaning: 2, next: 6, correct_tree: 2 (open and closed)
+        assertThat(variants).hasSize(13);
     }
 
     @Test

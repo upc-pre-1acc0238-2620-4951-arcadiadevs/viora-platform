@@ -12,9 +12,12 @@ import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.Deactivate
 import com.arcadiadevs.viora.platform.telemetry.domain.model.commands.RegisterIoTDeviceCommand;
 import com.arcadiadevs.viora.platform.telemetry.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.telemetry.domain.repositories.IoTDeviceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
 
 /**
  * Application service implementation orchestrating IoT device mutation use cases.
@@ -26,6 +29,7 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
     private final IoTDeviceRepository ioTDeviceRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ExternalOrchardService externalOrchardService;
+    private final Clock clock;
 
     /**
      * Constructs the IoTDeviceCommandServiceImpl with required dependencies.
@@ -39,6 +43,24 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
             ApplicationEventPublisher eventPublisher,
             ExternalOrchardService externalOrchardService
     ) {
+        this(ioTDeviceRepository, eventPublisher, externalOrchardService, Clock.systemUTC());
+    }
+
+    /**
+     * Constructs the service with the clock that dates the pauses.
+     *
+     * @param ioTDeviceRepository    the domain device repository port
+     * @param eventPublisher         the Spring application event publisher
+     * @param externalOrchardService the outbound ACL service for orchard verifications
+     * @param clock                  the application clock
+     */
+    @Autowired
+    public IoTDeviceCommandServiceImpl(
+            IoTDeviceRepository ioTDeviceRepository,
+            ApplicationEventPublisher eventPublisher,
+            ExternalOrchardService externalOrchardService,
+            Clock clock
+    ) {
         if (ioTDeviceRepository == null) {
             throw new IllegalArgumentException("device.repository.null");
         }
@@ -51,6 +73,7 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
         this.ioTDeviceRepository = ioTDeviceRepository;
         this.eventPublisher = eventPublisher;
         this.externalOrchardService = externalOrchardService;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     @Override
@@ -136,6 +159,22 @@ public class IoTDeviceCommandServiceImpl implements IoTDeviceCommandService {
                     : null;
 
             device.calibrateOffset(multiplier, texture, depth, command.expectedRevision());
+
+            // The app sends the name and "Transmitir lecturas" with the same save
+            if (command.name() != null && !command.name().isBlank()) {
+                var newName = new DeviceName(command.name());
+                if (!newName.equals(device.snapshot().name())) {
+                    if (ioTDeviceRepository.existsByNameAndPlotId(newName, plotId)) {
+                        return Result.failure(ApplicationError.conflict("device", "device.name.duplicate"));
+                    }
+                    device.rename(newName);
+                }
+            }
+            if (Boolean.FALSE.equals(command.transmitting())) {
+                device.pause(clock.instant());
+            } else if (Boolean.TRUE.equals(command.transmitting())) {
+                device.resume();
+            }
 
             var savedDevice = ioTDeviceRepository.save(device);
 

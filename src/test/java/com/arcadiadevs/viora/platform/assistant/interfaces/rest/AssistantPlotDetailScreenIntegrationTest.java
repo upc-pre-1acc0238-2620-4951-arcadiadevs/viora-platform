@@ -120,14 +120,14 @@ class AssistantPlotDetailScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[2].icon").value("fruit"))
                 .andExpect(jsonPath("$.questions[2].enabled").value(true))
                 .andExpect(jsonPath("$.questions[3].questionId").value("plot.next_year_harvest"))
-                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé en %d?".formatted(year + 1)))
+                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé esta campaña?"))
                 .andExpect(jsonPath("$.questions[3].icon").value("harvest"))
                 .andExpect(jsonPath("$.questions[3].enabled").value(false))
                 .andExpect(jsonPath("$.questions[3].disabledReason")
                         .value("Faltan datos de calibre · registra un muestreo"));
         catalog(plotId, "en")
                 .andExpect(jsonPath("$.questions[0].label").value("How is this plot doing?"))
-                .andExpect(jsonPath("$.questions[3].label").value("How much will I harvest in %d?".formatted(year + 1)))
+                .andExpect(jsonPath("$.questions[3].label").value("How much will I harvest this campaign?"))
                 .andExpect(jsonPath("$.questions[3].disabledReason")
                         .value("Caliber data is missing · record a sampling"));
 

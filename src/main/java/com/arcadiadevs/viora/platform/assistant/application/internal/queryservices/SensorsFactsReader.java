@@ -53,6 +53,6 @@ public class SensorsFactsReader implements ScreenFactsReader {
         var lastReadingOn = sensors.readAt() == null
                 ? null : LocalDate.ofInstant(sensors.readAt(), ProducerTimeZone.ZONE);
         return new SensorsFacts(sensors.nodes(), recent ? sensors.reading() : null,
-                new ClimateData.Coverage(lastReadingOn, days, COVERAGE_DAYS));
+                new ClimateData.Coverage(lastReadingOn, days, COVERAGE_DAYS), sensors.pausedNodes());
     }
 }

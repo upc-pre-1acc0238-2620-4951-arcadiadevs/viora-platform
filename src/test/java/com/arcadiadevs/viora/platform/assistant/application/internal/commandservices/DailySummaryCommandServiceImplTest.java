@@ -34,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -84,7 +85,8 @@ class DailySummaryCommandServiceImplTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         service = new DailySummaryCommandServiceImpl(subscriptions, orchard, factsAssembler, repository,
-                new AnswerLocalizer(messages), new AnswerTextChooser(writer), rateLimiter, CLOCK);
+                new AnswerLocalizer(messages), new AnswerTextChooser(writer), rateLimiter, CLOCK,
+                Duration.ofMinutes(10));
     }
 
     @Test
@@ -164,16 +166,33 @@ class DailySummaryCommandServiceImplTest {
     }
 
     @Test
-    @DisplayName("a stored summary that fell back to its template is not served again: the model is tried again")
+    @DisplayName("a stored summary that fell back to its template past the pause is not served again: the model is tried again")
     void fallbackIsNotServedAgain() {
         givenActivePlan();
         when(factsAssembler.assemble(ScreenKey.HOME, producerId, null)).thenReturn(field(openPlot()));
-        when(repository.findCurrent(anyString(), any(), any(), any(), any())).thenReturn(Optional.of(stored(true)));
+        when(repository.findCurrent(anyString(), any(), any(), any(), any()))
+                .thenReturn(Optional.of(stored(true, NOW.minusSeconds(3600))));
 
         var outcome = service.handle(command(null, AnswerLanguage.SPANISH, false)).success().orElseThrow();
 
         assertThat(outcome.created()).isTrue();
         verify(repository).save(outcome.summary());
+    }
+
+    @Test
+    @DisplayName("a summary that fell back to its template within the pause is served again without spending the limit")
+    void fallbackIsServedDuringThePause() {
+        givenActivePlan();
+        when(factsAssembler.assemble(ScreenKey.HOME, producerId, null)).thenReturn(field(openPlot()));
+        var fallback = stored(true, NOW.minusSeconds(300));
+        when(repository.findCurrent(anyString(), any(), any(), any(), any())).thenReturn(Optional.of(fallback));
+
+        var outcome = service.handle(command(null, AnswerLanguage.SPANISH, false)).success().orElseThrow();
+
+        assertThat(outcome.created()).isFalse();
+        assertThat(outcome.summary()).isEqualTo(fallback);
+        verify(repository, never()).save(any());
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyBoolean(), any());
     }
 
     @Test
@@ -290,10 +309,14 @@ class DailySummaryCommandServiceImplTest {
     }
 
     private DailySummary stored(boolean fallback) {
+        return stored(fallback, NOW.minusSeconds(3600));
+    }
+
+    private DailySummary stored(boolean fallback, Instant createdAt) {
         var card = new AnswerFact("1", "a", "b", FactTone.PRIMARY);
         return new DailySummary(DailySummaryId.generate(), producerId, null, AnswerLanguage.SPANISH,
                 new DataVersion("sha256:abc"), "Resumen guardado", List.of(card, card, card), List.of(),
-                fallback ? "GROQ" : AssistantAnswer.TEMPLATE, null, fallback, null, null, NOW.minusSeconds(3600));
+                fallback ? "GROQ" : AssistantAnswer.TEMPLATE, null, fallback, null, null, createdAt);
     }
 
     /** A plot with the thinning window open 20 Oct - 10 Nov, 30 % to remove, nothing else read. */

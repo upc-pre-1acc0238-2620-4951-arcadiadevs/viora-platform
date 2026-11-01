@@ -45,9 +45,8 @@ public final class SamplingQuestions {
 
     /**
      * Evaluates the questions of the screen against the figures of the plot. Every question needs a tree sampled this
-     * campaign; what the load means needs the issued prescription. {@code correct_tree} is always disabled: Thinning
-     * cannot correct a sampled tree yet, and sampling it again adds its counts to the load a second time
-     * (docs/asistente-decisiones.md, Pantalla Resumen de muestreo).
+     * campaign; what the load means needs the issued prescription. {@code correct_tree} says how a tree is corrected
+     * while the sampling is open, and that it no longer can once the plan is calculated.
      *
      * @param facts the figures of the plot
      * @return the questions in display order
@@ -66,11 +65,11 @@ public final class SamplingQuestions {
                 question(QuestionId.SAMPLING_NEXT, label(QuestionId.SAMPLING_NEXT, "label"), "calendar",
                         samplingMissing),
                 question(QuestionId.SAMPLING_CORRECT_TREE, label(QuestionId.SAMPLING_CORRECT_TREE, "label"),
-                        "pruning", CatalogText.of("assistant.reason.tree_correction_unavailable")));
+                        "pruning", samplingMissing));
     }
 
     /**
-     * Writes the answer to a question of the screen. {@code correct_tree} has no answer.
+     * Writes the answer to a question of the screen.
      *
      * @param questionId the question
      * @param facts      the figures of the plot
@@ -87,6 +86,8 @@ public final class SamplingQuestions {
             return meaning(facts);
         } else if (questionId.equals(QuestionId.SAMPLING_NEXT)) {
             return Optional.of(next(facts, plotId));
+        } else if (questionId.equals(QuestionId.SAMPLING_CORRECT_TREE)) {
+            return Optional.of(correctTree(facts));
         }
         return Optional.empty();
     }
@@ -177,6 +178,31 @@ public final class SamplingQuestions {
         };
         return new AnswerDraft(text, List.of(treesCard(plan, facts.treesNeeded()), state.card(today, plan)),
                 samplingSource(plan), actions);
+    }
+
+    /**
+     * "¿Cómo corrijo un árbol?": Thinning keeps the latest record of each tree tag, so while the plan is not
+     * calculated a tree is corrected by registering it again with the same tag in a new round. Once the plan is
+     * calculated Thinning refuses new rounds, and the answer says so instead of a step that would fail.
+     */
+    private static AnswerDraft correctTree(SamplingFacts facts) {
+        var q = "sampling.correct_tree";
+        var plan = facts.plan();
+        boolean open = !plan.issued();
+        final CatalogText text;
+        if (open) {
+            text = plan.lastSampledOn() == null
+                    ? text(q, "text.open_undated", plan.sampledTrees())
+                    : text(q, "text.open", plan.sampledTrees(), TextDate.of(plan.lastSampledOn()));
+        } else {
+            text = text(q, "text.closed", plan.sampledTrees());
+        }
+        return new AnswerDraft(text, List.of(treesCard(plan, facts.treesNeeded()),
+                new FactDraft(shared(open ? "card.correction_open.value" : "card.correction_closed.value"),
+                        shared("card.correction.label"),
+                        shared(open ? "card.correction_open.pill" : "card.correction_closed.pill"),
+                        FactTone.HIGHLIGHT)),
+                samplingSource(plan), List.of());
     }
 
     /** "5/5 · árboles muestreados · muestra representativa" or "… · faltan 2". */

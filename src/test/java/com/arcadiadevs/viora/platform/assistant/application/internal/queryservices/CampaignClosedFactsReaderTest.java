@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSettlementService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CampaignClosedFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
@@ -12,10 +13,13 @@ import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextF
 import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade.PlotBearingIndex;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.ThinningOutcome;
+import com.arcadiadevs.viora.platform.settlement.interfaces.acl.SettlementContextFacade;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 
@@ -37,9 +41,10 @@ class CampaignClosedFactsReaderTest {
     private final PhenologyContextFacade phenology = mock(PhenologyContextFacade.class);
     private final ThinningContextFacade thinning = mock(ThinningContextFacade.class);
     private final OrchardContextFacade orchard = mock(OrchardContextFacade.class);
+    private final SettlementContextFacade settlement = mock(SettlementContextFacade.class);
     private final CampaignClosedFactsReader reader = new CampaignClosedFactsReader(
             new ExternalPhenologyService(phenology), new ExternalThinningService(thinning),
-            new ExternalOrchardService(orchard));
+            new ExternalOrchardService(orchard), new ExternalSettlementService(settlement));
 
     @Test
     @DisplayName("the harvests, the bearing index, the area and the thinning of the latest harvested campaign")
@@ -52,6 +57,9 @@ class CampaignClosedFactsReaderTest {
                 "OPTIMAL", 0.57, 0.4, 0.4, "BALANCED", 9100.0, 8200.0, "CALIBER_ADJUSTED", 3, "PROVISIONAL", 14,
                 49)));
         when(orchard.findPlotAreaHectares(PLOT)).thenReturn(Optional.of(1.5));
+        when(settlement.findSettledCalibers(PLOT)).thenReturn(List.of(
+                new SettlementContextFacade.SettledCaliber(2024, 205.6, "201/220"),
+                new SettlementContextFacade.SettledCaliber(2025, 180.4, "171/190")));
 
         var facts = (CampaignClosedFacts) reader.read(new PlotId(PLOT), 2026);
 
@@ -64,6 +72,9 @@ class CampaignClosedFactsReaderTest {
         assertThat(facts.outcome()).isEqualTo(new ThinningOutcomeData(EXECUTED, 30.0, "OPTIMAL", 0.57, 0.4, 0.4,
                 "BALANCED", 9100.0, 8200.0, "CALIBER_ADJUSTED", 3, "PROVISIONAL", 14, 49));
         assertThat(facts.areaHectares()).isEqualTo(1.5);
+        assertThat(facts.calibers()).containsExactly(
+                Map.entry(2024, new CampaignClosedFacts.SettledCaliber(205.6, "201/220")),
+                Map.entry(2025, new CampaignClosedFacts.SettledCaliber(180.4, "171/190")));
         verify(thinning, never()).findThinningOutcome(PLOT, 2026);
     }
 

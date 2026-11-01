@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.telemetry.interfaces.acl.TelemetryContextF
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -89,11 +90,15 @@ public class ExternalTelemetryService {
                 .map(node -> new ClimateData.SensorNode(node.type(), node.depthCm(), node.simulated(),
                         node.criticalMoisturePercent(), node.warningMoisturePercent(), node.moistureRisk()))
                 .toList();
+        var paused = sensors.pausedNodes().stream()
+                .map(node -> new ClimateData.PausedNode(node.type(), node.depthCm(),
+                        LocalDate.ofInstant(node.pausedAt(), ProducerTimeZone.ZONE)))
+                .toList();
         var latest = sensors.latestReading();
         return latest == null
-                ? new Sensors(nodes, null, null)
+                ? new Sensors(nodes, null, null, paused)
                 : new Sensors(nodes, new ClimateData.Reading(latest.temperatureCelsius(), latest.relativeHumidity(),
-                        latest.soilMoisturePercent()), latest.readAt());
+                        latest.soilMoisturePercent()), latest.readAt(), paused);
     }
 
     /**
@@ -115,6 +120,16 @@ public class ExternalTelemetryService {
      * @param reading the latest reading; null without one
      * @param readAt  hour of the reading; null without one
      */
-    public record Sensors(List<ClimateData.SensorNode> nodes, ClimateData.Reading reading, Instant readAt) {
+    public record Sensors(List<ClimateData.SensorNode> nodes, ClimateData.Reading reading, Instant readAt,
+                          List<ClimateData.PausedNode> pausedNodes) {
+
+        public Sensors {
+            pausedNodes = pausedNodes == null ? List.of() : List.copyOf(pausedNodes);
+        }
+
+        /** The nodes and the latest reading, without paused nodes. */
+        public Sensors(List<ClimateData.SensorNode> nodes, ClimateData.Reading reading, Instant readAt) {
+            this(nodes, reading, readAt, List.of());
+        }
     }
 }

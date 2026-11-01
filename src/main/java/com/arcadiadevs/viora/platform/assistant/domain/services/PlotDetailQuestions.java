@@ -51,7 +51,7 @@ public final class PlotDetailQuestions {
                 question(QuestionId.PLOT_LAST_SAMPLING, label(QuestionId.PLOT_LAST_SAMPLING, "label"), "fruit",
                         facts.sampled() ? null : CatalogText.of("assistant.reason.sampling_missing")),
                 question(QuestionId.PLOT_NEXT_YEAR_HARVEST,
-                        label(QuestionId.PLOT_NEXT_YEAR_HARVEST, "label", String.valueOf(facts.campaignYear() + 1)),
+                        label(QuestionId.PLOT_NEXT_YEAR_HARVEST, "label"),
                         "harvest", plan != null && plan.caliberEstimated()
                                 ? null : CatalogText.of("assistant.reason.caliber_missing")));
     }

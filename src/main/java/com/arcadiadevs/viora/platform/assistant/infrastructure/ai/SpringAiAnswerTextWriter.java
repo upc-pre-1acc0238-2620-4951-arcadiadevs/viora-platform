@@ -37,7 +37,9 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
             - Nunca calcules, redondees, conviertas ni agregues cifras.
             - No agregues consejos, dosis, riego, productos, promesas ni fechas que no estén en el TEXTO BASE.
             - Conserva el sentido y la cautela del TEXTO BASE: si dice "tiende a", "puede" o "se espera", mantenlo.
-            - Nunca conviertas una tendencia en una certeza.
+            - Nunca conviertas una tendencia en una certeza: si dice "llegaría" o "podría", no escribas "llegará".
+            - No agregues juicios ni valoraciones (bueno, malo, mejora, preocupante) que no estén en el TEXTO BASE.
+            - Di "aclarear" y "aclareo" para quitar frutos; nunca "aclarar".
             - Solo texto plano: sin listas, sin markdown, sin comillas, sin saludo ni despedida.
             - Máximo 280 caracteres. Si dudas, devuelve el TEXTO BASE tal cual.""";
 
@@ -50,7 +52,8 @@ public class SpringAiAnswerTextWriter implements AnswerTextWriter {
             - Never calculate, round, convert or add a number.
             - Do not add advice, doses, irrigation, products, promises or dates that are not in BASE TEXT.
             - Keep the meaning and the caution of BASE TEXT: if it says "tends to", "can" or "is expected", keep it.
-            - Never turn a tendency into a certainty.
+            - Never turn a tendency into a certainty: if it says "would" or "could", do not write "will".
+            - Do not add judgments or ratings (good, bad, improvement, worrying) that are not in BASE TEXT.
             - Plain text only: no lists, no markdown, no quotes, no greeting, no sign-off.
             - At most 280 characters. When in doubt, return BASE TEXT unchanged.""";
 
