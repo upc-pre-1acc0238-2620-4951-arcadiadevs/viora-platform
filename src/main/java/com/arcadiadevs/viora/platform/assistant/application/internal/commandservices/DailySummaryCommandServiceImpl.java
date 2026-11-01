@@ -20,9 +20,11 @@ import com.arcadiadevs.viora.platform.assistant.domain.services.DailySummaryText
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -35,8 +37,10 @@ import java.time.LocalDate;
  * plots), the stored summary of the day with the same figures and language, and only then a new summary, which on
  * demand spends one answer of the producer's limit; the daily job never spends it. A summary is "of the day" while it
  * was written since midnight in Lima and its figures have not changed; one whose figures changed is written again,
- * never served as current. As with the answers, a summary that fell back to its template is not served again, so the
- * next request tries the model again.</p>
+ * never served as current. A summary that fell back to its template is served again only for a short pause
+ * ({@code viora.assistant.daily-summary.fallback-retry-after}, 10 minutes): after it the next request tries the
+ * model again. Without the pause, every visit to the home screen while the model is down would write a new summary
+ * and spend one answer of the producer's limit.</p>
  */
 @Service
 public class DailySummaryCommandServiceImpl implements DailySummaryCommandService {
@@ -52,6 +56,7 @@ public class DailySummaryCommandServiceImpl implements DailySummaryCommandServic
     private final AnswerTextChooser textChooser;
     private final AnswerRateLimiter rateLimiter;
     private final Clock clock;
+    private final Duration fallbackRetryAfter;
 
     /**
      * Constructs the command service.
@@ -64,6 +69,8 @@ public class DailySummaryCommandServiceImpl implements DailySummaryCommandServic
      * @param textChooser                 keeps the text of the model or the template
      * @param rateLimiter                 limits the new answers of a producer
      * @param clock                       the application clock
+     * @param fallbackRetryAfter          how long a summary that fell back to its template is served before the
+     *                                    model is tried again
      */
     public DailySummaryCommandServiceImpl(ExternalSubscriptionService externalSubscriptionService,
                                           ExternalOrchardService externalOrchardService,
@@ -72,7 +79,12 @@ public class DailySummaryCommandServiceImpl implements DailySummaryCommandServic
                                           AnswerLocalizer localizer,
                                           AnswerTextChooser textChooser,
                                           AnswerRateLimiter rateLimiter,
-                                          Clock clock) {
+                                          Clock clock,
+                                          @Value("${viora.assistant.daily-summary.fallback-retry-after:PT10M}")
+                                          Duration fallbackRetryAfter) {
+        if (fallbackRetryAfter == null || fallbackRetryAfter.isNegative()) {
+            throw new IllegalArgumentException("assistant.daily_summary.fallback_retry_after");
+        }
         this.externalSubscriptionService = externalSubscriptionService;
         this.externalOrchardService = externalOrchardService;
         this.factsAssembler = factsAssembler;
@@ -81,6 +93,7 @@ public class DailySummaryCommandServiceImpl implements DailySummaryCommandServic
         this.textChooser = textChooser;
         this.rateLimiter = rateLimiter;
         this.clock = clock;
+        this.fallbackRetryAfter = fallbackRetryAfter;
     }
 
     @Override
@@ -107,8 +120,9 @@ public class DailySummaryCommandServiceImpl implements DailySummaryCommandServic
         var now = clock.instant();
         var stored = repository.findCurrent(command.producerId(), command.plotId(), command.language(), version,
                         startOfTodayInLima(now))
-                // A summary that fell back to its template is not served again, so the next request tries the model
-                .filter(summary -> !summary.fallback());
+                // A summary that fell back to its template is served only during the pause, then the model is tried
+                .filter(summary -> !summary.fallback()
+                        || summary.createdAt().isAfter(now.minus(fallbackRetryAfter)));
         if (stored.isPresent()) {
             return Result.success(new Outcome(stored.get(), false));
         }
