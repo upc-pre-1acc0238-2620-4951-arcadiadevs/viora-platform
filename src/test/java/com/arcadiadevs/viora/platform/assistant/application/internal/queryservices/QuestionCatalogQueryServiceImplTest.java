@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSettlementService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
@@ -54,6 +55,8 @@ class QuestionCatalogQueryServiceImplTest {
     private ExternalThinningService externalThinningService;
     @Mock
     private ExternalTelemetryService externalTelemetryService;
+    @Mock
+    private ExternalSettlementService externalSettlementService;
 
     private QuestionCatalogQueryServiceImpl queryService;
 
@@ -76,7 +79,7 @@ class QuestionCatalogQueryServiceImplTest {
                 new SamplingFactsReader(externalThinningService, CLOCK),
                 new ThinningDoneFactsReader(externalThinningService),
                 new CampaignClosedFactsReader(externalPhenologyService, externalThinningService,
-                        externalOrchardService)), CLOCK);
+                        externalOrchardService, externalSettlementService)), CLOCK);
         queryService = new QuestionCatalogQueryServiceImpl(externalSubscriptionService, externalOrchardService,
                 factsAssembler);
     }

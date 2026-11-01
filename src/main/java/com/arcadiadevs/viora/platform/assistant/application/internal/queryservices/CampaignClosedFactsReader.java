@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSettlementService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CampaignClosedFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
@@ -21,6 +22,7 @@ public class CampaignClosedFactsReader implements ScreenFactsReader {
     private final ExternalPhenologyService externalPhenologyService;
     private final ExternalThinningService externalThinningService;
     private final ExternalOrchardService externalOrchardService;
+    private final ExternalSettlementService externalSettlementService;
 
     /**
      * Constructs the reader.
@@ -28,13 +30,16 @@ public class CampaignClosedFactsReader implements ScreenFactsReader {
      * @param externalPhenologyService reads the harvests and the bearing index
      * @param externalThinningService  reads the thinning of the closed campaign
      * @param externalOrchardService   reads the area of the plot
+     * @param externalSettlementService reads the caliber of each settled campaign
      */
     public CampaignClosedFactsReader(ExternalPhenologyService externalPhenologyService,
                                      ExternalThinningService externalThinningService,
-                                     ExternalOrchardService externalOrchardService) {
+                                     ExternalOrchardService externalOrchardService,
+                                     ExternalSettlementService externalSettlementService) {
         this.externalPhenologyService = externalPhenologyService;
         this.externalThinningService = externalThinningService;
         this.externalOrchardService = externalOrchardService;
+        this.externalSettlementService = externalSettlementService;
     }
 
     @Override
@@ -54,6 +59,7 @@ public class CampaignClosedFactsReader implements ScreenFactsReader {
                 bearing.map(PlotBearingIndex::value).orElse(null),
                 bearing.map(PlotBearingIndex::category).orElse(null),
                 externalThinningService.findThinningOutcome(plotId, yields.lastKey()).orElse(null),
-                externalOrchardService.findAreaHectares(plotId).orElse(null));
+                externalOrchardService.findAreaHectares(plotId).orElse(null),
+                externalSettlementService.findSettledCalibers(plotId));
     }
 }

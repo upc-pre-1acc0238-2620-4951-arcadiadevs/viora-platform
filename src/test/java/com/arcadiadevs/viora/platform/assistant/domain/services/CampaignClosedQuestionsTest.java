@@ -3,7 +3,9 @@ package com.arcadiadevs.viora.platform.assistant.domain.services;
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFact;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerSource;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CampaignClosedFacts;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CampaignClosedFacts.SettledCaliber;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
@@ -16,6 +18,7 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -33,8 +36,9 @@ class CampaignClosedQuestionsTest {
     private static final PlotId PLOT = new PlotId(UUID.randomUUID().toString());
     private static final List<QuestionId> QUESTIONS = List.of(QuestionId.CAMPAIGN_VS_PREVIOUS,
             QuestionId.CAMPAIGN_CALIBER_CHANGE, QuestionId.CAMPAIGN_PLAN_NEXT);
+    /** The closed campaign 2025 of the samples was not settled with a caliber. */
     private static final CatalogText CALIBER_REASON =
-            CatalogText.of("assistant.reason.caliber_history_unavailable");
+            CatalogText.of("assistant.reason.caliber_not_settled", "2025");
 
     private final AnswerLocalizer localizer = new AnswerLocalizer(messages());
 
@@ -54,7 +58,7 @@ class CampaignClosedQuestionsTest {
 
     @Test
     @DisplayName("catalog with history: three questions in contract order, labels name the closed and next years, "
-            + "caliber_change always disabled")
+            + "caliber_change disabled until the closed campaign is settled")
     void catalogWithHistory() {
         var facts = closed(contractHarvests(), 0.5123, "MODERATE_ALTERNATION", outcome("OPTIMAL", 14, 49), 1.5);
         var questions = QuestionCatalog.questionsFor(facts);
@@ -76,9 +80,9 @@ class CampaignClosedQuestionsTest {
                 .containsExactly("How did the 2025 campaign go against the earlier ones?",
                         "Did the caliber change against other campaigns?", "What do I plan for the 2026 campaign?");
         assertThat(localizer.resolve(questions.get(1).disabledReason(), Locale.forLanguageTag("es")))
-                .isEqualTo("El calibre de cada campaña aún no llega al asistente");
+                .isEqualTo("Liquida la cosecha 2025 para conocer su calibre");
         assertThat(localizer.resolve(questions.get(1).disabledReason(), Locale.ENGLISH))
-                .isEqualTo("The caliber of each campaign does not reach the assistant yet");
+                .isEqualTo("Settle the 2025 harvest to know its caliber");
     }
 
     @Test
@@ -113,7 +117,8 @@ class CampaignClosedQuestionsTest {
             assertThat(questions).extracting(CatalogQuestion::icon).containsExactly("history", "fruit", "calendar");
             assertThat(questions).noneMatch(CatalogQuestion::enabled);
             assertThat(questions).extracting(CatalogQuestion::disabledReason).containsExactly(
-                    CatalogText.of("assistant.reason.harvest_missing"), CALIBER_REASON,
+                    CatalogText.of("assistant.reason.harvest_missing"),
+                    CatalogText.of("assistant.reason.harvest_missing"),
                     CatalogText.of("assistant.reason.harvest_missing"));
             assertThat(questions).extracting(q -> localizer.resolve(q.label(), Locale.forLanguageTag("es")))
                     .containsExactly("¿Cómo fue mi campaña frente a las anteriores?",
@@ -132,12 +137,80 @@ class CampaignClosedQuestionsTest {
     }
 
     @Test
-    @DisplayName("caliber_change is never answered, and a question of another screen is not either")
-    void caliberChangeNeverAnswered() {
+    @DisplayName("caliber_change without settled calibers is not answered, and a question of another screen is not either")
+    void caliberChangeNeedsSettledCalibers() {
         var facts = closed(contractHarvests(), 0.5123, "MODERATE_ALTERNATION", outcome("OPTIMAL", 14, 49), 1.5);
 
         assertThat(AnswerComposer.compose(QuestionId.CAMPAIGN_CALIBER_CHANGE, facts, PLOT)).isEmpty();
         assertThat(CampaignClosedQuestions.answer(QuestionId.CHILL_MISSING, facts)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("caliber_change waits for an earlier settled campaign when only the closed one has its caliber")
+    void caliberChangeNeedsAnEarlierCaliber() {
+        var facts = withCalibers(Map.of(2025, new SettledCaliber(180.4, "171/190")));
+        var caliber = QuestionCatalog.questionsFor(facts).get(1);
+
+        assertThat(caliber.enabled()).isFalse();
+        assertThat(localizer.resolve(caliber.disabledReason(), Locale.forLanguageTag("es")))
+                .isEqualTo("Falta el calibre liquidado de una campaña anterior");
+        assertThat(localizer.resolve(caliber.disabledReason(), Locale.ENGLISH))
+                .isEqualTo("The settled caliber of an earlier campaign is missing");
+        assertThat(AnswerComposer.compose(QuestionId.CAMPAIGN_CALIBER_CHANGE, facts, PLOT)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("caliber_change: fewer fruits per kilo than the latest earlier settlement is bigger fruit, es and en")
+    void caliberChangeBigger() {
+        // 2023 is older than 2024: the comparison is with the latest earlier settlement
+        var facts = withCalibers(Map.of(2023, new SettledCaliber(150.0, "141/160"),
+                2024, new SettledCaliber(205.6, "201/220"), 2025, new SettledCaliber(180.4, "171/190")));
+
+        assertThat(QuestionCatalog.questionsFor(facts).get(1).enabled()).isTrue();
+        var draft = AnswerComposer.compose(QuestionId.CAMPAIGN_CALIBER_CHANGE, facts, PLOT).orElseThrow();
+        var es = localizer.localize(draft, AnswerLanguage.SPANISH);
+        var en = localizer.localize(draft, new AnswerLanguage("en"));
+
+        assertThat(es.text()).isEqualTo("Tu campaña 2025 se liquidó con 180 frutos por kilo (171/190) y la de 2024 "
+                + "con 206 (201/220). En 2025 la fruta salió más grande: entraron menos frutos en cada kilo.");
+        assertThat(en.text()).isEqualTo("Your 2025 campaign was settled at 180 fruits per kilo (171/190) and the 2024 "
+                + "one at 206 (201/220). In 2025 the fruit came out bigger: fewer fruits went into each kilo.");
+        assertThat(es.facts()).extracting(AnswerFact::value).containsExactly("180", "206");
+        assertThat(es.facts()).extracting(AnswerFact::label)
+                .containsExactly("frutos por kilo · 2025", "frutos por kilo · 2024");
+        assertThat(es.facts()).extracting(AnswerFact::pill).containsExactly("calibre 171/190", "calibre 201/220");
+        assertThat(es.sources()).extracting(AnswerSource::label)
+                .containsExactly("Basado en tus liquidaciones de 2025 y 2024");
+        for (var localized : List.of(es, en)) {
+            var language = localized == es ? AnswerLanguage.SPANISH : new AnswerLanguage("en");
+            assertThat(AnswerTextValidator.validate(localized.text(), localized.text(), localized.facts(), language))
+                    .isEqualTo(AnswerTextValidator.Verdict.ACCEPTED);
+        }
+    }
+
+    @Test
+    @DisplayName("caliber_change: more fruits per kilo is smaller fruit; the same whole figure held; no grade is said")
+    void caliberChangeSmallerAndEqual() {
+        var smaller = withCalibers(Map.of(2024, new SettledCaliber(170.0, "161/180"),
+                2025, new SettledCaliber(195.2, null)));
+        var es = localizer.localize(AnswerComposer.compose(QuestionId.CAMPAIGN_CALIBER_CHANGE, smaller, PLOT)
+                .orElseThrow(), AnswerLanguage.SPANISH);
+        assertThat(es.text()).isEqualTo("Tu campaña 2025 se liquidó con 195 frutos por kilo y la de 2024 con 170 "
+                + "(161/180). En 2025 la fruta salió más pequeña: entraron más frutos en cada kilo.");
+        assertThat(es.facts()).extracting(AnswerFact::pill).containsExactly("liquidado", "calibre 161/180");
+
+        var equal = withCalibers(Map.of(2024, new SettledCaliber(180.2, "171/190"),
+                2025, new SettledCaliber(179.8, "171/190")));
+        var en = localizer.localize(AnswerComposer.compose(QuestionId.CAMPAIGN_CALIBER_CHANGE, equal, PLOT)
+                .orElseThrow(), new AnswerLanguage("en"));
+        assertThat(en.text()).isEqualTo("Your 2025 campaign was settled at 180 fruits per kilo (171/190), the same as "
+                + "the 2024 one (171/190). The caliber held between the two campaigns.");
+    }
+
+    /** The harvests of the contract (closed campaign 2025) with the given settled calibers. */
+    private static CampaignClosedFacts withCalibers(Map<Integer, SettledCaliber> calibers) {
+        return new CampaignClosedFacts(contractHarvests(), 0.5123, "MODERATE_ALTERNATION",
+                outcome("OPTIMAL", 14, 49), 1.5, new TreeMap<>(calibers));
     }
 
     @Test

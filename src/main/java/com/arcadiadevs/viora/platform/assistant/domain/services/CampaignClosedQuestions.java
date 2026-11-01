@@ -40,16 +40,16 @@ public final class CampaignClosedQuestions {
 
     /**
      * Evaluates the questions of the screen against the figures of the plot. Without a harvest nothing can be
-     * answered; the comparison also needs an earlier campaign. {@code caliber_change} is always disabled: no context
-     * the assistant reads has the caliber of each campaign (docs/asistente-decisiones.md, Pantalla Campaña cerrada).
+     * answered; the comparison also needs an earlier campaign. {@code caliber_change} needs the caliber the mill
+     * weighed for the closed campaign and for an earlier one, both recorded when the harvest was settled.
      *
      * @param facts the figures of the plot
      * @return the questions in display order
      */
     public static List<CatalogQuestion> catalog(CampaignClosedFacts facts) {
-        var caliber = question(QuestionId.CAMPAIGN_CALIBER_CHANGE, label(QuestionId.CAMPAIGN_CALIBER_CHANGE, "label"),
-                "fruit", CatalogText.of("assistant.reason.caliber_history_unavailable"));
         var closed = facts.closedCampaignYear();
+        var caliber = question(QuestionId.CAMPAIGN_CALIBER_CHANGE, label(QuestionId.CAMPAIGN_CALIBER_CHANGE, "label"),
+                "fruit", caliberMissing(facts));
         if (closed.isEmpty()) {
             var missing = CatalogText.of("assistant.reason.harvest_missing");
             return List.of(
@@ -71,7 +71,7 @@ public final class CampaignClosedQuestions {
     }
 
     /**
-     * Writes the answer to a question of the screen. {@code caliber_change} has no answer.
+     * Writes the answer to a question of the screen.
      *
      * @param questionId the question
      * @param facts      the figures of the plot
@@ -80,6 +80,8 @@ public final class CampaignClosedQuestions {
     public static Optional<AnswerDraft> answer(QuestionId questionId, CampaignClosedFacts facts) {
         if (questionId.equals(QuestionId.CAMPAIGN_VS_PREVIOUS)) {
             return versusPrevious(facts);
+        } else if (questionId.equals(QuestionId.CAMPAIGN_CALIBER_CHANGE)) {
+            return caliberChange(facts);
         } else if (questionId.equals(QuestionId.CAMPAIGN_PLAN_NEXT)) {
             return planNext(facts);
         }
@@ -139,6 +141,67 @@ public final class CampaignClosedQuestions {
                 new FactDraft(shared(valueKey, difference), shared("card.vs_average.label"),
                         shared("card.previous.pill", previous), FactTone.HIGHLIGHT)),
                 source, List.of()));
+    }
+
+    /**
+     * Why {@code caliber_change} cannot be answered yet: the closed campaign has no recorded harvest, it was not
+     * settled with a caliber, or no earlier campaign was; null when it can be answered.
+     */
+    private static CatalogText caliberMissing(CampaignClosedFacts facts) {
+        var closed = facts.closedCampaignYear();
+        if (closed.isEmpty()) {
+            return CatalogText.of("assistant.reason.harvest_missing");
+        }
+        if (!facts.calibers().containsKey(closed.get())) {
+            return CatalogText.of("assistant.reason.caliber_not_settled", String.valueOf(closed.get()));
+        }
+        if (facts.calibers().headMap(closed.get()).isEmpty()) {
+            return CatalogText.of("assistant.reason.caliber_previous_missing");
+        }
+        return null;
+    }
+
+    /**
+     * "¿Cambió el calibre frente a otras campañas?": the caliber the mill weighed for the closed campaign against
+     * the latest earlier campaign settled with one, in fruits per kilogram and commercial size grade. Fewer fruits
+     * per kilogram is bigger fruit; the text says only that, never why it changed.
+     */
+    private static Optional<AnswerDraft> caliberChange(CampaignClosedFacts facts) {
+        var q = "campaign.caliber_change";
+        if (caliberMissing(facts) != null) {
+            return Optional.empty();
+        }
+        int closedYear = facts.closedCampaignYear().orElseThrow();
+        var earlier = facts.calibers().headMap(closedYear);
+        int previousYear = earlier.lastKey();
+        var closed = facts.calibers().get(closedYear);
+        var previous = earlier.get(previousYear);
+        long closedFruits = whole(closed.fruitsPerKg());
+        long previousFruits = whole(previous.fruitsPerKg());
+        String variant = closedFruits == previousFruits ? "equal" : closedFruits < previousFruits ? "bigger" : "smaller";
+        String closedText = String.valueOf(closedYear);
+        String previousText = String.valueOf(previousYear);
+        var text = text(q, "text." + variant, closedText, closedFruits, grade(closed), previousText, previousFruits,
+                grade(previous));
+        return Optional.of(new AnswerDraft(text, List.of(
+                new FactDraft(shared("value.integer", closedFruits), shared("card.fruits_per_kg.label", closedText),
+                        gradePill(closed), FactTone.PRIMARY),
+                new FactDraft(shared("value.integer", previousFruits), shared("card.fruits_per_kg.label", previousText),
+                        gradePill(previous), FactTone.HIGHLIGHT)),
+                shared("source.settlements", closedText, previousText), List.of()));
+    }
+
+    /** The grade of a caliber written after its figure in the text, as " (171/190)", or nothing without one. */
+    private static CatalogText grade(CampaignClosedFacts.SettledCaliber caliber) {
+        return caliber.commercialSizeGrade() == null
+                ? shared("grade.none")
+                : shared("grade.inline", caliber.commercialSizeGrade());
+    }
+
+    private static CatalogText gradePill(CampaignClosedFacts.SettledCaliber caliber) {
+        return caliber.commercialSizeGrade() == null
+                ? shared("card.settled.pill")
+                : shared("card.grade.pill", caliber.commercialSizeGrade());
     }
 
     /**

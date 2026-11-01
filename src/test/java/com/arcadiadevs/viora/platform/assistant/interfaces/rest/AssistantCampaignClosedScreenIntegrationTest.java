@@ -116,7 +116,7 @@ class AssistantCampaignClosedScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[1].icon").value("fruit"))
                 .andExpect(jsonPath("$.questions[1].enabled").value(false))
                 .andExpect(jsonPath("$.questions[1].disabledReason")
-                        .value("El calibre de cada campaña aún no llega al asistente"))
+                        .value("Liquida la cosecha %d para conocer su calibre".formatted(closed)))
                 .andExpect(jsonPath("$.questions[2].questionId").value("campaign.plan_next"))
                 .andExpect(jsonPath("$.questions[2].label").value("¿Qué planifico para la campaña %d?".formatted(year)))
                 .andExpect(jsonPath("$.questions[2].icon").value("calendar"))
@@ -125,7 +125,7 @@ class AssistantCampaignClosedScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[0].label")
                         .value("How did the %d campaign go against the earlier ones?".formatted(closed)))
                 .andExpect(jsonPath("$.questions[1].disabledReason")
-                        .value("The caliber of each campaign does not reach the assistant yet"))
+                        .value("Settle the %d harvest to know its caliber".formatted(closed)))
                 .andExpect(jsonPath("$.questions[2].label")
                         .value("What do I plan for the %d campaign?".formatted(year)));
 
@@ -229,7 +229,7 @@ class AssistantCampaignClosedScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[0].disabledReason")
                         .value("Sin cosecha registrada · registra la cosecha de la campaña"))
                 .andExpect(jsonPath("$.questions[1].disabledReason")
-                        .value("El calibre de cada campaña aún no llega al asistente"))
+                        .value("Sin cosecha registrada · registra la cosecha de la campaña"))
                 .andExpect(jsonPath("$.questions[2].label").value("¿Qué planifico para la próxima campaña?"))
                 .andExpect(jsonPath("$.questions[2].disabledReason")
                         .value("Sin cosecha registrada · registra la cosecha de la campaña"));
