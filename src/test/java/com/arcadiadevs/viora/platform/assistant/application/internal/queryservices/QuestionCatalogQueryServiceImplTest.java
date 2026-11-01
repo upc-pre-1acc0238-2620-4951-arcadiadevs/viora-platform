@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.assistant.application.internal.queryservi
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalPhenologyService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalSubscriptionService;
+import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.assistant.domain.model.queries.GetQuestionCatalogQuery;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogQuestion;
@@ -10,6 +11,7 @@ import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.Catalo
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenQuestionCatalog;
+import com.arcadiadevs.viora.platform.phenology.interfaces.acl.PhenologyContextFacade.PlotBearingIndex;
 import com.arcadiadevs.viora.platform.thinning.interfaces.acl.ThinningContextFacade.PrescriptionAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +23,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +52,8 @@ class QuestionCatalogQueryServiceImplTest {
     private ExternalPhenologyService externalPhenologyService;
     @Mock
     private ExternalThinningService externalThinningService;
+    @Mock
+    private ExternalTelemetryService externalTelemetryService;
 
     private QuestionCatalogQueryServiceImpl queryService;
 
@@ -55,16 +62,31 @@ class QuestionCatalogQueryServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        var factsAssembler = new AnswerFactsAssembler(List.of(
+                new HomeFactsReader(externalOrchardService, externalThinningService, externalPhenologyService,
+                        externalTelemetryService, CLOCK),
+                new AlternationFactsReader(externalOrchardService, externalPhenologyService, externalThinningService),
+                new PlanFactsReader(externalThinningService),
+                new AlertFactsReader(externalTelemetryService, externalOrchardService),
+                new ClimateFactsReader(externalTelemetryService, CLOCK),
+                new ChillFactsReader(externalPhenologyService),
+                new PlotDetailFactsReader(externalThinningService, externalPhenologyService, externalTelemetryService,
+                        CLOCK),
+                new SensorsFactsReader(externalTelemetryService, CLOCK),
+                new SamplingFactsReader(externalThinningService, CLOCK),
+                new ThinningDoneFactsReader(externalThinningService),
+                new CampaignClosedFactsReader(externalPhenologyService, externalThinningService,
+                        externalOrchardService)), CLOCK);
         queryService = new QuestionCatalogQueryServiceImpl(externalSubscriptionService, externalOrchardService,
-                externalPhenologyService, externalThinningService, CLOCK);
+                factsAssembler);
     }
 
     @Test
     @DisplayName("ALTERNATION: every question enabled, in contract order, with the index and next year")
     void alternationWithEveryFact() {
         givenAccessiblePlot();
-        when(externalPhenologyService.findBiennialBearingIndex(plotId)).thenReturn(Optional.of(0.51));
-        when(externalPhenologyService.countHistoricalCampaigns(plotId)).thenReturn(3);
+        when(externalPhenologyService.findBearing(plotId)).thenReturn(Optional.of(bearing(0.51)));
+        when(externalPhenologyService.findHistoricalYields(plotId)).thenReturn(harvests(3));
         when(externalThinningService.findPrescriptionAvailability(plotId, 2026))
                 .thenReturn(Optional.of(new PrescriptionAvailability(true, 30.0, 5, 0, "ESTIMATED")));
 
@@ -85,8 +107,8 @@ class QuestionCatalogQueryServiceImplTest {
     @DisplayName("ALTERNATION: without index, history or caliber every question is disabled with its reason")
     void alternationWithoutFacts() {
         givenAccessiblePlot();
-        when(externalPhenologyService.findBiennialBearingIndex(plotId)).thenReturn(Optional.empty());
-        when(externalPhenologyService.countHistoricalCampaigns(plotId)).thenReturn(1);
+        when(externalPhenologyService.findBearing(plotId)).thenReturn(Optional.empty());
+        when(externalPhenologyService.findHistoricalYields(plotId)).thenReturn(harvests(1));
         when(externalThinningService.findPrescriptionAvailability(plotId, 2026)).thenReturn(Optional.empty());
 
         var questions = catalog(ScreenKey.ALTERNATION).questions();
@@ -106,8 +128,8 @@ class QuestionCatalogQueryServiceImplTest {
     @DisplayName("ALTERNATION: two campaigns are enough to compare; a caliber not estimated still blocks next year")
     void alternationWithTwoCampaignsAndNoCaliberEstimate() {
         givenAccessiblePlot();
-        when(externalPhenologyService.findBiennialBearingIndex(plotId)).thenReturn(Optional.of(0.12));
-        when(externalPhenologyService.countHistoricalCampaigns(plotId)).thenReturn(2);
+        when(externalPhenologyService.findBearing(plotId)).thenReturn(Optional.of(bearing(0.12)));
+        when(externalPhenologyService.findHistoricalYields(plotId)).thenReturn(harvests(2));
         when(externalThinningService.findPrescriptionAvailability(plotId, 2026))
                 .thenReturn(Optional.of(new PrescriptionAvailability(true, 30.0, 5, 0, "NOT_CALIBRATED")));
 
@@ -133,6 +155,7 @@ class QuestionCatalogQueryServiceImplTest {
         assertThat(questions.get(0).label()).isEqualTo(CatalogText.of("assistant.question.plan.why_percent.label", 30));
         assertThat(questions.get(1).label()).isEqualTo(CatalogText.of("assistant.question.plan.if_less.label", 20));
         verify(externalPhenologyService, never()).findBiennialBearingIndex(any());
+        verify(externalPhenologyService, never()).findBearing(any());
     }
 
     @Test
@@ -213,6 +236,7 @@ class QuestionCatalogQueryServiceImplTest {
 
         assertThat(error.code()).isEqualTo("PLOT_NOT_FOUND");
         verify(externalPhenologyService, never()).findBiennialBearingIndex(any());
+        verify(externalPhenologyService, never()).findBearing(any());
     }
 
     @Test
@@ -224,6 +248,19 @@ class QuestionCatalogQueryServiceImplTest {
                 .hasMessage("assistant.plot.required");
         assertThatThrownBy(() -> new PlotId("not-a-uuid")).hasMessage("assistant.plot.invalid");
         assertThat(ScreenKey.fromValue("alternation")).isEqualTo(ScreenKey.ALTERNATION);
+    }
+
+    private static PlotBearingIndex bearing(double value) {
+        return new PlotBearingIndex(value, "MODERATE_ALTERNATION");
+    }
+
+    /** Harvests of the given number of campaigns, the last one in 2025. */
+    private static SortedMap<Integer, Double> harvests(int campaigns) {
+        var yields = new TreeMap<Integer, Double>();
+        for (int i = 0; i < campaigns; i++) {
+            yields.put(2025 - i, 50_000.0);
+        }
+        return yields;
     }
 
     private void givenAccessiblePlot() {

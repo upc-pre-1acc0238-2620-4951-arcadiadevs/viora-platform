@@ -105,7 +105,7 @@ public class AskQuestionCommandServiceImpl implements AskQuestionCommandService 
             return unavailable();
         }
 
-        var facts = factsAssembler.assemble(screen, command.plotId());
+        var facts = factsAssembler.assemble(screen, command.producerId(), command.plotId());
         var version = AnswerComposer.dataVersionOf(screen, facts);
         var now = clock.instant();
         if (!command.forceRefresh()) {

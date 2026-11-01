@@ -174,7 +174,14 @@ Respuesta (JSON completo; sin SSE, ver sección 0):
 
 ### 4.4 Resumen del día (Inicio)
 
-`GET /assistant/daily-summary?plotId={uuid?}` → mismo formato que una respuesta, con `questionId: "home.daily_summary"` y 3 hechos para el bento de 3 tarjetas (los tres del mismo tamaño). Se **precalcula una vez al día** (zona `America/Lima`, p. ej. 06:30) con un job, y se genera bajo demanda si falta. Cache por `dataVersion`. El push de "tu resumen está listo" quedó descartado por ahora.
+`GET /assistant/daily-summary?plotId={uuid?}` → `200` con su propio recurso (`AssistantDailySummaryResource`), porque `AssistantAnswer` exige exactamente 2 hechos y el resumen lleva 3:
+
+- `summaryId` (no `answerId`), `questionId: "home.daily_summary"`, `plotId` (`null` para todo el campo), `createdAt`, `dataVersion`, `freshness` (siempre `UP_TO_DATE`: si cambian los datos se escribe otro), `text`, `facts` con **exactamente 3 tarjetas** (días de ventana de aclareo, máxima de la semana y alertas activas, las tres del mismo tamaño), `sources` y `model`, con la misma forma que en una respuesta.
+- **Precalculado:** un job a las 06:30 de `America/Lima` (`viora.assistant.daily-summary.cron`, apagable con `VIORA_ASSISTANT_DAILY_SUMMARY_ENABLED`) escribe en español el resumen de todo el campo de cada productor con lotes activos, hasta `max-producers` por corrida. El job no consume cupo de respuestas.
+- **Bajo demanda:** si no hay un resumen escrito desde la medianoche de Lima con los mismos datos y el mismo idioma, se escribe en la llamada y consume un cupo del productor (`429` si se agotó). Servir uno existente no consume cupo. Un resumen que cayó a la plantilla no se reutiliza: la siguiente llamada vuelve a intentar el modelo.
+- **Mismos controles que las respuestas:** plan activo (`403 ASSISTANT_FORBIDDEN`), lote ajeno `403`, inexistente `404`, mal formado `400`, sin lotes activos `409 ASSISTANT_CONFLICT`; validador del texto y plantilla si el modelo está apagado o su texto se rechaza.
+- **Guardado** en su propia tabla `assistant_daily_summaries` (script manual `scripts/sql/2026-10-31-assistant-daily-summaries.sql`), borrado con la cuenta y a los `history-days` días. No aparece en `/answers` ni en `/answers/latest`, y `POST /answers` con `home.daily_summary` sigue respondiendo `400`.
+- El push de "tu resumen está listo" quedó descartado por ahora.
 
 ### 4.5 Códigos de error
 
@@ -325,17 +332,17 @@ Las decisiones 1, 2, 3, 4, 5 y 7 de la versión anterior se cerraron en la secci
 
 ## 12. Pendiente del backend tras 0.63.0
 
-Estado: ALTERNATION y PLAN completos (catálogo, respuestas, modelo, historial, límites, retención). La app construye la hoja con esas dos pantallas (1.18.0) y las demás siguen en rondas backend → app.
+Estado (2026-10-31): el asistente responde las 11 pantallas (HOME, ALTERNATION, PLAN, ALERT, CLIMATE, WINTER_CHILL, PLOT_DETAIL, SENSORS, SAMPLING_SUMMARY, THINNING_DONE, CAMPAIGN_CLOSED) y el resumen del día (sección 4.4), sobre el contrato publicado en 0.63.0: misma forma de respuesta, mismos códigos de estado y de error, misma tabla y mismas propiedades. La app 1.18.0 construye la hoja con ALTERNATION y PLAN; las demás pantallas quedan listas para las rondas de la app.
 
-1. **Reorganizar el asistente por pantalla antes de sumar pantallas.** Hoy `PlotFacts` (catálogo) y `AnswerFacts` (respuestas) son registros planos con los campos de ALTERNATION y PLAN mezclados, y `QuestionCatalog`, `AnswerComposer` y `AnswerFactsAssembler` despachan con `switch`. Con 11 pantallas eso no escala. Propuesta: `ScreenFacts` sellado con un registro por pantalla (con su `canonical()` para `dataVersion`), un lector de hechos por pantalla en `application/internal/queryservices` y, en `domain/services`, una clase por pantalla con sus preguntas y sus plantillas. El catálogo y la respuesta leen los mismos hechos, así una pregunta habilitada siempre se puede responder.
-2. **Pantallas que faltan** (preguntas en la sección 5), con las fachadas que habría que ampliar:
-   - ALERT (T15) y CLIMATE (P90): `TelemetryContextFacade` hoy solo da cobertura; necesita el incidente activo del lote (tipo, severidad, valor y umbral, inicio, duración), el pronóstico de máximas y los umbrales de ADR-006. `climate.irrigate` va deshabilitada mientras no haya sondas reales (`IoTDevice` no distingue nodo virtual de real).
-   - WINTER_CHILL (P80): porciones de frío del `ChillAccumulationTracker` (Fenología), fecha estimada y el invierno anterior.
-   - PLOT_DETAIL (P26) y CAMPAIGN_CLOSED (P73): reutilizan vecería, prescripción y cosechas; `campaign.caliber_change` necesita el calibre de la campaña cerrada.
-   - SENSORS (P85): nodos por estado y última lectura; los datos de nodos virtuales se rotulan "dato simulado".
-   - SAMPLING_SUMMARY (P54) y THINNING_DONE (P63): resumen de la ronda y aclareo ejecutado desde `ThinningContextFacade`.
-   - Preguntas de uso de la app (`sensors.how_link`, `sampling.correct_tree`) no salen de datos: decidir si se quedan como texto fijo o se quitan del catálogo.
-3. **Inicio y resumen del día** (sección 4.4): `GET /assistant/daily-summary` con 3 tarjetas, así que no cabe en `AssistantAnswer` (exige 2): necesita su propio agregado y recurso, el job de las 06:30 de Lima y generación bajo demanda. La app lo lee con su worker y una notificación local (decidido 2026-10-30, opción A).
-4. **Validación agronómica** de la redacción (sección 10) antes de producción; se vuelve más urgente con ALERT y CLIMATE (efecto del calor en el cuajado).
-5. Micrometer, cuando exista un sistema que lea las métricas.
+Hecho en esta ronda (decisiones en `docs/asistente-decisiones.md`):
 
+- **Reorganización por pantalla:** `ScreenFacts` sellado con un registro por pantalla (con su `canonical()` para `dataVersion`), un lector de hechos por pantalla en `application/internal/queryservices` y una clase por pantalla en `domain/services` con sus preguntas y sus plantillas. El catálogo y la respuesta leen los mismos hechos.
+- **Inicio con ámbito de lote o de todo el campo:** sin `plotId`, HOME responde por todos los lotes activos del productor y la respuesta se guarda con `plot_id` nulo. Las demás pantallas siguen exigiendo `plotId` (`400`). **Antes del release** hay que correr a mano `scripts/sql/2026-10-30-assistant-answers-field-scope.sql` en producción: sin él, toda pregunta de HOME sin lote falla al guardarse.
+- **Resumen del día** con su propio agregado, recurso, tabla y job (sección 4.4).
+
+Sigue pendiente:
+
+1. **Validación agronómica** de la redacción (sección 10) antes de producción; más urgente con ALERT y CLIMATE (efecto del calor en el cuajado).
+2. **Preguntas que hoy no se pueden responder:** `sampling.correct_tree` y `sensors.why_paused` se ofrecen siempre deshabilitadas (sin datos detrás; ver `docs/asistente-decisiones.md`). Decidir si se quitan del catálogo o esperan a que exista el dato. `sensors.how_link` sí se responde con los nodos del lote y los pasos para vincular uno.
+3. **Pausa tras una plantilla en el resumen del día:** hoy cada llamada después de un resumen de plantilla escribe otro y consume cupo. Decidir si se vuelve a la pausa de 10 minutos de la versión anterior.
+4. Micrometer, cuando exista un sistema que lea las métricas.

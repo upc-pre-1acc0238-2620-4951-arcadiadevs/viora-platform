@@ -1,0 +1,23 @@
+-- =============================================================================================
+-- Asistente Viora · HOME answers about the producer's whole field are stored without plot
+-- File:    scripts/sql/2026-10-30-assistant-answers-field-scope.sql
+-- Target:  PostgreSQL (production). H2 needs nothing: tests create the schema from the entities.
+--
+-- WHEN TO RUN
+--   Manually, before deploying the release that adds the HOME screen of the assistant. Until it
+--   runs, every HOME question asked without plotId (the whole field) fails in production when its
+--   answer is saved, because the INSERT of an answer with plot_id NULL breaks a NOT NULL. Answers
+--   about one plot, and every other screen, are not affected. It is idempotent: dropping a NOT NULL
+--   that is already gone does nothing.
+--
+-- WHY
+--   `assistant_answers` was created with plot_id NOT NULL: every answer was about one plot. The
+--   HOME screen (Inicio, P110-P113) also answers for every active plot of the producer when the
+--   app sends no plotId; those answers are stored with plot_id NULL and only match other answers
+--   about the producer's field (reuse of a saved answer, latest answer of the screen). Every other
+--   screen still requires its plot, so no other answer is stored without one. The entity made the
+--   column nullable, but the project manages its schema with `ddl-auto=update`, which adds columns
+--   and never relaxes an existing NOT NULL. No other column or index changes.
+-- =============================================================================================
+
+ALTER TABLE assistant_answers ALTER COLUMN plot_id DROP NOT NULL;

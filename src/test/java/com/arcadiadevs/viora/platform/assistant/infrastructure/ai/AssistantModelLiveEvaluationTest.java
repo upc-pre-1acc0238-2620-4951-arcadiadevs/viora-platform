@@ -2,9 +2,10 @@ package com.arcadiadevs.viora.platform.assistant.infrastructure.ai;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
 import com.arcadiadevs.viora.platform.assistant.application.internal.outboundservices.ai.AnswerTextWriter;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFacts;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AlternationFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlanFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
@@ -106,16 +107,16 @@ class AssistantModelLiveEvaluationTest {
         return CatalogText.of(key);
     }
 
-    private static AnswerFacts alternationFacts() {
+    private static AlternationFacts alternationFacts() {
         var yields = new TreeMap<Integer, Double>();
         yields.put(2023, 40_000.0);
         yields.put(2024, 100_000.0);
         yields.put(2025, 50_000.0);
-        return new AnswerFacts(2026, 10.0, yields, 0.50, "MODERATE_ALTERNATION", null, null, null, null, null, 0);
+        return new AlternationFacts(2026, 10.0, yields, 0.50, "MODERATE_ALTERNATION", false);
     }
 
-    private static AnswerFacts planFacts() {
-        return new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 30.0,
-                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5);
+    private static PlanFacts planFacts() {
+        return new PlanFacts(2026, 0.60, 0.40, 30.0,
+                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5, false, null, 0);
     }
 }

@@ -64,9 +64,13 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
     @Transactional(readOnly = true)
     public Optional<AssistantAnswer> findReusable(String producerId, PlotId plotId, QuestionId questionId,
                                                   AnswerLanguage language, DataVersion dataVersion, Instant since) {
-        return answers.findReusable(producerId, plotId.plotId(), questionId.value(), language.code(),
-                        dataVersion.value(), since, PageRequest.of(0, 1))
-                .stream().findFirst().map(AssistantAnswerRepositoryImpl::toDomain);
+        var page = PageRequest.of(0, 1);
+        var found = plotId == null
+                ? answers.findReusableOfField(producerId, questionId.value(), language.code(), dataVersion.value(),
+                        since, page)
+                : answers.findReusable(producerId, plotId.plotId(), questionId.value(), language.code(),
+                        dataVersion.value(), since, page);
+        return found.stream().findFirst().map(AssistantAnswerRepositoryImpl::toDomain);
     }
 
     @Override
@@ -81,8 +85,11 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
     @Transactional(readOnly = true)
     public Optional<AssistantAnswer> findLatestOfScreen(String producerId, PlotId plotId, String questionPrefix,
                                                         Instant since) {
-        return answers.findLatestOfScreen(producerId, plotId.plotId(), questionPrefix, since, PageRequest.of(0, 1))
-                .stream().findFirst().map(AssistantAnswerRepositoryImpl::toDomain);
+        var page = PageRequest.of(0, 1);
+        var found = plotId == null
+                ? answers.findLatestOfScreenOfField(producerId, questionPrefix, since, page)
+                : answers.findLatestOfScreen(producerId, plotId.plotId(), questionPrefix, since, page);
+        return found.stream().findFirst().map(AssistantAnswerRepositoryImpl::toDomain);
     }
 
     @Override
@@ -101,7 +108,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
         var entity = new AssistantAnswerPersistenceEntity();
         entity.setId(UUID.fromString(answer.id().value()));
         entity.setProducerId(answer.producerId());
-        entity.setPlotId(answer.plotId().plotId());
+        entity.setPlotId(answer.plotId() == null ? null : answer.plotId().plotId());
         entity.setQuestionId(answer.questionId().value());
         entity.setQuestion(answer.question());
         entity.setLanguage(answer.language().code());
@@ -124,7 +131,7 @@ public class AssistantAnswerRepositoryImpl implements AssistantAnswerRepository 
         return new AssistantAnswer(
                 new AnswerId(entity.getId().toString()),
                 entity.getProducerId(),
-                new PlotId(entity.getPlotId()),
+                entity.getPlotId() == null ? null : new PlotId(entity.getPlotId()),
                 new QuestionId(entity.getQuestionId()),
                 entity.getQuestion(),
                 new AnswerLanguage(entity.getLanguage()),

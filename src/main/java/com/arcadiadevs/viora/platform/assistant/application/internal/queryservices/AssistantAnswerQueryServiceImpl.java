@@ -20,7 +20,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -85,7 +84,7 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         if (!externalSubscriptionService.hasActivePlan(query.producerId())) {
             return Result.failure(inactivePlan());
         }
-        var prefix = query.screen().name().toLowerCase(Locale.ROOT) + ".";
+        var prefix = query.screen().questionPrefix();
         return repository.findLatestOfScreen(query.producerId(), query.plotId(), prefix, since())
                 .<Result<AnswerView, ApplicationError>>map(answer -> Result.success(view(answer, new HashMap<>())))
                 .orElseGet(() -> Result.failure(ApplicationError.notFound("Answer", "assistant.answer.none")));
@@ -95,11 +94,16 @@ public class AssistantAnswerQueryServiceImpl implements AssistantAnswerQueryServ
         return clock.instant().minus(historyWindow);
     }
 
-    /** Several answers of one screen and plot share one read of the figures. */
+    /**
+     * Several answers of one screen and plot share one read of the figures; those about the producer's whole field
+     * share the read of its field.
+     */
     private AnswerView view(AssistantAnswer answer, Map<String, DataVersion> versions) {
         var screen = answer.questionId().screen();
-        var current = versions.computeIfAbsent(screen + "|" + answer.plotId().plotId(),
-                key -> AnswerComposer.dataVersionOf(screen, factsAssembler.assemble(screen, answer.plotId())));
+        var scope = answer.plotId() == null ? "field" : answer.plotId().plotId();
+        var current = versions.computeIfAbsent(screen + "|" + scope,
+                key -> AnswerComposer.dataVersionOf(screen,
+                        factsAssembler.assemble(screen, answer.producerId(), answer.plotId())));
         return new AnswerView(answer, answer.freshness(current));
     }
 

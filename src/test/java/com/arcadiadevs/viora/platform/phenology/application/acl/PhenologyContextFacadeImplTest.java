@@ -43,7 +43,8 @@ class PhenologyContextFacadeImplTest {
 
     @BeforeEach
     void setUp() {
-        facade = new PhenologyContextFacadeImpl(harvestRecordQueryService, externalOrchardService, temperatureProvider);
+        facade = new PhenologyContextFacadeImpl(harvestRecordQueryService, externalOrchardService, temperatureProvider,
+                java.time.Clock.systemUTC());
     }
 
     @Test
@@ -59,6 +60,21 @@ class PhenologyContextFacadeImplTest {
     @DisplayName("Returns nothing while the history is too short to classify the index")
     void returnsNothingWithInsufficientHistory() {
         givenTracker(0.0, 1);
+
+        assertThat(facade.findBiennialBearingIndex(plotId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Returns nothing when the tracker has not computed an index yet")
+    void returnsNothingWithoutAComputedIndex() {
+        var tracker = mock(ChillAccumulationTracker.class);
+        List<HistoricalHarvestEntrySnapshot> history = List.of(
+                mock(HistoricalHarvestEntrySnapshot.class), mock(HistoricalHarvestEntrySnapshot.class),
+                mock(HistoricalHarvestEntrySnapshot.class));
+        when(tracker.snapshot()).thenReturn(new ChillAccumulationTrackerSnapshot(
+                null, null, null, history, null, 0L));
+        when(harvestRecordQueryService.handle(any(GetChillAccumulationTrackerByPlotIdQuery.class)))
+                .thenReturn(Optional.of(tracker));
 
         assertThat(facade.findBiennialBearingIndex(plotId)).isEmpty();
     }

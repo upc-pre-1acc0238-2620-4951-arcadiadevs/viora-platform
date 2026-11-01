@@ -1,12 +1,14 @@
 package com.arcadiadevs.viora.platform.assistant.domain.services;
 
 import com.arcadiadevs.viora.platform.assistant.application.internal.AnswerLocalizer;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AlternationFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFact;
-import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.AnswerLanguage;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlanFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ScreenKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,21 +36,21 @@ class AnswerComposerTest {
      * Three campaigns on 10 ha: 4.0, 10.0 and 5.0 t/ha, so the average is 6.3 and the last one (2025) is low.
      * The current campaign is 2026.
      */
-    private static AnswerFacts alternationFacts() {
+    private static AlternationFacts alternationFacts() {
         var yields = new TreeMap<Integer, Double>();
         yields.put(2023, 40_000.0);
         yields.put(2024, 100_000.0);
         yields.put(2025, 50_000.0);
-        return new AnswerFacts(2026, 10.0, yields, 0.50, "MODERATE_ALTERNATION", null, null, null, null, null, 0);
+        return new AlternationFacts(2026, 10.0, yields, 0.50, "MODERATE_ALTERNATION", false);
     }
 
     /** A load of 0.60 fruits per shoot against a target of 0.40: 30 % to remove, between 3 and 14 November. */
-    private static AnswerFacts planFacts() {
-        return new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 30.0,
-                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5);
+    private static PlanFacts planFacts() {
+        return new PlanFacts(2026, 0.60, 0.40, 30.0,
+                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5, false, null, 0);
     }
 
-    private AnswerLocalizer.Localized answer(QuestionId question, AnswerFacts facts, String language) {
+    private AnswerLocalizer.Localized answer(QuestionId question, ScreenFacts facts, String language) {
         var draft = AnswerComposer.compose(question, facts, PLOT);
         assertThat(draft).as(question.value()).isPresent();
         return localizer.localize(draft.get(), new AnswerLanguage(language));
@@ -93,7 +95,7 @@ class AnswerComposerTest {
         var yields = new TreeMap<Integer, Double>();
         yields.put(2024, 40_000.0);
         yields.put(2025, 120_000.0);
-        var facts = new AnswerFacts(2026, 10.0, yields, 0.60, "SEVERE_ALTERNATION", null, null, null, null, null, 0);
+        var facts = new AlternationFacts(2026, 10.0, yields, 0.60, "SEVERE_ALTERNATION", false);
 
         var answer = answer(QuestionId.ALTERNATION_BREAK_CYCLE, facts, "es");
 
@@ -134,7 +136,7 @@ class AnswerComposerTest {
         var yields = new TreeMap<Integer, Double>();
         yields.put(2025, 100_000.0);
         yields.put(2026, 40_000.0);
-        var facts = new AnswerFacts(2026, 10.0, yields, 0.60, "SEVERE_ALTERNATION", null, null, null, null, null, 0);
+        var facts = new AlternationFacts(2026, 10.0, yields, 0.60, "SEVERE_ALTERNATION", false);
 
         var answer = answer(QuestionId.ALTERNATION_NEXT_YEAR, facts, "es");
 
@@ -231,9 +233,11 @@ class AnswerComposerTest {
     @Test
     @DisplayName("a question whose figures are missing has no answer, so the server never invents one")
     void withoutFiguresThereIsNoAnswer() {
-        var empty = new AnswerFacts(2026, 10.0, new TreeMap<>(), null, null, null, null, null, null, null, 0);
+        var emptyAlternation = new AlternationFacts(2026, 10.0, new TreeMap<>(), null, null, false);
+        var emptyPlan = new PlanFacts(2026, null, null, null, null, null, 0, false, null, 0);
 
         for (var question : ALL_QUESTIONS) {
+            ScreenFacts empty = question.screen() == ScreenKey.ALTERNATION ? emptyAlternation : emptyPlan;
             assertThat(AnswerComposer.compose(question, empty, PLOT)).as(question.value()).isEmpty();
         }
     }
@@ -241,21 +245,20 @@ class AnswerComposerTest {
     @Test
     @DisplayName("a prescription with nothing to remove, or a window that closes before it opens, has no answer")
     void degeneratePrescriptions() {
-        var nothingToRemove = new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.40, 0.40, 0.0,
-                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5);
+        var nothingToRemove = new PlanFacts(2026, 0.40, 0.40, 0.0,
+                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5, false, null, 0);
         assertThat(AnswerComposer.compose(QuestionId.PLAN_WHY_PERCENT, nothingToRemove, PLOT)).isEmpty();
         assertThat(AnswerComposer.compose(QuestionId.PLAN_IF_NONE, nothingToRemove, PLOT)).isEmpty();
 
-        var backwards = new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 30.0,
-                LocalDate.of(2026, 11, 14), LocalDate.of(2026, 11, 3), 5);
+        var backwards = new PlanFacts(2026, 0.60, 0.40, 30.0,
+                LocalDate.of(2026, 11, 14), LocalDate.of(2026, 11, 3), 5, false, null, 0);
         assertThat(AnswerComposer.compose(QuestionId.PLAN_BEST_TIME, backwards, PLOT)).isEmpty();
     }
 
     @Test
     @DisplayName("without a closing date the window card says it follows the plan instead of failing")
     void windowWithoutClosingDate() {
-        var facts = new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 30.0,
-                LocalDate.of(2026, 11, 3), null, 0);
+        var facts = new PlanFacts(2026, 0.60, 0.40, 30.0, LocalDate.of(2026, 11, 3), null, 0, false, null, 0);
 
         var answer = answer(QuestionId.PLAN_WHY_PERCENT, facts, "es");
 
@@ -276,13 +279,12 @@ class AnswerComposerTest {
 
         var moreYields = new TreeMap<>(alternation.yieldsKg());
         moreYields.put(2026, 30_000.0);
-        var newHarvest = new AnswerFacts(2026, 10.0, moreYields, 0.50, "MODERATE_ALTERNATION", null, null, null, null,
-                null, 0);
+        var newHarvest = new AlternationFacts(2026, 10.0, moreYields, 0.50, "MODERATE_ALTERNATION", false);
         assertThat(AnswerComposer.dataVersionOf(ScreenKey.ALTERNATION, newHarvest))
                 .isNotEqualTo(AnswerComposer.dataVersionOf(ScreenKey.ALTERNATION, alternation));
 
-        var newPercentage = new AnswerFacts(2026, null, new TreeMap<>(), null, null, 0.60, 0.40, 35.0,
-                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5);
+        var newPercentage = new PlanFacts(2026, 0.60, 0.40, 35.0,
+                LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 14), 5, false, null, 0);
         assertThat(AnswerComposer.dataVersionOf(ScreenKey.PLAN, newPercentage))
                 .isNotEqualTo(AnswerComposer.dataVersionOf(ScreenKey.PLAN, plan));
 
