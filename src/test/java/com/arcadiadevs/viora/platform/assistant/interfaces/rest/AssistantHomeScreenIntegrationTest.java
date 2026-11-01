@@ -128,7 +128,7 @@ class AssistantHomeScreenIntegrationTest {
                 .andExpect(jsonPath("$.questions[2].icon").value("alert"))
                 .andExpect(jsonPath("$.questions[2].enabled").value(true))
                 .andExpect(jsonPath("$.questions[3].questionId").value("home.harvest_estimate"))
-                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé este año?"))
+                .andExpect(jsonPath("$.questions[3].label").value("¿Cuánto cosecharé esta campaña?"))
                 .andExpect(jsonPath("$.questions[3].icon").value("harvest"))
                 .andExpect(jsonPath("$.questions[3].enabled").value(false))
                 .andExpect(jsonPath("$.questions[3].disabledReason")

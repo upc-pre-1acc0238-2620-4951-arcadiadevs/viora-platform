@@ -72,7 +72,7 @@ class PlotDetailQuestionsTest {
     }
 
     @Test
-    @DisplayName("catalog with index, sampling and caliber: the four questions enabled, the harvest naming next year")
+    @DisplayName("catalog with index, sampling and caliber: the four questions enabled, the harvest named by its campaign")
     void catalogComplete() {
         var questions = QuestionCatalog.questionsFor(plot(thinnedPlan(14250.0), 0, List.of(), hotToday()));
 
@@ -85,7 +85,7 @@ class PlotDetailQuestionsTest {
                 CatalogText.of("assistant.question.plot.how_is.label"),
                 CatalogText.of("assistant.question.plot.today.label"),
                 CatalogText.of("assistant.question.plot.last_sampling.label"),
-                CatalogText.of("assistant.question.plot.next_year_harvest.label", "2027"));
+                CatalogText.of("assistant.question.plot.next_year_harvest.label"));
     }
 
     @Test
