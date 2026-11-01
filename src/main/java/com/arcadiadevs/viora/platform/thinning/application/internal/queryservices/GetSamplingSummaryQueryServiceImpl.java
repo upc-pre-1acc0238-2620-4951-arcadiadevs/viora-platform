@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -119,8 +120,13 @@ public class GetSamplingSummaryQueryServiceImpl implements GetSamplingSummaryQue
 
     private List<SamplingTreeObservation> toObservations(List<SamplingRoundSnapshot> rounds) {
         var observations = new ArrayList<SamplingTreeObservation>();
+        // A tree registered again in a later round was corrected: only its latest record is listed
+        var counted = new HashSet<>(SamplingCoverageEvaluator.latestRecordsFromSnapshots(rounds));
         for (var round : rounds) {
             for (var record : round.samplingRecords()) {
+                if (!counted.contains(record)) {
+                    continue;
+                }
                 observations.add(new SamplingTreeObservation(
                         round.id(),
                         record.treeTag(),

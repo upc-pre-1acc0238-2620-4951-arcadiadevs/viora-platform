@@ -1,16 +1,24 @@
 package com.arcadiadevs.viora.platform.thinning.domain.services;
 
+
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.SamplingRoundSnapshot;
+import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.TreeSamplingRecordSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.SamplingRound;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.TreeTag;
 
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
 /**
  * Domain Service evaluating whether cumulative field samplings fulfill statistical representativeness.
+ *
+ * <p>A tree is counted once, with its latest record: registering a tree tag again in a later round corrects it.
+ * The rounds are taken in the order they were sent, so the record sent last wins. Without this rule a corrected
+ * tree entered the load twice (the wrong record and the right one) while it counted once for the coverage.</p>
  */
 public final class SamplingCoverageEvaluator {
 
@@ -113,10 +121,8 @@ public final class SamplingCoverageEvaluator {
             return 0;
         }
         long totalShoots = 0;
-        for (SamplingRound round : rounds) {
-            for (TreeSamplingRecord record : round.samplingRecords()) {
-                totalShoots += record.shootFruitCount().shootCount();
-            }
+        for (TreeSamplingRecord record : latestRecords(rounds)) {
+            totalShoots += record.shootFruitCount().shootCount();
         }
         return saturated(totalShoots);
     }
@@ -132,10 +138,8 @@ public final class SamplingCoverageEvaluator {
             return 0;
         }
         long totalShoots = 0;
-        for (var round : roundSnapshots) {
-            for (var record : round.samplingRecords()) {
-                totalShoots += record.shootFruitCount().shootCount();
-            }
+        for (var record : latestRecordsFromSnapshots(roundSnapshots)) {
+            totalShoots += record.shootFruitCount().shootCount();
         }
         return saturated(totalShoots);
     }
@@ -155,11 +159,9 @@ public final class SamplingCoverageEvaluator {
         }
         long totalFruits = 0;
         long totalShoots = 0;
-        for (SamplingRound round : rounds) {
-            for (TreeSamplingRecord record : round.samplingRecords()) {
-                totalFruits += record.shootFruitCount().fruitSetCount();
-                totalShoots += record.shootFruitCount().shootCount();
-            }
+        for (TreeSamplingRecord record : latestRecords(rounds)) {
+            totalFruits += record.shootFruitCount().fruitSetCount();
+            totalShoots += record.shootFruitCount().shootCount();
         }
         return totalShoots == 0 ? 0.0 : (double) totalFruits / totalShoots;
     }
@@ -176,11 +178,9 @@ public final class SamplingCoverageEvaluator {
         }
         long totalFruits = 0;
         long totalShoots = 0;
-        for (var round : roundSnapshots) {
-            for (var record : round.samplingRecords()) {
-                totalFruits += record.shootFruitCount().fruitSetCount();
-                totalShoots += record.shootFruitCount().shootCount();
-            }
+        for (var record : latestRecordsFromSnapshots(roundSnapshots)) {
+            totalFruits += record.shootFruitCount().fruitSetCount();
+            totalShoots += record.shootFruitCount().shootCount();
         }
         return totalShoots == 0 ? 0.0 : (double) totalFruits / totalShoots;
     }
@@ -196,10 +196,8 @@ public final class SamplingCoverageEvaluator {
             return 0;
         }
         long totalFruits = 0;
-        for (SamplingRound round : rounds) {
-            for (TreeSamplingRecord record : round.samplingRecords()) {
-                totalFruits += record.shootFruitCount().fruitSetCount();
-            }
+        for (TreeSamplingRecord record : latestRecords(rounds)) {
+            totalFruits += record.shootFruitCount().fruitSetCount();
         }
         return saturated(totalFruits);
     }
@@ -215,12 +213,47 @@ public final class SamplingCoverageEvaluator {
             return 0;
         }
         long totalFruits = 0;
-        for (var round : roundSnapshots) {
-            for (var record : round.samplingRecords()) {
-                totalFruits += record.shootFruitCount().fruitSetCount();
-            }
+        for (var record : latestRecordsFromSnapshots(roundSnapshots)) {
+            totalFruits += record.shootFruitCount().fruitSetCount();
         }
         return saturated(totalFruits);
+    }
+
+    /**
+     * The record that counts for each tree: the latest one of its tag, taking the rounds in the order they were
+     * sent (and, within a round, the tags are unique).
+     *
+     * @param rounds the sampling rounds
+     * @return one record per tree tag, in the order each tree was first sampled
+     */
+    public static List<TreeSamplingRecord> latestRecords(List<SamplingRound> rounds) {
+        if (rounds == null || rounds.isEmpty()) {
+            return List.of();
+        }
+        var latest = new LinkedHashMap<TreeTag, TreeSamplingRecord>();
+        rounds.stream()
+                .sorted(Comparator.comparing(SamplingRound::createdAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .forEach(round -> round.samplingRecords().forEach(record -> latest.put(record.treeTag(), record)));
+        return List.copyOf(latest.values());
+    }
+
+    /**
+     * The record that counts for each tree, from round snapshots (see {@link #latestRecords(List)}).
+     *
+     * @param roundSnapshots the sampling round snapshots
+     * @return one record per tree tag, in the order each tree was first sampled
+     */
+    public static List<TreeSamplingRecordSnapshot> latestRecordsFromSnapshots(
+            List<SamplingRoundSnapshot> roundSnapshots) {
+        if (roundSnapshots == null || roundSnapshots.isEmpty()) {
+            return List.of();
+        }
+        var latest = new LinkedHashMap<TreeTag, TreeSamplingRecordSnapshot>();
+        roundSnapshots.stream()
+                .sorted(Comparator.comparing(SamplingRoundSnapshot::createdAt,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .forEach(round -> round.samplingRecords().forEach(record -> latest.put(record.treeTag(), record)));
+        return List.copyOf(latest.values());
     }
 
     /** Sums are kept in a long so they never wrap around; a total beyond an int is reported as its largest value. */

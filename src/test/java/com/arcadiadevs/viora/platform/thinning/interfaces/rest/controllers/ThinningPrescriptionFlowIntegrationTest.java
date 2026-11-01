@@ -194,6 +194,35 @@ class ThinningPrescriptionFlowIntegrationTest {
     }
 
     @Test
+    @DisplayName("A tree registered again before the plan is calculated corrects it; once issued, no round is taken")
+    void registeringATreeAgainCorrectsIt() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        sampleFiveTrees(plotId);
+        // T-3 was counted wrong: 32 fruits on its 20 shoots, not 12. The latest record replaces the first one
+        var correction = """
+                {"clientBatchId":"%s","campaignYear":%d,"samples":[
+                 {"treeTag":"T-3","shootCount":20,"fruitSetCount":32,"trunkDiameterMm":150.0,"samplingDate":"%s"}]}
+                """.formatted(UUID.randomUUID(), campaign, LocalDate.now());
+        mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content(correction))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sampledTreesCount").value(5))
+                // (4 x 12 + 32) fruits over 5 x 20 shoots, not (5 x 12 + 32) over 6 x 20
+                .andExpect(jsonPath("$.meanFruitsPerShoot").value(0.8));
+
+        mvc.perform(put("/api/v1/plots/{id}/thinning-prescriptions/full-bloom", plotId)
+                        .contentType(MediaType.APPLICATION_JSON).content(fullBloom(bloom)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PRESCRIBED"))
+                // 1 - 0.4 / 0.8, from the corrected load
+                .andExpect(jsonPath("$.percentageToRemove").value(50.0));
+
+        mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content(correction.replaceFirst("[0-9a-f-]{36}", UUID.randomUUID().toString())))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
     @DisplayName("Correcting the full bloom moves the window of the issued prescription")
     void correctingTheFullBloomMovesTheWindow() throws Exception {
         var plotId = createPlot("SEVILLANA");
