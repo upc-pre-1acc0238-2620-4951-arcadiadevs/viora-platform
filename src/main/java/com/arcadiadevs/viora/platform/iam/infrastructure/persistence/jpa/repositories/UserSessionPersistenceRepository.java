@@ -1,7 +1,9 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.repositories;
 
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.entities.UserSessionPersistenceEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +21,14 @@ import java.util.UUID;
 public interface UserSessionPersistenceRepository extends JpaRepository<UserSessionPersistenceEntity, UUID> {
 
     Optional<UserSessionPersistenceEntity> findByRefreshTokenHash(String refreshTokenHash);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from UserSessionPersistenceEntity s where s.refreshTokenHash = :hash")
+    Optional<UserSessionPersistenceEntity> findLockedByRefreshTokenHash(@Param("hash") String refreshTokenHash);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from UserSessionPersistenceEntity s where s.id = :id")
+    Optional<UserSessionPersistenceEntity> findLockedById(@Param("id") UUID id);
 
     List<UserSessionPersistenceEntity> findByUserIdAndRevokedAtIsNull(UUID userId);
 

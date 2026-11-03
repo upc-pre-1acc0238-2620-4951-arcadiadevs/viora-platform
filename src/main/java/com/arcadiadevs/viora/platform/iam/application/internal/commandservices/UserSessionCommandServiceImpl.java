@@ -22,6 +22,8 @@ import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountReposit
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserSessionRepository;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +33,16 @@ import java.time.Instant;
 /**
  * Application service implementation opening and renewing user sessions.
  *
- * <p>Every session stores only the hash of its refresh token. A refresh rotates the token; presenting a token that
- * was already rotated or revoked revokes every session of the account, because it means the token leaked.</p>
+ * <p>Every session stores only the hash of its refresh token. A refresh rotates the token. A rotated token that comes
+ * back while its successor was never used means the client lost the answer (no signal, the app was closed or updated),
+ * so the rotation is answered again. Any other rotated or revoked token revokes every session of the account, because
+ * it means the token leaked.</p>
  */
 @Service
 @Transactional
 public class UserSessionCommandServiceImpl implements UserSessionCommandService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserSessionCommandServiceImpl.class);
 
     private final UserAccountRepository userAccountRepository;
     private final UserSessionRepository userSessionRepository;
@@ -161,7 +167,8 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
     }
 
     /**
-     * Rotates a refresh token: revokes its session and opens a new one with the current credentials version.
+     * Rotates a refresh token: revokes its session and opens a new one with the current credentials version. The
+     * sessions stay locked until the transaction ends, so a second request with the same token waits for the first.
      *
      * @param command refresh command
      * @return the new session, or why the refresh token was rejected
@@ -172,7 +179,7 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
             return Result.failure(invalidRefreshToken());
         }
         var now = Instant.now();
-        var optionalSession = userSessionRepository.findByRefreshTokenHash(
+        var optionalSession = userSessionRepository.findByRefreshTokenHashForUpdate(
                 tokenGenerator.hash(command.refreshToken().trim()));
         if (optionalSession.isEmpty()) {
             return Result.failure(invalidRefreshToken());
@@ -181,11 +188,18 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
         var session = optionalSession.get();
         var userId = session.snapshot().userId();
         if (session.snapshot().revokedAt() != null) {
-            // A rotated or revoked token came back: someone else holds a copy, so every session is closed
-            revokeAllSessionsOf(userId, now);
-            return Result.failure(invalidRefreshToken());
-        }
-        if (!session.isActive(now)) {
+            var successor = userSessionRepository.findByIdForUpdate(session.snapshot().successorId()).orElse(null);
+            if (!session.rotationAnswerWasLost(successor, now)) {
+                // A rotated or revoked token came back: someone else holds a copy, so every session is closed
+                log.warn("A used refresh token came back: closing every session of account {}.", userId.userId());
+                revokeAllSessionsOf(userId, now);
+                return Result.failure(invalidRefreshToken());
+            }
+            // The successor is replaced, so its token raises the alarm if it ever shows up
+            log.info("Answering again a refresh whose answer was lost, for account {}.", userId.userId());
+            successor.revoke(now);
+            userSessionRepository.save(successor);
+        } else if (!session.isActive(now)) {
             return Result.failure(invalidRefreshToken());
         }
 
@@ -196,7 +210,7 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
                 || optionalAccount.get().snapshot().credentialsVersion() != session.snapshot().credentialsVersion()) {
             return Result.failure(invalidRefreshToken());
         }
-        return openSessionFor(optionalAccount.get(), now);
+        return openSessionFor(optionalAccount.get(), now, session);
     }
 
     /**
@@ -215,8 +229,8 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
     }
 
     /**
-     * Closes the session held by the refresh token, so the token cannot renew it again. An unknown or already closed
-     * session answers the same empty success.
+     * Closes the session held by the refresh token, so the token cannot renew it again, along with a successor whose
+     * answer may have been lost. An unknown or already closed session answers the same empty success.
      *
      * @param command sign-out command
      * @return empty success
@@ -228,21 +242,35 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
         }
         userSessionRepository.findByRefreshTokenHash(tokenGenerator.hash(command.refreshToken().trim()))
                 .ifPresent(session -> {
-                    session.revoke(Instant.now());
+                    var now = Instant.now();
+                    session.revoke(now);
                     userSessionRepository.save(session);
+                    userSessionRepository.findByIdForUpdate(session.snapshot().successorId()).ifPresent(successor -> {
+                        successor.revoke(now);
+                        userSessionRepository.save(successor);
+                    });
                 });
         return Result.success(null);
     }
 
     private Result<AuthenticatedSession, ApplicationError> openSessionFor(UserAccount account, Instant now) {
+        return openSessionFor(account, now, null);
+    }
+
+    private Result<AuthenticatedSession, ApplicationError> openSessionFor(UserAccount account, Instant now,
+                                                                          UserSession predecessor) {
         var snapshot = account.snapshot();
         if (snapshot.status() != UserAccountStatus.ACTIVE) {
             return Result.failure(ApplicationError.forbidden("email-verification", "user.email.not_verified"));
         }
 
         var refreshToken = tokenGenerator.generate();
-        userSessionRepository.save(UserSession.start(snapshot.id(), tokenGenerator.hash(refreshToken),
+        var opened = userSessionRepository.save(UserSession.start(snapshot.id(), tokenGenerator.hash(refreshToken),
                 snapshot.credentialsVersion(), now));
+        if (predecessor != null) {
+            predecessor.replaceWith(opened.snapshot().id(), now);
+            userSessionRepository.save(predecessor);
+        }
 
         var accessToken = tokenService.generateAccessToken(snapshot.id().userId(), snapshot.email().value(),
                 snapshot.role().name(), snapshot.credentialsVersion());
