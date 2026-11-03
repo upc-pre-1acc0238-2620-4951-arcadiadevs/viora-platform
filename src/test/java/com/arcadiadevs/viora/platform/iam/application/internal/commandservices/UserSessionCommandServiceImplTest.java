@@ -85,6 +85,27 @@ class UserSessionCommandServiceImplTest {
     }
 
     @Test
+    @DisplayName("Opens the session when the client serves the role of the account")
+    void signInWithTheRoleOfTheAccount() {
+        var session = success(service.handle(new AuthenticateUserCommand(EMAIL, "Password123", "ROLE_PRODUCER")));
+
+        assertThat(session.role()).isEqualTo("ROLE_PRODUCER");
+    }
+
+    @Test
+    @DisplayName("Refuses an account of another role only once the password is right, and opens no session")
+    void signInWithAnotherRole() {
+        var wrongRole = failure(service.handle(
+                new AuthenticateUserCommand(EMAIL, "Password123", "ROLE_TECHNICAL_MANAGER")));
+        var wrongPassword = failure(service.handle(
+                new AuthenticateUserCommand(EMAIL, "Wrong12345", "ROLE_TECHNICAL_MANAGER")));
+
+        assertThat(wrongRole.code()).isEqualTo("USER_ROLE_FORBIDDEN");
+        assertThat(wrongPassword.code()).isEqualTo("USER_FORBIDDEN");
+        assertThat(sessions.byHash).isEmpty();
+    }
+
+    @Test
     @DisplayName("Answers a wrong password and an unknown email the same way")
     void wrongCredentialsLookTheSame() {
         var wrongPassword = failure(service.handle(new AuthenticateUserCommand(EMAIL, "Otra12345")));

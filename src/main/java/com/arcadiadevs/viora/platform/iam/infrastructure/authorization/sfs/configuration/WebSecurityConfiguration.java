@@ -20,6 +20,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -41,6 +42,7 @@ public class WebSecurityConfiguration {
     private final BearerTokenService tokenService;
     private final Argon2HashingService hashingService;
     private final AuthenticationEntryPoint unauthorizedRequestHandler;
+    private final AccessDeniedHandler forbiddenRequestHandler;
     private final DeepLinkProperties deepLinkProperties;
     private final List<String> allowedOrigins;
 
@@ -49,6 +51,7 @@ public class WebSecurityConfiguration {
             BearerTokenService tokenService,
             Argon2HashingService hashingService,
             AuthenticationEntryPoint unauthorizedRequestHandler,
+            AccessDeniedHandler forbiddenRequestHandler,
             DeepLinkProperties deepLinkProperties,
             @Value("${web.cors.allowed-origins:*}") List<String> allowedOrigins
     ) {
@@ -56,6 +59,7 @@ public class WebSecurityConfiguration {
         this.tokenService = tokenService;
         this.hashingService = hashingService;
         this.unauthorizedRequestHandler = unauthorizedRequestHandler;
+        this.forbiddenRequestHandler = forbiddenRequestHandler;
         this.deepLinkProperties = deepLinkProperties;
         this.allowedOrigins = allowedOrigins;
     }
@@ -96,7 +100,9 @@ public class WebSecurityConfiguration {
         }));
 
         http.csrf(AbstractHttpConfigurer::disable)
-                .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedRequestHandler))
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(unauthorizedRequestHandler)
+                        .accessDeniedHandler(forbiddenRequestHandler))
                 .sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         // Deny by default: only the routes below answer without a session. Any other route needs a
@@ -119,6 +125,14 @@ public class WebSecurityConfiguration {
                                 "/api/v1/agronomic-dossiers/verifications/**").permitAll()
                         // Mercado Pago signs its notifications; the controller verifies that signature
                         .requestMatchers(HttpMethod.POST, "/api/v1/payment-notifications/mercado-pago").permitAll()
+                        // Profiles and plans serve every role; the rest of the API is the producer's for now
+                        .requestMatchers(
+                                "/api/v1/profiles/**",
+                                "/api/v1/subscriptions/**",
+                                "/api/v1/subscription-plans/**",
+                                "/api/v1/cooperative-code-redemptions/**",
+                                "/api/v1/quota-extension-redemptions/**").authenticated()
+                        .requestMatchers("/api/v1/**").hasRole("PRODUCER")
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());

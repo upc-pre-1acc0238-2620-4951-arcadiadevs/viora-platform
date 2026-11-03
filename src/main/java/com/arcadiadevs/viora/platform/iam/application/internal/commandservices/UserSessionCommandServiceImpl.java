@@ -100,7 +100,7 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
 
     /**
      * Signs in with email and password. A wrong email and a wrong password get the same answer, in the same time;
-     * an unverified email is only reported once the password is right. After too many failed attempts the email is
+     * an unverified email or an account of another role are only reported once the password is right. After too many failed attempts the email is
      * refused for a while, even with the right password.
      *
      * <p>It runs outside a transaction: the password hash takes tens of milliseconds and must not hold one of the
@@ -136,6 +136,9 @@ public class UserSessionCommandServiceImpl implements UserSessionCommandService 
             return Result.failure(ApplicationError.forbidden("user", "user.credentials.invalid"));
         }
         attemptLimiter.resetSignIn(email.value());
+        if (command.role() != null && !command.role().equals(optionalAccount.get().snapshot().role().name())) {
+            return Result.failure(ApplicationError.forbidden("user-role", "user.role.sign_in_not_allowed"));
+        }
         return openSessionFor(optionalAccount.get(), now);
     }
 

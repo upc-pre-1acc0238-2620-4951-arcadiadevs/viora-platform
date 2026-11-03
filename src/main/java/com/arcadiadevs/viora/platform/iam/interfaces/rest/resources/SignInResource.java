@@ -12,6 +12,9 @@ public record SignInResource(
         String email,
 
         @NotBlank(message = "user.password.blank")
-        String password
+        String password,
+
+        // Role the client serves; without it, an account of any role can sign in
+        String role
 ) {
 }
