@@ -15,9 +15,10 @@ import java.util.List;
  * @param baseUrl           public https URL of the domain the links point to, without trailing slash
  * @param passwordResetPath path of the password reset resource the app handles, without trailing slash
  * @param android           identity of the Android app allowed to open the links
+ * @param gestor            the links of the app for technical managers
  */
 @ConfigurationProperties(prefix = "viora.deep-link")
-public record DeepLinkProperties(String baseUrl, String passwordResetPath, Android android) {
+public record DeepLinkProperties(String baseUrl, String passwordResetPath, Android android, Gestor gestor) {
 
     /**
      * Normalizes missing values to empty ones, so an unconfigured property never breaks the startup.
@@ -27,6 +28,7 @@ public record DeepLinkProperties(String baseUrl, String passwordResetPath, Andro
         passwordResetPath = passwordResetPath == null || passwordResetPath.isBlank()
                 ? "/password-resets" : passwordResetPath.trim().replaceAll("/+$", "");
         android = android == null ? new Android("", List.of()) : android;
+        gestor = gestor == null ? new Gestor(null, null, null) : gestor;
     }
 
     /**
@@ -37,6 +39,37 @@ public record DeepLinkProperties(String baseUrl, String passwordResetPath, Andro
      */
     public String passwordResetLink(String resetToken) {
         return baseUrl + passwordResetPath + "/" + resetToken;
+    }
+
+    /**
+     * Builds the password reset link of a technical manager, which opens the Gestor app.
+     *
+     * @param resetToken the token of the reset link, already URL safe
+     * @return the absolute link
+     */
+    public String gestorPasswordResetLink(String resetToken) {
+        return baseUrl + gestor.passwordResetPath() + "/" + resetToken;
+    }
+
+    /**
+     * The links of the app for technical managers. iOS has no verified link without a paid Apple account, so the web
+     * page behind the link opens the app through its own URL scheme.
+     *
+     * @param passwordResetPath path of the password reset resource the app handles, without trailing slash
+     * @param iosScheme         URL scheme of the iOS app
+     * @param android           identity of the Android app allowed to open the links
+     */
+    public record Gestor(String passwordResetPath, String iosScheme, Android android) {
+
+        /**
+         * Normalizes missing values, so an unconfigured property never breaks the startup.
+         */
+        public Gestor {
+            passwordResetPath = passwordResetPath == null || passwordResetPath.isBlank()
+                    ? "/gestor/password-resets" : passwordResetPath.trim().replaceAll("/+$", "");
+            iosScheme = iosScheme == null || iosScheme.isBlank() ? "viora-gestor" : iosScheme.trim();
+            android = android == null ? new Android("", List.of()) : android;
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Serves the Digital Asset Links file that lets Android open the links of this domain in the Viora app.
@@ -34,19 +35,18 @@ public class AndroidAssetLinksController {
     }
 
     /**
-     * Answers the asset links of the configured Android app.
+     * Answers the asset links of the configured Android apps.
      *
-     * @return the statements, empty while the app identity is not configured
+     * @return the statements, empty while no app identity is configured
      */
     @GetMapping(value = "/.well-known/assetlinks.json", produces = MediaType.APPLICATION_JSON_VALUE)
     public List<AssetLinkResource> assetLinks() {
-        var android = deepLinkProperties.android();
-        if (!android.isConfigured()) {
-            return List.of();
-        }
-        return List.of(new AssetLinkResource(
-                List.of(HANDLE_ALL_URLS),
-                new AssetLinkResource.Target("android_app", android.packageName(), android.sha256CertFingerprints())
-        ));
+        return Stream.of(deepLinkProperties.android(), deepLinkProperties.gestor().android())
+                .filter(DeepLinkProperties.Android::isConfigured)
+                .map(android -> new AssetLinkResource(
+                        List.of(HANDLE_ALL_URLS),
+                        new AssetLinkResource.Target("android_app", android.packageName(),
+                                android.sha256CertFingerprints())))
+                .toList();
     }
 }

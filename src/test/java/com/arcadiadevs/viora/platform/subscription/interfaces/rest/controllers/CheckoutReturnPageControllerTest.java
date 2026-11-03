@@ -20,7 +20,7 @@ class CheckoutReturnPageControllerTest {
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CheckoutReturnPageController(
             new DeepLinkProperties("https://viora.example", "/password-resets",
-                    new DeepLinkProperties.Android("pe.edu.upc.viora", List.of("AB:CD")))))
+                    new DeepLinkProperties.Android("pe.edu.upc.viora", List.of("AB:CD")), null)))
             .build();
 
     @Test

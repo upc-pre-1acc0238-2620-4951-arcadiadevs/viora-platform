@@ -1,5 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
+
 /**
  * Outbound application port for delivering transactional system emails.
  *
@@ -16,8 +18,9 @@ public interface TransactionalEmailService {
      *
      * @param recipientEmail destination email address
      * @param resetToken     the token of the reset link; the implementation builds the link around it
+     * @param role           the role of the account, which decides the app the link opens
      */
-    void sendPasswordResetEmail(String recipientEmail, String resetToken);
+    void sendPasswordResetEmail(String recipientEmail, String resetToken, UserRole role);
 
     /**
      * Sends an email with the 6-digit code that verifies the address of a new account.
