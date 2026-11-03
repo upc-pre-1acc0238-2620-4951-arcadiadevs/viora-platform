@@ -54,7 +54,7 @@ Crea la cuenta pendiente de verificación y su perfil en una sola operación at�
 #### Reglas de Validación:
 * `email`: Formato válido de correo electrónico. Si ya pertenece a una **cuenta activa** responde `409` (`user.email.already_exists`).
 * `password`: 8 caracteres o más, con letras y números. Si no cumple, responde `400` con **todas** las reglas incumplidas en `violations` (ver la sección 2.7).
-* `role`: Obligatorio. Solo se acepta `ROLE_PRODUCER`; cualquier otro responde `400` (`user.role.sign_up_not_allowed`).
+* `role`: Obligatorio. `ROLE_PRODUCER` o `ROLE_TECHNICAL_MANAGER`. Registrarse de nuevo con un correo pendiente y otro rol responde `400` (`user.role.sign_up_not_allowed`).
 * `termsAccepted`: Obligatorio y en `true`. El backend registra la versión vigente de los términos y la fecha (Ley 29733).
 * `profile.*`: Validados por `Profiles` con `libphonenumber`. El teléfono debe ser un **celular del país elegido** (`profile.phone.not_mobile` si es fijo, `profile.phone.country_mismatch` si es de otro país). Si el perfil es inválido, **no se crea la cuenta**.
 
@@ -122,6 +122,10 @@ Crea la cuenta pendiente de verificación y su perfil en una sola operación at�
 #### Errores:
 * Correo o contraseña incorrectos: `403`, `code: USER_FORBIDDEN` (mensaje genérico, no dice cuál de los dos falló).
 * Correo sin verificar (solo si la contraseña es correcta): `403`, `code: EMAIL_VERIFICATION_FORBIDDEN`. La app lleva a T04a y puede reenviar el código.
+* Cuenta de otro rol (solo si la contraseña es correcta): `403`, `code: USER_ROLE_FORBIDDEN`.
+
+#### Rol de la aplicación:
+`role` es opcional. Una app de un solo rol lo envía (`ROLE_PRODUCER` o `ROLE_TECHNICAL_MANAGER`) para rechazar las cuentas de otro rol; un cliente que sirve a ambos, como la web, lo omite y decide qué mostrar con el `role` de la respuesta. Este filtro no protege los datos: lo hacen los permisos de cada endpoint, leídos del token. Por ahora solo `auth`, los perfiles, las suscripciones y sus planes aceptan cualquier rol; el resto de `/api/v1` es de `ROLE_PRODUCER`.
 
 ---
 

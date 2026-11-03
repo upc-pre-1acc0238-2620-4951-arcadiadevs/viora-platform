@@ -1,0 +1,91 @@
+package com.arcadiadevs.viora.platform.iam.infrastructure.authorization.sfs.configuration;
+
+import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.tokens.TokenService;
+import com.arcadiadevs.viora.platform.iam.domain.model.UserAccountFixtures;
+import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserAccountSnapshot;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
+import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
+import jakarta.servlet.Filter;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * The real security filter chain with real tokens: which part of the API answers each role.
+ */
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:roleaccess;DB_CLOSE_DELAY=-1",
+        "spring.jpa.hibernate.ddl-auto=create-drop"
+})
+@DisplayName("Access to the API by role")
+class RoleAccessIntegrationTest {
+
+    @Autowired WebApplicationContext context;
+    @Autowired UserAccountRepository accounts;
+    @Autowired TokenService tokenService;
+    private MockMvc mvc;
+
+    @BeforeEach
+    void setUp() {
+        mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean("springSecurityFilterChain", Filter.class))
+                .build();
+    }
+
+    @Test
+    @DisplayName("A technical manager is refused outside profiles and subscriptions, with the usual error body")
+    void technicalManagerIsRefusedInProducerApi() throws Exception {
+        var token = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
+
+        for (var path : new String[]{"/api/v1/plots", "/api/v1/samplings", "/api/v1/assistant/daily-summary"}) {
+            mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+        }
+    }
+
+    @Test
+    @DisplayName("A technical manager reaches subscriptions and its profile, and a producer the rest of the API")
+    void eachRoleReachesItsApi() throws Exception {
+        var managerAccount = accountOf(UserRole.ROLE_TECHNICAL_MANAGER);
+        var manager = "Bearer " + tokenOf(managerAccount);
+        var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
+
+        mvc.perform(get("/api/v1/subscriptions").header(HttpHeaders.AUTHORIZATION, manager))
+                .andExpect(status().isNoContent());
+        var profile = mvc.perform(get("/api/v1/profiles/" + managerAccount.id().userId())
+                .header(HttpHeaders.AUTHORIZATION, manager)).andReturn().getResponse().getStatus();
+        assertThat(profile).isNotIn(401, 403);
+        mvc.perform(get("/api/v1/plots").header(HttpHeaders.AUTHORIZATION, producer)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Without a token the producer API answers 401 and the plan catalog stays public")
+    void withoutToken() throws Exception {
+        mvc.perform(get("/api/v1/plots")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/subscription-plans")).andExpect(status().isOk());
+    }
+
+    private UserAccountSnapshot accountOf(UserRole role) {
+        return accounts.save(UserAccountFixtures.activeAccount(
+                UUID.randomUUID() + "@viora.ag", "hashed:Password123", role)).snapshot();
+    }
+
+    private String tokenOf(UserAccountSnapshot account) {
+        return tokenService.generateAccessToken(account.id().userId(), account.email().value(),
+                account.role().name(), account.credentialsVersion());
+    }
+}

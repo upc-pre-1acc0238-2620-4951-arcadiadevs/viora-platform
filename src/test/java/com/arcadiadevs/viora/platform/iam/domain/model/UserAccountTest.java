@@ -57,14 +57,12 @@ class UserAccountTest {
     }
 
     @Test
-    @DisplayName("Should only let producers sign up, and only after accepting the terms")
-    void shouldRejectSignUpWithoutTermsOrWithAnotherRole() {
+    @DisplayName("Should let producers and technical managers sign up, and only after accepting the terms")
+    void shouldRejectSignUpWithoutTerms() {
         var now = Instant.now();
 
-        assertThatThrownBy(() -> UserAccount.signUp(email, hash, UserRole.ROLE_TECHNICAL_MANAGER, TERMS, null,
-                HASHER.hash(CODE), now))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("user.role.sign_up_not_allowed");
+        assertThat(UserAccount.signUp(email, hash, UserRole.ROLE_TECHNICAL_MANAGER, TERMS, null,
+                HASHER.hash(CODE), now).snapshot().role()).isEqualTo(UserRole.ROLE_TECHNICAL_MANAGER);
         assertThatThrownBy(() -> UserAccount.signUp(email, hash, role, null, null, HASHER.hash(CODE), now))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("user.terms.not_accepted");

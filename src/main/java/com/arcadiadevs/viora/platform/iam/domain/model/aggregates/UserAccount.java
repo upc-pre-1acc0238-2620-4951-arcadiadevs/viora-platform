@@ -95,7 +95,7 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
      *
      * @param email                    normalized email address
      * @param passwordHash             derived password hash
-     * @param role                     requested role; only {@link UserRole#ROLE_PRODUCER} can sign up
+     * @param role                     requested role
      * @param termsAcceptance          the accepted terms version and instant
      * @param onboardingProfileDetails profile details submitted at sign-up, or null when there are none
      * @param verificationCodeHash     hash of the email verification code being sent
@@ -121,9 +121,6 @@ public class UserAccount extends AbstractDomainAggregateRoot<UserAccount> {
         }
         if (role == null) {
             throw new IllegalArgumentException("user.role.null");
-        }
-        if (role != UserRole.ROLE_PRODUCER) {
-            throw new IllegalArgumentException("user.role.sign_up_not_allowed");
         }
         if (termsAcceptance == null) {
             throw new IllegalArgumentException("user.terms.not_accepted");
