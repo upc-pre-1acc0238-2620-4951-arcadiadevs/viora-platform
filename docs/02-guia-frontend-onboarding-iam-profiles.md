@@ -144,7 +144,8 @@ La misma sesión que `sign-in`, con un **`refreshToken` nuevo**.
 
 #### Reglas importantes:
 * **Rotación:** cada refresh token sirve **una sola vez**. La app debe guardar siempre el último `refreshToken` recibido.
-* **Reuso = robo:** si se envía un refresh token que ya se usó, el backend cierra **todas** las sesiones de la cuenta y responde `403` (`code: USER_FORBIDDEN`). La app debe ir al login.
+* **Respuesta perdida:** si vuelve un refresh token ya rotado y la sesión que generó **nunca se usó**, la app no recibió la respuesta (sin señal, app cerrada o actualizada). El backend responde `200` con un par nuevo e invalida el par que se perdió.
+* **Reuso = robo:** en cualquier otro caso, un refresh token que ya se usó hace que el backend cierre **todas** las sesiones de la cuenta y responda `403` (`code: USER_FORBIDDEN`). La app debe ir al login.
 * Hay que enviar el **refresh token**, no el access token.
 * También responde `403` si el refresh token venció o si la contraseña cambió después de emitirlo.
 
@@ -302,7 +303,7 @@ Con `VIORA_DEMO_ACCOUNT_EMAIL` y `VIORA_DEMO_ACCOUNT_PASSWORD` configuradas, el 
    - Configurar un interceptor en el cliente HTTP (Dio, Axios, etc.).
    - Cuando una petición a endpoints protegidos (ej. `/api/v1/plots`) falle con `401 Unauthorized`:
      1. Pausar las peticiones en cola.
-     2. Invocar `POST /api/v1/auth/refresh-tokens` con el `refreshToken` almacenado, **una sola vez** aunque haya varias peticiones fallidas: como el refresh token se usa una vez, dos renovaciones en paralelo cierran todas las sesiones.
+     2. Invocar `POST /api/v1/auth/refresh-tokens` con el `refreshToken` almacenado, **una sola vez** aunque haya varias peticiones fallidas: el refresh token se usa una vez, y aunque el backend atiende en orden dos renovaciones simultáneas, solo vale el último par que entregó.
      3. Si la renovación es exitosa, guardar **los dos** tokens nuevos y reintentar la petición original.
      4. Si la renovación falla (`403`), redirigir a la pantalla de Login.
    - Tras **cambiar** la contraseña desde la app, guardar los tokens nuevos de la respuesta y seguir en la app. Tras **recuperarla** con el enlace, ir al Login.
