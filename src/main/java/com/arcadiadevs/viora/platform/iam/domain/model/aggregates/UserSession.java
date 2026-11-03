@@ -13,8 +13,9 @@ import java.time.Instant;
  *
  * <p>It is a separate aggregate from {@link UserAccount} because an account accumulates sessions without limit; it
  * refers to the account by {@link UserId} only. The session keeps only the hash of its refresh token and the
- * credentials version of the account when it started. Each refresh rotates it: the old session is revoked and a new
- * one is started. Contains zero JPA, framework, or presentation annotations.</p>
+ * credentials version of the account when it started. Each refresh rotates it: the old session is revoked, a new one
+ * is started and the old one remembers it as its successor. Contains zero JPA, framework, or presentation
+ * annotations.</p>
  */
 public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
 
@@ -34,9 +35,10 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
     private final Instant createdAt;
     private final Instant expiresAt;
     private Instant revokedAt;
+    private UserSessionId successorId;
 
     private UserSession(UserSessionId id, UserId userId, TokenHash refreshTokenHash, long credentialsVersion,
-                        Instant createdAt, Instant expiresAt, Instant revokedAt) {
+                        Instant createdAt, Instant expiresAt, Instant revokedAt, UserSessionId successorId) {
         this.id = id;
         this.userId = userId;
         this.refreshTokenHash = refreshTokenHash;
@@ -44,6 +46,7 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
         this.revokedAt = revokedAt;
+        this.successorId = successorId;
     }
 
     /**
@@ -70,7 +73,7 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
             throw new IllegalArgumentException("user.clock.now.null");
         }
         return new UserSession(new UserSessionId(), userId, refreshTokenHash, credentialsVersion, now,
-                now.plus(LIFESPAN), null);
+                now.plus(LIFESPAN), null, null);
     }
 
     /**
@@ -84,7 +87,8 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
             throw new IllegalArgumentException("user.session.snapshot.null");
         }
         return new UserSession(snapshot.id(), snapshot.userId(), snapshot.refreshTokenHash(),
-                snapshot.credentialsVersion(), snapshot.createdAt(), snapshot.expiresAt(), snapshot.revokedAt());
+                snapshot.credentialsVersion(), snapshot.createdAt(), snapshot.expiresAt(), snapshot.revokedAt(),
+                snapshot.successorId());
     }
 
     /**
@@ -113,12 +117,44 @@ public class UserSession extends AbstractDomainAggregateRoot<UserSession> {
     }
 
     /**
+     * Revokes the session because the given one took its place in a rotation.
+     *
+     * @param successorId the session that replaces this one
+     * @param now         the revocation instant
+     * @throws IllegalArgumentException if an argument is null
+     */
+    public void replaceWith(UserSessionId successorId, Instant now) {
+        if (successorId == null) {
+            throw new IllegalArgumentException("user.session.successor_id.null");
+        }
+        revoke(now);
+        this.successorId = successorId;
+    }
+
+    /**
+     * Checks whether presenting this session's token again means its client never received the answer of the rotation:
+     * the session was rotated, its token has not expired and the given successor was never used. A used successor
+     * proves that the client got the answer, so the token coming back is a copy.
+     *
+     * @param successor the session that replaced this one
+     * @param now       current instant
+     * @return true if the rotation can be answered again with a new session
+     */
+    public boolean rotationAnswerWasLost(UserSession successor, Instant now) {
+        return revokedAt != null
+                && !now.isAfter(expiresAt)
+                && successor != null
+                && successor.id.equals(successorId)
+                && successor.isActive(now);
+    }
+
+    /**
      * Exposes the current state as an immutable snapshot.
      *
      * @return UserSessionSnapshot instance
      */
     public UserSessionSnapshot snapshot() {
         return new UserSessionSnapshot(id, userId, refreshTokenHash, credentialsVersion, createdAt, expiresAt,
-                revokedAt);
+                revokedAt, successorId);
     }
 }

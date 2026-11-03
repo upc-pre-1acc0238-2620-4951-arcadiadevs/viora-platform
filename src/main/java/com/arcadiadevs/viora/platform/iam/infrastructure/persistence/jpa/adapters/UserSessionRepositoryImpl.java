@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.adapte
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserSession;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserSessionId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserSessionRepository;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.assemblers.UserSessionPersistenceAssembler;
 import com.arcadiadevs.viora.platform.iam.infrastructure.persistence.jpa.repositories.UserSessionPersistenceRepository;
@@ -43,6 +44,24 @@ public class UserSessionRepositoryImpl implements UserSessionRepository {
             return Optional.empty();
         }
         return persistenceRepository.findByRefreshTokenHash(refreshTokenHash.value())
+                .map(UserSessionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<UserSession> findByRefreshTokenHashForUpdate(TokenHash refreshTokenHash) {
+        if (refreshTokenHash == null) {
+            return Optional.empty();
+        }
+        return persistenceRepository.findLockedByRefreshTokenHash(refreshTokenHash.value())
+                .map(UserSessionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<UserSession> findByIdForUpdate(UserSessionId id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return persistenceRepository.findLockedById(UUID.fromString(id.sessionId()))
                 .map(UserSessionPersistenceAssembler::toDomainFromPersistence);
     }
 

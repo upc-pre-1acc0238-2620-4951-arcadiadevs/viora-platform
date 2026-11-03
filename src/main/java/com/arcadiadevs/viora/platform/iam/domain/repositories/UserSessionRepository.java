@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.iam.domain.repositories;
 import com.arcadiadevs.viora.platform.iam.domain.model.aggregates.UserSession;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.TokenHash;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserSessionId;
 
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,23 @@ public interface UserSessionRepository {
      * @return Optional containing the session if found
      */
     Optional<UserSession> findByRefreshTokenHash(TokenHash refreshTokenHash);
+
+    /**
+     * Same as {@link #findByRefreshTokenHash}, holding the session until the transaction ends, so two refreshes of the
+     * same token run one after the other.
+     *
+     * @param refreshTokenHash hash of the refresh token
+     * @return Optional containing the locked session if found
+     */
+    Optional<UserSession> findByRefreshTokenHashForUpdate(TokenHash refreshTokenHash);
+
+    /**
+     * Finds a session by its identifier, holding it until the transaction ends.
+     *
+     * @param id the session identifier
+     * @return Optional containing the locked session if found
+     */
+    Optional<UserSession> findByIdForUpdate(UserSessionId id);
 
     /**
      * Finds the sessions of an account that are not revoked yet.

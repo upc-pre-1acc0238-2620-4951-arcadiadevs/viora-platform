@@ -16,6 +16,7 @@ import java.time.Instant;
  * @param createdAt          start instant
  * @param expiresAt          instant after which the refresh token cannot be used
  * @param revokedAt          revocation instant, or null while the session is not revoked
+ * @param successorId        the session that replaced this one in a rotation, or null if there is none
  */
 public record UserSessionSnapshot(
         UserSessionId id,
@@ -24,7 +25,8 @@ public record UserSessionSnapshot(
         long credentialsVersion,
         Instant createdAt,
         Instant expiresAt,
-        Instant revokedAt
+        Instant revokedAt,
+        UserSessionId successorId
 ) {
     public UserSessionSnapshot {
         if (id == null) {

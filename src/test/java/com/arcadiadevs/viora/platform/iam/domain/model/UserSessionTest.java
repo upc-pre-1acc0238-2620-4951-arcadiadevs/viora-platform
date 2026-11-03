@@ -43,6 +43,39 @@ class UserSessionTest {
     }
 
     @Test
+    @DisplayName("Should remember its successor when it is replaced, and survive being rebuilt from the snapshot")
+    void shouldRememberSuccessor() {
+        var now = Instant.now();
+        var session = UserSession.start(userId, UserAccountFixtures.tokenHashOf("hash"), 0L, now);
+        var successor = UserSession.start(userId, UserAccountFixtures.tokenHashOf("next"), 0L, now);
+
+        session.replaceWith(successor.snapshot().id(), now.plusSeconds(10));
+
+        assertThat(session.snapshot().revokedAt()).isEqualTo(now.plusSeconds(10));
+        assertThat(UserSession.reconstitute(session.snapshot()).snapshot().successorId())
+                .isEqualTo(successor.snapshot().id());
+    }
+
+    @Test
+    @DisplayName("Should treat the rotation answer as lost only while the successor was never used")
+    void shouldDetectLostRotationAnswer() {
+        var now = Instant.now();
+        var session = UserSession.start(userId, UserAccountFixtures.tokenHashOf("hash"), 0L, now);
+        var successor = UserSession.start(userId, UserAccountFixtures.tokenHashOf("next"), 0L, now);
+        var stranger = UserSession.start(userId, UserAccountFixtures.tokenHashOf("other"), 0L, now);
+        assertThat(session.rotationAnswerWasLost(successor, now)).isFalse();
+
+        session.replaceWith(successor.snapshot().id(), now);
+
+        assertThat(session.rotationAnswerWasLost(successor, now.plusSeconds(60))).isTrue();
+        assertThat(session.rotationAnswerWasLost(stranger, now.plusSeconds(60))).isFalse();
+        assertThat(session.rotationAnswerWasLost(null, now.plusSeconds(60))).isFalse();
+        assertThat(session.rotationAnswerWasLost(successor, now.plus(8, ChronoUnit.DAYS))).isFalse();
+        successor.revoke(now.plusSeconds(90));
+        assertThat(session.rotationAnswerWasLost(successor, now.plusSeconds(120))).isFalse();
+    }
+
+    @Test
     @DisplayName("Should reject a session without refresh token hash or with a negative version")
     void shouldValidateStart() {
         assertThatThrownBy(() -> UserSession.start(userId, null, 0L, Instant.now()))
