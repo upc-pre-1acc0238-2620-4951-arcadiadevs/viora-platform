@@ -32,6 +32,8 @@ public final class UserSessionPersistenceAssembler {
         entity.setCredentialsVersion(snapshot.credentialsVersion());
         entity.setExpiresAt(snapshot.expiresAt());
         entity.setRevokedAt(snapshot.revokedAt());
+        entity.setSuccessorSessionId(snapshot.successorId() == null
+                ? null : UUID.fromString(snapshot.successorId().sessionId()));
         entity.setCreatedAt(snapshot.createdAt());
         entity.setUpdatedAt(snapshot.revokedAt() != null ? snapshot.revokedAt() : snapshot.createdAt());
         return entity;
@@ -51,7 +53,9 @@ public final class UserSessionPersistenceAssembler {
                 entity.getCredentialsVersion(),
                 entity.getCreatedAt(),
                 entity.getExpiresAt(),
-                entity.getRevokedAt()
+                entity.getRevokedAt(),
+                entity.getSuccessorSessionId() == null
+                        ? null : new UserSessionId(entity.getSuccessorSessionId().toString())
         ));
     }
 }
