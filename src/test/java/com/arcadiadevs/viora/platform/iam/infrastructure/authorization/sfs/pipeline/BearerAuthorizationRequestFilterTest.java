@@ -35,7 +35,7 @@ class BearerAuthorizationRequestFilterTest {
                 return new ModelAndView();
             });
     private final BearerAuthorizationRequestFilter filter = new BearerAuthorizationRequestFilter(
-            tokenService, userDetailsService, entryPoint, "/password-resets");
+            tokenService, userDetailsService, entryPoint, List.of("/password-resets", "/gestor/password-resets"));
 
     @BeforeEach
     @AfterEach
@@ -67,7 +67,8 @@ class BearerAuthorizationRequestFilterTest {
     @Test
     @DisplayName("A rejected token sent to a public path is ignored")
     void rejectedTokenOnPublicPathIsIgnored() throws Exception {
-        for (var path : List.of("/api/v1/auth/sign-in", "/password-resets/abc", "/.well-known/assetlinks.json")) {
+        for (var path : List.of("/api/v1/auth/sign-in", "/password-resets/abc", "/gestor/password-resets/abc",
+                "/.well-known/assetlinks.json")) {
             var request = request(path, "expired");
             when(tokenService.validateToken("expired")).thenReturn(false);
             var response = new MockHttpServletResponse();

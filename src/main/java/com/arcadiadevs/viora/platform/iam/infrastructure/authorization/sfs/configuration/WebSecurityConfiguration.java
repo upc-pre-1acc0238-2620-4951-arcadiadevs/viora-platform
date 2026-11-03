@@ -67,7 +67,7 @@ public class WebSecurityConfiguration {
     @Bean
     public BearerAuthorizationRequestFilter authorizationRequestFilter() {
         return new BearerAuthorizationRequestFilter(tokenService, userDetailsService, unauthorizedRequestHandler,
-                deepLinkProperties.passwordResetPath());
+                List.of(deepLinkProperties.passwordResetPath(), deepLinkProperties.gestor().passwordResetPath()));
     }
 
     @Bean
@@ -118,6 +118,7 @@ public class WebSecurityConfiguration {
                                 "/email/**",
                                 "/error",
                                 deepLinkProperties.passwordResetPath() + "/**",
+                                deepLinkProperties.gestor().passwordResetPath() + "/**",
                                 "/payments/return/**").permitAll()
                         // The plan catalog is shown before signing up, and a sealed dossier is checked by third parties
                         .requestMatchers(HttpMethod.GET,

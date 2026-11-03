@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.email.brevo;
 
 import com.arcadiadevs.viora.platform.iam.application.internal.outboundservices.email.TransactionalEmailService;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
 import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,12 +133,16 @@ public class BrevoTransactionalEmailAdapter implements TransactionalEmailService
      *
      * @param recipientEmail destination email address
      * @param resetToken     the token of the reset link
+     * @param role           the role of the account, which decides the app the link opens
      * @throws IllegalStateException if Brevo rejects the request or cannot be reached
      */
     @Async
     @Override
-    public void sendPasswordResetEmail(String recipientEmail, String resetToken) {
-        var resetLink = deepLinks.passwordResetLink(URLEncoder.encode(resetToken, StandardCharsets.UTF_8));
+    public void sendPasswordResetEmail(String recipientEmail, String resetToken, UserRole role) {
+        var token = URLEncoder.encode(resetToken, StandardCharsets.UTF_8);
+        var resetLink = role == UserRole.ROLE_TECHNICAL_MANAGER
+                ? deepLinks.gestorPasswordResetLink(token)
+                : deepLinks.passwordResetLink(token);
         send(recipientEmail, resetSubject, resetLinkTemplate.replace(RESET_LINK_PLACEHOLDER, resetLink), "",
                 "password reset", "email.password_reset.dispatch_failed");
     }

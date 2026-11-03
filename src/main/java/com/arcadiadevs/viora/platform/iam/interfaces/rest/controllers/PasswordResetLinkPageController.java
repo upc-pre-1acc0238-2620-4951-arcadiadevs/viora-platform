@@ -18,13 +18,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 /**
- * Web page behind the password reset link of the email ({@code /password-resets/{token}}).
+ * Web page behind the password reset link of the email: {@code /password-resets/{token}} for the producer app and
+ * {@code /gestor/password-resets/{token}} for the Gestor app.
  *
  * <p>When Android opens the link in the app (verified App Link) this page is never reached. It is reached when the
  * phone opens the link in the browser instead: the installed app was signed with a certificate missing from
  * {@code assetlinks.json}, the link verification has not run yet, or the email app keeps links in its own browser.
  * The page then opens the app explicitly with an Android intent URL, which names the package and so does not depend
- * on the link verification. The token is only passed along; it is checked by the app through the IAM API.</p>
+ * on the link verification. On iOS the button of the Gestor page opens the app through its URL scheme. The token is
+ * only passed along; it is checked by the app through the IAM API.</p>
  */
 @Hidden
 @RestController
@@ -55,10 +57,28 @@ public class PasswordResetLinkPageController {
      */
     @GetMapping(value = "${viora.deep-link.password-reset-path:/password-resets}/{token}", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> page(@PathVariable String token) {
+        return page(token, deepLinkProperties.passwordResetLink(token), deepLinkProperties.android(), "");
+    }
+
+    /**
+     * Answers the page that opens the reset link in the Gestor app.
+     *
+     * @param token the reset token, last segment of the link
+     * @return 200 with the page, or 404 for something that is not a reset token
+     */
+    @GetMapping(value = "${viora.deep-link.gestor.password-reset-path:/gestor/password-resets}/{token}", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> gestorPage(@PathVariable String token) {
+        var gestor = deepLinkProperties.gestor();
+        var link = deepLinkProperties.gestorPasswordResetLink(token);
+        var iosUrl = gestor.iosScheme() + "://open" + URI.create(link).getRawPath();
+        return page(token, link, gestor.android(), iosUrl);
+    }
+
+    private ResponseEntity<String> page(String token, String link, DeepLinkProperties.Android app, String iosUrl) {
         if (!TOKEN.matcher(token).matches()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-        var html = template.replace("{{intentUrl}}", intentUrl(token));
+        var html = template.replace("{{intentUrl}}", intentUrl(link, app.packageName())).replace("{{iosUrl}}", iosUrl);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .contentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8))
@@ -69,9 +89,8 @@ public class PasswordResetLinkPageController {
      * {@code intent://<host>/password-resets/<token>#Intent;scheme=https;package=<app>;end}: Chrome hands it to the
      * named app, which opens the same link it would have received from the email.
      */
-    private String intentUrl(String token) {
-        var link = URI.create(deepLinkProperties.passwordResetLink(token));
-        var packageName = deepLinkProperties.android().packageName();
+    private String intentUrl(String resetLink, String packageName) {
+        var link = URI.create(resetLink);
         var intent = "intent://" + link.getHost() + link.getRawPath() + "#Intent;scheme=" + link.getScheme();
         if (!packageName.isEmpty()) {
             intent += ";package=" + packageName;

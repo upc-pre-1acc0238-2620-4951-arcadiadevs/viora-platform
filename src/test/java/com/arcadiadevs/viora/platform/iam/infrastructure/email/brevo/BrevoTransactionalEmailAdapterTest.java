@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.iam.infrastructure.email.brevo;
 
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
 import com.arcadiadevs.viora.platform.shared.infrastructure.deeplinks.configuration.DeepLinkProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class BrevoTransactionalEmailAdapterTest {
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
     private static final String ASSETS = "https://viora.example/";
     private static final DeepLinkProperties DEEP_LINKS = new DeepLinkProperties("https://links.viora.example/",
-            "/password-resets", new DeepLinkProperties.Android("", List.of()));
+            "/password-resets", new DeepLinkProperties.Android("", List.of()), null);
     private static final String UNRECOGNISED_IP = "{\"code\":\"unauthorized\",\"message\":\"We have detected you are "
             + "using an unrecognised IP address 203.0.113.7. If you performed this action make sure to add the new IP "
             + "address in this link: https://app.brevo.com/security/authorised_ips\"}";
@@ -47,7 +48,7 @@ class BrevoTransactionalEmailAdapterTest {
         var server = MockRestServiceServer.bindTo(builder).build();
         var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
-        assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
+        assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456", UserRole.ROLE_PRODUCER))
                 .doesNotThrowAnyException();
         server.verify();
     }
@@ -59,7 +60,7 @@ class BrevoTransactionalEmailAdapterTest {
         var server = MockRestServiceServer.bindTo(builder).build();
         var adapter = new BrevoTransactionalEmailAdapter(builder.build(), false, "any-api-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
-        assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
+        assertThatCode(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456", UserRole.ROLE_PRODUCER))
                 .doesNotThrowAnyException();
         server.verify();
     }
@@ -81,7 +82,23 @@ class BrevoTransactionalEmailAdapterTest {
                 .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
         var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Restablece — Viora", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
-        adapter.sendPasswordResetEmail("user@viora.ag", "Ab9_x-Z");
+        adapter.sendPasswordResetEmail("user@viora.ag", "Ab9_x-Z", UserRole.ROLE_PRODUCER);
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("Should post the reset link of the Gestor app to a technical manager")
+    void shouldPostGestorResetLinkToBrevo() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(BREVO_URL))
+                .andExpect(jsonPath("$.htmlContent").value(containsString(
+                        "https://links.viora.example/gestor/password-resets/Ab9_x-Z")))
+                .andRespond(withSuccess("{\"messageId\":\"abc\"}", MediaType.APPLICATION_JSON));
+        var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "test-key", "viora@arcadiadevs.com", "Viora", "Restablece — Viora", "Verifica — Viora", ASSETS, DEEP_LINKS);
+
+        adapter.sendPasswordResetEmail("user@viora.ag", "Ab9_x-Z", UserRole.ROLE_TECHNICAL_MANAGER);
 
         server.verify();
     }
@@ -96,7 +113,7 @@ class BrevoTransactionalEmailAdapterTest {
                 .body(UNRECOGNISED_IP));
         var adapter = new BrevoTransactionalEmailAdapter(builder.build(), true, "bad-key", "viora@arcadiadevs.com", "Viora", "Subject", "Verifica — Viora", ASSETS, DEEP_LINKS);
 
-        assertThatThrownBy(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456"))
+        assertThatThrownBy(() -> adapter.sendPasswordResetEmail("user@viora.ag", "123456", UserRole.ROLE_PRODUCER))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("email.password_reset.dispatch_failed")
                 .cause()

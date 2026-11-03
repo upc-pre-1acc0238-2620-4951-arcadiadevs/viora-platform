@@ -261,7 +261,12 @@ Ya viene configurada por defecto en `application.properties`; las variables de e
 | `ANDROID_PACKAGE_NAME` | `pe.edu.upc.viora` | Nunca, salvo que cambie el application id |
 | `ANDROID_SHA256_CERT_FINGERPRINTS` | `8C:B1:E1:62:88:15:5E:46:61:0D:A7:C8:60:BA:E7:2B:A2:42:48:49:C4:2C:C3:88:C6:02:21:FA:04:B4:F4:12` | Solo si cambia el keystore; al publicar en Play Store se **agrega** la huella de Play App Signing, separada por coma |
 
-`https://viora-platform.onrender.com/.well-known/assetlinks.json` debe devolver ese paquete y esa huella.
+| `GESTOR_ANDROID_PACKAGE_NAME` | `pe.edu.upc.viora.gestor` | Nunca, salvo que cambie el application id de la app Gestor |
+| `GESTOR_ANDROID_SHA256_CERT_FINGERPRINTS` | `46:CB:3F:22:01:BA:9D:A3:B6:D5:C8:B0:65:6D:15:2A:9E:14:33:E9:71:29:34:8D:06:88:AD:BA:CD:C8:0E:00` | Cuando la app Gestor tenga un keystore compartido |
+
+`https://viora-platform.onrender.com/.well-known/assetlinks.json` debe devolver esos paquetes y esas huellas.
+
+**App Gestor:** las cuentas `ROLE_TECHNICAL_MANAGER` reciben el enlace `/gestor/password-resets/{token}`. En iOS, la página de ese enlace abre la app con `viora-gestor://open/gestor/password-resets/{token}`.
 
 #### Firma de la app y Firebase App Distribution
 - La huella es la del **certificado del keystore** que firma el APK (`CN=Viora, OU=ArcadiaDevs, O=UPC, L=Lima, ST=Lima, C=PE`), no la de cada APK: **no cambia entre versiones** mientras se firme con ese keystore. Guárdenlo de forma segura; si se pierde, la huella cambia y los enlaces dejan de abrir la app.

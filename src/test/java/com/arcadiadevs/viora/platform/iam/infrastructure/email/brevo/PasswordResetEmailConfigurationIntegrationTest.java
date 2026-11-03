@@ -50,7 +50,7 @@ class PasswordResetEmailConfigurationIntegrationTest {
     }
 
     @Test
-    @DisplayName("The Android asset links file is served without a session, with the app package and fingerprint")
+    @DisplayName("The Android asset links file is served without a session, with the packages and fingerprints of both apps")
     void assetLinksAreServed() throws Exception {
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
 
@@ -58,7 +58,9 @@ class PasswordResetEmailConfigurationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         [{"target": {"namespace": "android_app", "package_name": "pe.edu.upc.viora",
-                          "sha256_cert_fingerprints": ["8C:B1:E1:62:88:15:5E:46:61:0D:A7:C8:60:BA:E7:2B:A2:42:48:49:C4:2C:C3:88:C6:02:21:FA:04:B4:F4:12"]}}]
+                          "sha256_cert_fingerprints": ["8C:B1:E1:62:88:15:5E:46:61:0D:A7:C8:60:BA:E7:2B:A2:42:48:49:C4:2C:C3:88:C6:02:21:FA:04:B4:F4:12"]}},
+                         {"target": {"namespace": "android_app", "package_name": "pe.edu.upc.viora.gestor",
+                          "sha256_cert_fingerprints": ["46:CB:3F:22:01:BA:9D:A3:B6:D5:C8:B0:65:6D:15:2A:9E:14:33:E9:71:29:34:8D:06:88:AD:BA:CD:C8:0E:00"]}}]
                         """));
     }
 }
