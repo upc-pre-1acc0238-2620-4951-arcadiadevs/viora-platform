@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.*;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
@@ -13,6 +14,7 @@ import com.arcadiadevs.viora.platform.subscription.application.ports.PaymentNoti
 /** Authenticated provider boundary; browser callbacks cannot invoke payment activation. */
 @RestController
 @RequestMapping("/api/v1/payment-notifications/mercado-pago")
+@Tag(name = "Payment Notifications", description = "Signed payment notifications sent by Mercado Pago")
 public class PaymentNotificationController {
     private final CheckoutService payments;
     private final PaymentNotificationAuthenticator signatures;
