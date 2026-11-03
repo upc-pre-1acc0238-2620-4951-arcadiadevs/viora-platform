@@ -167,6 +167,19 @@ class UserAccountCommandServiceImplTest {
     }
 
     @Test
+    @DisplayName("Tells the reason when a pending account signs up again with another role")
+    void signUpOverPendingAccountWithAnotherRoleFails() {
+        when(userAccountRepository.findByEmail(any(EmailAddress.class)))
+                .thenReturn(Optional.of(pendingAccount(Instant.now().minusSeconds(60))));
+
+        var error = failure(service.handle(new RegisterUserAccountCommand(EMAIL, NEW_HASH, "ROLE_TECHNICAL_MANAGER",
+                true, "Juan Perez", "PE", "+51987654321")));
+
+        assertThat(error.code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.properties()).containsEntry("reason", "user.role.sign_up_not_allowed");
+    }
+
+    @Test
     @DisplayName("Answers 429 with the seconds to wait when a pending sign-up is retried within the cooldown")
     void signUpWithinCooldownIsRejected() {
         var pending = pendingAccount(Instant.now());
