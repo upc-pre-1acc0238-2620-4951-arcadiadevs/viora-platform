@@ -36,4 +36,7 @@ public class UserSessionPersistenceEntity extends AuditableAbstractPersistenceEn
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
+
+    @Column(name = "successor_session_id")
+    private UUID successorSessionId;
 }

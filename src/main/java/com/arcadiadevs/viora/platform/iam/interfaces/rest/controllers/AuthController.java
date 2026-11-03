@@ -134,7 +134,7 @@ public class AuthController {
 
     @PostMapping("/refresh-tokens")
     @Operation(summary = "Renew session tokens",
-            description = "Rotates the refresh token: the one sent stops working and a new pair is returned. A refresh token used twice closes every session of the account.",
+            description = "Rotates the refresh token: the one sent stops working and a new pair is returned. A used refresh token closes every session of the account, unless the session it gave was never used: then the answer was lost and a new pair is returned.",
             security = {})
     public ResponseEntity<?> refreshTokens(@Valid @RequestBody RefreshTokenResource resource) {
         return toSessionResponse(userSessionCommandService.handle(

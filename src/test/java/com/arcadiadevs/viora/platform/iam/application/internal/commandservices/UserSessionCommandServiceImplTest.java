@@ -20,6 +20,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.EmailAddress
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.NewPassword;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserId;
 import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserRole;
+import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.UserSessionId;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserSessionRepository;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
@@ -171,15 +172,113 @@ class UserSessionCommandServiceImplTest {
     }
 
     @Test
-    @DisplayName("Closes every session when a rotated refresh token is used again")
+    @DisplayName("Answers again when a rotated token comes back and its successor was never used: the answer was lost")
+    void lostRefreshAnswerIsAnsweredAgain() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        var renewed = success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        assertThat(renewed.refreshToken()).isEqualTo("refresh-3");
+        assertThat(active("refresh-3")).isTrue();
+        assertThat(active("refresh-2")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Keeps answering a token whose answers keep getting lost, leaving one session open")
+    void repeatedlyLostAnswersLeaveOneSession() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        var renewed = success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        assertThat(renewed.refreshToken()).isEqualTo("refresh-4");
+        assertThat(sessions.byHash.values()).filteredOn(session -> session.isActive(Instant.now())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Closes every session when a rotated token comes back after its successor was used")
     void reusedRefreshTokenRevokesEverything() {
         success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
         success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+        success(service.handle(new RefreshUserSessionCommand("refresh-2")));
 
         var error = failure(service.handle(new RefreshUserSessionCommand("refresh-1")));
 
         assertThat(error.details()).isEqualTo("user.refresh_token.invalid");
         assertThat(sessions.byHash.values()).noneMatch(session -> session.isActive(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("Closes every session when the token replaced by a recovery shows up: two clients share the chain")
+    void tokenReplacedByARecoveryRaisesTheAlarm() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        var error = failure(service.handle(new RefreshUserSessionCommand("refresh-2")));
+
+        assertThat(error.details()).isEqualTo("user.refresh_token.invalid");
+        assertThat(sessions.byHash.values()).noneMatch(session -> session.isActive(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("Does not recover a rotated token once it has expired")
+    void expiredRotatedTokenIsNotRecovered() {
+        var userId = account.snapshot().id();
+        var longAgo = Instant.now().minus(UserSession.LIFESPAN).minusSeconds(60);
+        var rotated = UserSession.start(userId, UserAccountFixtures.tokenHashOf("old"), 0L, longAgo);
+        var successor = UserSession.start(userId, UserAccountFixtures.tokenHashOf("next"), 0L, Instant.now());
+        rotated.replaceWith(successor.snapshot().id(), longAgo.plusSeconds(60));
+        sessions.save(rotated);
+        sessions.save(successor);
+
+        var error = failure(service.handle(new RefreshUserSessionCommand("old")));
+
+        assertThat(error.details()).isEqualTo("user.refresh_token.invalid");
+        assertThat(sessions.byHash.values()).noneMatch(session -> session.isActive(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("Treats a token rotated before successors were recorded as reused")
+    void tokenRotatedWithoutSuccessorRevokesEverything() {
+        var userId = account.snapshot().id();
+        var oldRotated = UserSession.start(userId, UserAccountFixtures.tokenHashOf("old"), 0L, Instant.now());
+        oldRotated.revoke(Instant.now());
+        sessions.save(oldRotated);
+        sessions.save(UserSession.start(userId, UserAccountFixtures.tokenHashOf("current"), 0L, Instant.now()));
+
+        var error = failure(service.handle(new RefreshUserSessionCommand("old")));
+
+        assertThat(error.details()).isEqualTo("user.refresh_token.invalid");
+        assertThat(active("current")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Does not recover a session after the password changed")
+    void passwordChangeStopsTheRecovery() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+        account.changePassword("Password123", new NewPassword("NuevaClave456"), new FakePasswordHasher(), Instant.now());
+
+        var error = failure(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        assertThat(error.details()).isEqualTo("user.refresh_token.invalid");
+        assertThat(sessions.byHash.values()).noneMatch(session -> session.isActive(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("Signing out with a token whose answer was lost also closes its successor, and it cannot come back")
+    void signOutAfterALostAnswerClosesTheSuccessor() {
+        success(service.handle(new OpenUserSessionCommand(account.snapshot().id().userId())));
+        success(service.handle(new RefreshUserSessionCommand("refresh-1")));
+
+        service.handle(new SignOutUserSessionCommand("refresh-1"));
+
+        assertThat(active("refresh-2")).isFalse();
+        assertThat(failure(service.handle(new RefreshUserSessionCommand("refresh-1"))).details())
+                .isEqualTo("user.refresh_token.invalid");
     }
 
     @Test
@@ -234,6 +333,10 @@ class UserSessionCommandServiceImplTest {
         assertThat(service.handle(new SignOutUserSessionCommand("unknown-token"))).isInstanceOf(Result.Success.class);
     }
 
+    private boolean active(String refreshToken) {
+        return sessions.byHash.get(UserAccountFixtures.tokenHashOf(refreshToken)).isActive(Instant.now());
+    }
+
     private static AuthenticatedSession success(Result<AuthenticatedSession, ApplicationError> result) {
         assertThat(result).isInstanceOf(Result.Success.class);
         return ((Result.Success<AuthenticatedSession, ApplicationError>) result).value();
@@ -271,6 +374,16 @@ class UserSessionCommandServiceImplTest {
         @Override
         public Optional<UserSession> findByRefreshTokenHash(TokenHash refreshTokenHash) {
             return Optional.ofNullable(byHash.get(refreshTokenHash));
+        }
+
+        @Override
+        public Optional<UserSession> findByRefreshTokenHashForUpdate(TokenHash refreshTokenHash) {
+            return findByRefreshTokenHash(refreshTokenHash);
+        }
+
+        @Override
+        public Optional<UserSession> findByIdForUpdate(UserSessionId id) {
+            return byHash.values().stream().filter(session -> session.snapshot().id().equals(id)).findFirst();
         }
 
         @Override
