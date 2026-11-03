@@ -165,7 +165,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
             if (existingAccount.isPresent()) {
                 account = existingAccount.get();
                 if (role != account.snapshot().role()) {
-                    return Result.failure(ApplicationError.validationError("argument", "user.role.sign_up_not_allowed"));
+                    return Result.failure(ApplicationError.validationError("argument", "user.role.sign_up_not_allowed",
+                            Map.of("reason", "user.role.sign_up_not_allowed")));
                 }
                 try {
                     if (passwordHasher.matches(command.password(), account.snapshot().passwordHash())) {
