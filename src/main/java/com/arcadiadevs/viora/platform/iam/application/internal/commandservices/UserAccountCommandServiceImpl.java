@@ -358,7 +358,8 @@ public class UserAccountCommandServiceImpl implements UserAccountCommandService 
                 }
                 userAccountRepository.save(account);
                 publishDomainEvents(account);
-                afterCommit(() -> emailService.sendPasswordResetEmail(email.value(), resetToken));
+                var role = account.snapshot().role();
+                afterCommit(() -> emailService.sendPasswordResetEmail(email.value(), resetToken, role));
             }
 
             // Always respond success to prevent user enumeration

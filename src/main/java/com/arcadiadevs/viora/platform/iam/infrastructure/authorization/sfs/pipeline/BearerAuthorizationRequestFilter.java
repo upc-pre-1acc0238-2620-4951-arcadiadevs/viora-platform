@@ -30,7 +30,7 @@ public class BearerAuthorizationRequestFilter extends OncePerRequestFilter {
     private final BearerTokenService tokenService;
     private final UserDetailsService userDetailsService;
     private final AuthenticationEntryPoint unauthorizedHandler;
-    private final String passwordResetPath;
+    private final List<String> passwordResetPaths;
 
     /**
      * Creates the filter.
@@ -38,18 +38,18 @@ public class BearerAuthorizationRequestFilter extends OncePerRequestFilter {
      * @param tokenService        reads and validates bearer tokens
      * @param userDetailsService  loads the user named by a token
      * @param unauthorizedHandler answers 401 when a presented token is rejected
-     * @param passwordResetPath   path of the password reset links, public like the IAM endpoints
+     * @param passwordResetPaths  paths of the password reset links, public like the IAM endpoints
      */
     public BearerAuthorizationRequestFilter(
             BearerTokenService tokenService,
             @Qualifier("defaultUserDetailsService") UserDetailsService userDetailsService,
             AuthenticationEntryPoint unauthorizedHandler,
-            String passwordResetPath
+            List<String> passwordResetPaths
     ) {
         this.tokenService = tokenService;
         this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;
-        this.passwordResetPath = passwordResetPath;
+        this.passwordResetPaths = passwordResetPaths;
     }
 
     @Override
@@ -102,6 +102,7 @@ public class BearerAuthorizationRequestFilter extends OncePerRequestFilter {
 
     private boolean isPublic(HttpServletRequest request) {
         var path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.startsWith(passwordResetPath + "/") || PUBLIC_PATH_PREFIXES.stream().anyMatch(path::startsWith);
+        return passwordResetPaths.stream().anyMatch(reset -> path.startsWith(reset + "/"))
+                || PUBLIC_PATH_PREFIXES.stream().anyMatch(path::startsWith);
     }
 }

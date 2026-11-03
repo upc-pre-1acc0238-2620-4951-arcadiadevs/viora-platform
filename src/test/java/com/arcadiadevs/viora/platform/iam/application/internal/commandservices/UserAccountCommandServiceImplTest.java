@@ -180,6 +180,17 @@ class UserAccountCommandServiceImplTest {
     }
 
     @Test
+    @DisplayName("Sends the reset link with the role of the account")
+    void requestSendsTheRoleOfTheAccount() {
+        var account = UserAccountFixtures.activeAccount(EMAIL, NEW_HASH, UserRole.ROLE_TECHNICAL_MANAGER);
+        when(userAccountRepository.findByEmail(any(EmailAddress.class))).thenReturn(Optional.of(account));
+
+        service.handle(new RequestPasswordResetCommand(EMAIL));
+
+        verify(emailService).sendPasswordResetEmail(EMAIL, "link-token", UserRole.ROLE_TECHNICAL_MANAGER);
+    }
+
+    @Test
     @DisplayName("Answers 429 with the seconds to wait when a pending sign-up is retried within the cooldown")
     void signUpWithinCooldownIsRejected() {
         var pending = pendingAccount(Instant.now());
@@ -256,7 +267,7 @@ class UserAccountCommandServiceImplTest {
         assertThat(result).isInstanceOf(Result.Success.class);
         assertThat(account.snapshot().resetToken().tokenHash()).isEqualTo(UserAccountFixtures.tokenHashOf("link-token"));
         verify(eventPublisher).publishEvent(any(PasswordResetRequestedEvent.class));
-        verify(emailService).sendPasswordResetEmail(EMAIL, "link-token");
+        verify(emailService).sendPasswordResetEmail(EMAIL, "link-token", UserRole.ROLE_PRODUCER);
     }
 
     @Test
@@ -268,7 +279,7 @@ class UserAccountCommandServiceImplTest {
         var result = service.handle(new RequestPasswordResetCommand(EMAIL));
 
         assertThat(result).isInstanceOf(Result.Success.class);
-        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString(), any());
     }
 
     @Test
@@ -415,7 +426,7 @@ class UserAccountCommandServiceImplTest {
             assertThat(service.handle(new RequestPasswordResetCommand(EMAIL))).isInstanceOf(Result.Success.class);
         }
 
-        verify(emailService, times(2)).sendPasswordResetEmail(eq(EMAIL), anyString());
+        verify(emailService, times(2)).sendPasswordResetEmail(eq(EMAIL), anyString(), any());
     }
 
     @Test
@@ -431,7 +442,7 @@ class UserAccountCommandServiceImplTest {
         service.handle(new RequestPasswordResetCommand(DEMO_EMAIL));
 
         assertThat(failure(change).details()).isEqualTo("user.account.demo_protected");
-        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString(), any());
     }
 
     private static RegisterUserAccountCommand signUpCommand(boolean termsAccepted) {

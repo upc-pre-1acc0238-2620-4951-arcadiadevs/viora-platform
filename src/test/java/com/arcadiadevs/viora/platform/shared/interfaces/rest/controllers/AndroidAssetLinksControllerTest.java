@@ -20,7 +20,9 @@ class AndroidAssetLinksControllerTest {
     @DisplayName("Publishes the app package and fingerprints so Android opens the links in the app")
     void publishesConfiguredApp() throws Exception {
         var properties = new DeepLinkProperties("https://viora.example", "/password-resets",
-                new DeepLinkProperties.Android("com.arcadiadevs.viora", List.of("AB:CD:EF", " ")));
+                new DeepLinkProperties.Android("com.arcadiadevs.viora", List.of("AB:CD:EF", " ")),
+                new DeepLinkProperties.Gestor(null, null,
+                        new DeepLinkProperties.Android("com.arcadiadevs.viora.gestor", List.of("12:34"))));
         var mockMvc = MockMvcBuilders.standaloneSetup(new AndroidAssetLinksController(properties)).build();
 
         mockMvc.perform(get("/.well-known/assetlinks.json"))
@@ -29,13 +31,15 @@ class AndroidAssetLinksControllerTest {
                 .andExpect(jsonPath("$[0].target.namespace").value("android_app"))
                 .andExpect(jsonPath("$[0].target.package_name").value("com.arcadiadevs.viora"))
                 .andExpect(jsonPath("$[0].target.sha256_cert_fingerprints.length()").value(1))
-                .andExpect(jsonPath("$[0].target.sha256_cert_fingerprints[0]").value("AB:CD:EF"));
+                .andExpect(jsonPath("$[0].target.sha256_cert_fingerprints[0]").value("AB:CD:EF"))
+                .andExpect(jsonPath("$[1].target.package_name").value("com.arcadiadevs.viora.gestor"))
+                .andExpect(jsonPath("$[1].target.sha256_cert_fingerprints[0]").value("12:34"));
     }
 
     @Test
     @DisplayName("Answers an empty list while the app identity is not configured")
     void answersEmptyListWhenUnconfigured() throws Exception {
-        var properties = new DeepLinkProperties("", null, null);
+        var properties = new DeepLinkProperties("", null, null, null);
         var mockMvc = MockMvcBuilders.standaloneSetup(new AndroidAssetLinksController(properties)).build();
 
         mockMvc.perform(get("/.well-known/assetlinks.json"))
@@ -47,9 +51,11 @@ class AndroidAssetLinksControllerTest {
     @DisplayName("Builds the reset link from the base URL and path, without doubled slashes")
     void buildsResetLink() {
         var properties = new DeepLinkProperties("https://viora.example/", null,
-                new DeepLinkProperties.Android(null, Arrays.asList((String) null)));
+                new DeepLinkProperties.Android(null, Arrays.asList((String) null)), null);
 
         assertThat(properties.passwordResetLink("Ab9_x-Z")).isEqualTo("https://viora.example/password-resets/Ab9_x-Z");
+        assertThat(properties.gestorPasswordResetLink("Ab9_x-Z"))
+                .isEqualTo("https://viora.example/gestor/password-resets/Ab9_x-Z");
         assertThat(properties.android().isConfigured()).isFalse();
     }
 }
