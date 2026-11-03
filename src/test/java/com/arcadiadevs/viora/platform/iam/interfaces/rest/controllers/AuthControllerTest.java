@@ -168,6 +168,21 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/auth/sign-in should pass the role of the client and answer 403 USER_ROLE_FORBIDDEN")
+    void shouldRejectSignInOfAnotherRole() throws Exception {
+        when(sessionService.handle(new AuthenticateUserCommand("productor@viora.ag", "Password123",
+                "ROLE_TECHNICAL_MANAGER"))).thenReturn(Result.failure(
+                ApplicationError.forbidden("user-role", "user.role.sign_in_not_allowed")));
+
+        mockMvc.perform(post("/api/v1/auth/sign-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"productor@viora.ag\", \"password\": \"Password123\", "
+                                + "\"role\": \"ROLE_TECHNICAL_MANAGER\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_ROLE_FORBIDDEN"));
+    }
+
+    @Test
     @DisplayName("POST /api/v1/auth/email-verifications should return the session once the email is verified")
     void shouldReturnSessionOnEmailVerification() throws Exception {
         when(commandService.handle(any(VerifyEmailCommand.class))).thenReturn(Result.success(USER_ID));

@@ -125,11 +125,11 @@ public class AuthController {
 
     @PostMapping("/sign-in")
     @Operation(summary = "Authenticate user credentials",
-            description = "Validates credentials and returns the access token and a refresh token. A wrong email and a wrong password get the same answer; an account whose email is not verified yet answers 403 with code EMAIL_VERIFICATION_FORBIDDEN.",
+            description = "Validates credentials and returns the access token and a refresh token. A wrong email and a wrong password get the same answer; an account whose email is not verified yet answers 403 with code EMAIL_VERIFICATION_FORBIDDEN. A client that serves one role sends it in `role`, and an account of another role answers 403 with code USER_ROLE_FORBIDDEN.",
             security = {})
     public ResponseEntity<?> signIn(@Valid @RequestBody SignInResource resource) {
         return toSessionResponse(userSessionCommandService.handle(
-                new AuthenticateUserCommand(resource.email(), resource.password())));
+                new AuthenticateUserCommand(resource.email(), resource.password(), resource.role())));
     }
 
     @PostMapping("/refresh-tokens")
