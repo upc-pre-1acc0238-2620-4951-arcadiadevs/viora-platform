@@ -24,6 +24,14 @@ public interface InvitationCodeRepository {
     Optional<InvitationCode> findByFingerprintForRedemption(CodeFingerprint fingerprint);
 
     /**
+     * Finds a code by its fingerprint without locking it, such as to show what it covers before redeeming it.
+     *
+     * @param fingerprint the fingerprint of the code
+     * @return the code, or empty if no code has this fingerprint
+     */
+    Optional<InvitationCode> findByFingerprint(CodeFingerprint fingerprint);
+
+    /**
      * Finds a code and locks it until the transaction ends, such as to revoke it.
      *
      * @param id the code identity

@@ -38,6 +38,12 @@ public class InvitationCodeRepositoryImpl implements InvitationCodeRepository {
     }
 
     @Override
+    public Optional<InvitationCode> findByFingerprint(CodeFingerprint fingerprint) {
+        return persistenceRepository.findUnlockedByCodeHash(fingerprint.value())
+                .map(InvitationCodePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
     public Optional<InvitationCode> findByIdForUpdate(InvitationCodeId id) {
         return persistenceRepository.findLockedById(UUID.fromString(id.invitationCodeId()))
                 .map(InvitationCodePersistenceAssembler::toDomainFromPersistence);
