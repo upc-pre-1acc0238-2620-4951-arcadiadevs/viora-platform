@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -20,6 +21,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -90,6 +93,37 @@ class RoleAccessIntegrationTest {
         mvc.perform(get("/api/v1/invitation-codes").header(HttpHeaders.AUTHORIZATION, producer))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("Both roles read sectors; only a manager edits the list and only a producer sectors a plot")
+    void sectorsAreSharedByRole() throws Exception {
+        var manager = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
+        var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
+        var plot = "/api/v1/plot-sector-assignments/" + UUID.randomUUID();
+
+        // Past the filter, the territory services answer for the missing license with their own reason.
+        for (var token : new String[]{manager, producer}) {
+            mvc.perform(get("/api/v1/sector-zones").header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.reason").exists());
+            mvc.perform(get("/api/v1/plot-sector-assignments").header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(jsonPath("$.reason").exists());
+        }
+        mvc.perform(post("/api/v1/sector-zones").header(HttpHeaders.AUTHORIZATION, producer)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"Sama\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+        mvc.perform(post(plot + "/resolutions").header(HttpHeaders.AUTHORIZATION, producer))
+                .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+        mvc.perform(put(plot).header(HttpHeaders.AUTHORIZATION, manager)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"Sama\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+        mvc.perform(post("/api/v1/sector-zones").header(HttpHeaders.AUTHORIZATION, manager)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"Sama\"}"))
+                .andExpect(jsonPath("$.reason").value("territory.manager.no_license"));
+        mvc.perform(get("/api/v1/sector-zones")).andExpect(status().isUnauthorized());
     }
 
     @Test

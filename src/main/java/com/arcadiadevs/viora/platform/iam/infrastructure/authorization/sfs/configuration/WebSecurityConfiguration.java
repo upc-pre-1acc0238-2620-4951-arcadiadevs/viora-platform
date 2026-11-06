@@ -138,6 +138,14 @@ public class WebSecurityConfiguration {
                                 "/api/v1/manager-code-redemptions/**",
                                 "/api/v1/cooperative-licenses/**",
                                 "/api/v1/invitation-codes/**").hasRole("TECHNICAL_MANAGER")
+                        // A manager keeps the sector list of the license; its members read it and sector their plots
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/sector-zones/**",
+                                "/api/v1/plot-sector-assignments/**").hasAnyRole("TECHNICAL_MANAGER", "PRODUCER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/plot-sector-assignments/**").hasRole("PRODUCER")
+                        .requestMatchers(
+                                "/api/v1/sector-zones/**",
+                                "/api/v1/plot-sector-assignments/*/resolutions").hasRole("TECHNICAL_MANAGER")
                         .requestMatchers("/api/v1/**").hasRole("PRODUCER")
                         .anyRequest().authenticated());
 

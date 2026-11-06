@@ -1,9 +1,11 @@
 package com.arcadiadevs.viora.platform.subscription.domain.repositories;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
@@ -58,4 +60,13 @@ public interface SubscriptionRepository {
      * @return owned contract, or empty if the identifier is missing or foreign
      */
     Optional<Subscription> findByIdAndProducerId(SubscriptionId id, ProducerId producerId);
+
+    /**
+     * Lists the producers a license sponsors at an instant: those with an active plan of that license in force.
+     *
+     * @param licenseId the license
+     * @param at        the instant
+     * @return the producers, without repetitions
+     */
+    List<ProducerId> findSponsoredProducerIds(CooperativeLicenseId licenseId, Instant at);
 }

@@ -35,6 +35,7 @@ class CheckoutServiceTest {
             return findById(id).filter(subscription -> subscription.snapshot().producerId().equals(owner));
         }
         public Optional<Subscription> findCurrent(ProducerId p, Instant at) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p)).findFirst(); }
+        public List<ProducerId> findSponsoredProducerIds(CooperativeLicenseId licenseId, Instant at) { return List.of(); }
         public boolean existsActiveByProducerId(ProducerId p, Instant at) { return contracts.values().stream().anyMatch(s -> s.snapshot().producerId().equals(p) && s.hasActiveEntitlement(at)); }
         public Optional<Subscription> findPendingByProducerId(ProducerId p) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p) && s.snapshot().status() == SubscriptionStatus.PENDING_PAYMENT).findFirst(); }
         public PaymentAttempt save(PaymentAttempt a) { attempts.put(a.id(), a); return a; }
