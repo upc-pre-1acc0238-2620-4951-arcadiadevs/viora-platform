@@ -4,7 +4,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.territory.application.commandservices.PlotSectorAssignmentCommandService;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalOrchardService;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScopeResolver;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseAccessPolicy;
 import com.arcadiadevs.viora.platform.territory.domain.exceptions.PlotSectorNotPendingException;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.PlotSectorAssignment;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.SectorZone;
@@ -36,7 +36,7 @@ public class PlotSectorAssignmentCommandServiceImpl implements PlotSectorAssignm
 
     private final PlotSectorAssignmentRepository plotSectorAssignmentRepository;
     private final SectorZoneRepository sectorZoneRepository;
-    private final LicenseScopeResolver licenseScopeResolver;
+    private final LicenseAccessPolicy licenseAccessPolicy;
     private final ExternalOrchardService externalOrchardService;
     private final Clock clock;
 
@@ -45,22 +45,22 @@ public class PlotSectorAssignmentCommandServiceImpl implements PlotSectorAssignm
      *
      * @param plotSectorAssignmentRepository the sectors given to plots
      * @param sectorZoneRepository           the sector zones
-     * @param licenseScopeResolver           the license each user reaches
+     * @param licenseAccessPolicy            the license each user reaches
      * @param externalOrchardService         the owners of plots
      * @param clock                          the application clock
      * @throws IllegalArgumentException if any dependency is null
      */
     public PlotSectorAssignmentCommandServiceImpl(PlotSectorAssignmentRepository plotSectorAssignmentRepository,
                                                   SectorZoneRepository sectorZoneRepository,
-                                                  LicenseScopeResolver licenseScopeResolver,
+                                                  LicenseAccessPolicy licenseAccessPolicy,
                                                   ExternalOrchardService externalOrchardService, Clock clock) {
-        if (plotSectorAssignmentRepository == null || sectorZoneRepository == null || licenseScopeResolver == null
+        if (plotSectorAssignmentRepository == null || sectorZoneRepository == null || licenseAccessPolicy == null
                 || externalOrchardService == null || clock == null) {
             throw new IllegalArgumentException("territory.plot_sector_service.dependency.null");
         }
         this.plotSectorAssignmentRepository = plotSectorAssignmentRepository;
         this.sectorZoneRepository = sectorZoneRepository;
-        this.licenseScopeResolver = licenseScopeResolver;
+        this.licenseAccessPolicy = licenseAccessPolicy;
         this.externalOrchardService = externalOrchardService;
         this.clock = clock;
     }
@@ -73,7 +73,7 @@ public class PlotSectorAssignmentCommandServiceImpl implements PlotSectorAssignm
         }
         try {
             var producerId = new ProducerId(command.producerId());
-            var scope = licenseScopeResolver.resolveMember(producerId);
+            var scope = licenseAccessPolicy.resolveMember(producerId);
             if (scope.isFailure()) {
                 return Result.failure(scope.failure().orElseThrow());
             }
@@ -122,7 +122,7 @@ public class PlotSectorAssignmentCommandServiceImpl implements PlotSectorAssignm
             return Result.failure(ApplicationError.validationError("command", "territory.plot_sector.command.null"));
         }
         try {
-            var scope = licenseScopeResolver.resolveManager(new ManagerId(command.managerId()));
+            var scope = licenseAccessPolicy.resolveManager(new ManagerId(command.managerId()));
             if (scope.isFailure()) {
                 return Result.failure(scope.failure().orElseThrow());
             }

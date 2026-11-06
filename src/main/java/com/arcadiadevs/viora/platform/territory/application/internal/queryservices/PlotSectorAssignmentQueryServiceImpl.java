@@ -4,7 +4,7 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalProfileService;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScopeResolver;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseAccessPolicy;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.PlotSectorAssignmentQueryService;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.PlotSectorAssignmentView;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.PlotSectorAssignment;
@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 public class PlotSectorAssignmentQueryServiceImpl implements PlotSectorAssignmentQueryService {
 
     private final SectorZoneRepository sectorZoneRepository;
-    private final LicenseScopeResolver licenseScopeResolver;
+    private final LicenseAccessPolicy licenseAccessPolicy;
     private final VisiblePlotSectors visiblePlotSectors;
     private final ExternalOrchardService externalOrchardService;
     private final ExternalProfileService externalProfileService;
@@ -42,23 +42,23 @@ public class PlotSectorAssignmentQueryServiceImpl implements PlotSectorAssignmen
      * Creates the query service.
      *
      * @param sectorZoneRepository   the sector zones
-     * @param licenseScopeResolver   the license each user reaches
+     * @param licenseAccessPolicy    the license each user reaches
      * @param visiblePlotSectors     the plot sectors each user sees
      * @param externalOrchardService the plot names
      * @param externalProfileService the member names
      * @throws IllegalArgumentException if any dependency is null
      */
     public PlotSectorAssignmentQueryServiceImpl(SectorZoneRepository sectorZoneRepository,
-                                                LicenseScopeResolver licenseScopeResolver,
+                                                LicenseAccessPolicy licenseAccessPolicy,
                                                 VisiblePlotSectors visiblePlotSectors,
                                                 ExternalOrchardService externalOrchardService,
                                                 ExternalProfileService externalProfileService) {
-        if (sectorZoneRepository == null || licenseScopeResolver == null || visiblePlotSectors == null
+        if (sectorZoneRepository == null || licenseAccessPolicy == null || visiblePlotSectors == null
                 || externalOrchardService == null || externalProfileService == null) {
             throw new IllegalArgumentException("territory.plot_sector_queries.dependency.null");
         }
         this.sectorZoneRepository = sectorZoneRepository;
-        this.licenseScopeResolver = licenseScopeResolver;
+        this.licenseAccessPolicy = licenseAccessPolicy;
         this.visiblePlotSectors = visiblePlotSectors;
         this.externalOrchardService = externalOrchardService;
         this.externalProfileService = externalProfileService;
@@ -67,7 +67,7 @@ public class PlotSectorAssignmentQueryServiceImpl implements PlotSectorAssignmen
     @Override
     public Result<List<PlotSectorAssignmentView>, ApplicationError> handle(
             GetPlotSectorAssignmentsByUserIdQuery query) {
-        var scope = licenseScopeResolver.resolve(query.userId());
+        var scope = licenseAccessPolicy.resolve(query.userId());
         if (scope.isFailure()) {
             return Result.failure(scope.failure().orElseThrow());
         }
@@ -85,7 +85,7 @@ public class PlotSectorAssignmentQueryServiceImpl implements PlotSectorAssignmen
     @Override
     public Result<PlotSectorAssignmentView, ApplicationError> handle(
             GetPlotSectorAssignmentByPlotIdAndUserIdQuery query) {
-        var scope = licenseScopeResolver.resolve(query.userId());
+        var scope = licenseAccessPolicy.resolve(query.userId());
         if (scope.isFailure()) {
             return Result.failure(scope.failure().orElseThrow());
         }

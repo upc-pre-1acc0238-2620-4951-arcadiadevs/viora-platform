@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.territory.application.internal.scope;
+package com.arcadiadevs.viora.platform.territory.application.internal.security;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Resolves which license a signed-in user reaches: a technical manager the license they are in charge of while it is
+ * Who may use the sectors of a license, and as whom: a technical manager the license they are in charge of while it is
  * in force, and a producer the license that sponsors their plan. Anyone else reaches none.
  */
 @Component
-public class LicenseScopeResolver {
+public class LicenseAccessPolicy {
 
     /** Reason when a manager has no license in force. */
     public static final String MANAGER_WITHOUT_LICENSE = "territory.manager.no_license";
@@ -35,10 +35,10 @@ public class LicenseScopeResolver {
      * @param externalSubscriptionService the licenses
      * @throws IllegalArgumentException if any dependency is null
      */
-    public LicenseScopeResolver(ExternalIamService externalIamService,
+    public LicenseAccessPolicy(ExternalIamService externalIamService,
                                 ExternalSubscriptionService externalSubscriptionService) {
         if (externalIamService == null || externalSubscriptionService == null) {
-            throw new IllegalArgumentException("territory.scope.dependency.null");
+            throw new IllegalArgumentException("territory.access_policy.dependency.null");
         }
         this.externalIamService = externalIamService;
         this.externalSubscriptionService = externalSubscriptionService;

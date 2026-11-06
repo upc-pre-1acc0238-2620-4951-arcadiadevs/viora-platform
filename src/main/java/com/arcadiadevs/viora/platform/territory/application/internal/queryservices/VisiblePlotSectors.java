@@ -2,7 +2,7 @@ package com.arcadiadevs.viora.platform.territory.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalSubscriptionService;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScope;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseScope;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.PlotSectorAssignment;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.LicenseId;
 import com.arcadiadevs.viora.platform.territory.domain.repositories.PlotSectorAssignmentRepository;

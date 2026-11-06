@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.territory.application.internal.scope;
+package com.arcadiadevs.viora.platform.territory.application.internal.security;
 
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.LicenseId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ManagerId;

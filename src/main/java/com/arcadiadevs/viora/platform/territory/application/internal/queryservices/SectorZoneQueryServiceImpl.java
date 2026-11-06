@@ -2,8 +2,8 @@ package com.arcadiadevs.viora.platform.territory.application.internal.queryservi
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScope;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScopeResolver;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseScope;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseAccessPolicy;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.SectorZoneQueryService;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.SectorZoneView;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.PlotSectorAssignment;
@@ -30,31 +30,31 @@ import java.util.stream.Collectors;
 public class SectorZoneQueryServiceImpl implements SectorZoneQueryService {
 
     private final SectorZoneRepository sectorZoneRepository;
-    private final LicenseScopeResolver licenseScopeResolver;
+    private final LicenseAccessPolicy licenseAccessPolicy;
     private final VisiblePlotSectors visiblePlotSectors;
 
     /**
      * Creates the query service.
      *
      * @param sectorZoneRepository the sector zones
-     * @param licenseScopeResolver the license each user reaches
+     * @param licenseAccessPolicy  the license each user reaches
      * @param visiblePlotSectors   the plot sectors each user sees
      * @throws IllegalArgumentException if any dependency is null
      */
     public SectorZoneQueryServiceImpl(SectorZoneRepository sectorZoneRepository,
-                                      LicenseScopeResolver licenseScopeResolver,
+                                      LicenseAccessPolicy licenseAccessPolicy,
                                       VisiblePlotSectors visiblePlotSectors) {
-        if (sectorZoneRepository == null || licenseScopeResolver == null || visiblePlotSectors == null) {
+        if (sectorZoneRepository == null || licenseAccessPolicy == null || visiblePlotSectors == null) {
             throw new IllegalArgumentException("territory.sector_zone_queries.dependency.null");
         }
         this.sectorZoneRepository = sectorZoneRepository;
-        this.licenseScopeResolver = licenseScopeResolver;
+        this.licenseAccessPolicy = licenseAccessPolicy;
         this.visiblePlotSectors = visiblePlotSectors;
     }
 
     @Override
     public Result<List<SectorZoneView>, ApplicationError> handle(GetSectorZonesByUserIdQuery query) {
-        var scope = licenseScopeResolver.resolve(query.userId());
+        var scope = licenseAccessPolicy.resolve(query.userId());
         if (scope.isFailure()) {
             return Result.failure(scope.failure().orElseThrow());
         }
@@ -68,7 +68,7 @@ public class SectorZoneQueryServiceImpl implements SectorZoneQueryService {
 
     @Override
     public Result<SectorZoneView, ApplicationError> handle(GetSectorZoneByIdAndUserIdQuery query) {
-        var scope = licenseScopeResolver.resolve(query.userId());
+        var scope = licenseAccessPolicy.resolve(query.userId());
         if (scope.isFailure()) {
             return Result.failure(scope.failure().orElseThrow());
         }

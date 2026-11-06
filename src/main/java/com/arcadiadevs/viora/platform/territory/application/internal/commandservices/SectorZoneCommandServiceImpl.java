@@ -3,7 +3,7 @@ package com.arcadiadevs.viora.platform.territory.application.internal.commandser
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.territory.application.commandservices.SectorZoneCommandService;
-import com.arcadiadevs.viora.platform.territory.application.internal.scope.LicenseScopeResolver;
+import com.arcadiadevs.viora.platform.territory.application.internal.security.LicenseAccessPolicy;
 import com.arcadiadevs.viora.platform.territory.domain.exceptions.SectorZoneNameTakenException;
 import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.SectorZone;
 import com.arcadiadevs.viora.platform.territory.domain.model.commands.CreateSectorZoneCommand;
@@ -26,22 +26,22 @@ public class SectorZoneCommandServiceImpl implements SectorZoneCommandService {
     private static final String RESOURCE = "sector-zone";
 
     private final SectorZoneRepository sectorZoneRepository;
-    private final LicenseScopeResolver licenseScopeResolver;
+    private final LicenseAccessPolicy licenseAccessPolicy;
 
     /**
      * Creates the service.
      *
      * @param sectorZoneRepository the sector zones
-     * @param licenseScopeResolver the license each manager is in charge of
+     * @param licenseAccessPolicy  the license each manager is in charge of
      * @throws IllegalArgumentException if any dependency is null
      */
     public SectorZoneCommandServiceImpl(SectorZoneRepository sectorZoneRepository,
-                                        LicenseScopeResolver licenseScopeResolver) {
-        if (sectorZoneRepository == null || licenseScopeResolver == null) {
+                                        LicenseAccessPolicy licenseAccessPolicy) {
+        if (sectorZoneRepository == null || licenseAccessPolicy == null) {
             throw new IllegalArgumentException("territory.sector_zone_service.dependency.null");
         }
         this.sectorZoneRepository = sectorZoneRepository;
-        this.licenseScopeResolver = licenseScopeResolver;
+        this.licenseAccessPolicy = licenseAccessPolicy;
     }
 
     @Override
@@ -50,7 +50,7 @@ public class SectorZoneCommandServiceImpl implements SectorZoneCommandService {
             return Result.failure(ApplicationError.validationError("command", "territory.sector_zone.command.null"));
         }
         try {
-            var scope = licenseScopeResolver.resolveManager(new ManagerId(command.managerId()));
+            var scope = licenseAccessPolicy.resolveManager(new ManagerId(command.managerId()));
             if (scope.isFailure()) {
                 return Result.failure(scope.failure().orElseThrow());
             }
@@ -73,7 +73,7 @@ public class SectorZoneCommandServiceImpl implements SectorZoneCommandService {
             return Result.failure(ApplicationError.validationError("command", "territory.sector_zone.command.null"));
         }
         try {
-            var scope = licenseScopeResolver.resolveManager(new ManagerId(command.managerId()));
+            var scope = licenseAccessPolicy.resolveManager(new ManagerId(command.managerId()));
             if (scope.isFailure()) {
                 return Result.failure(scope.failure().orElseThrow());
             }
