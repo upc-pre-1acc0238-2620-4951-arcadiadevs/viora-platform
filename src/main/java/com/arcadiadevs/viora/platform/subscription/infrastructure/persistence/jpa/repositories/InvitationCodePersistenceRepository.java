@@ -29,6 +29,15 @@ public interface InvitationCodePersistenceRepository extends JpaRepository<Invit
     Optional<InvitationCodePersistenceEntity> findByCodeHash(String codeHash);
 
     /**
+     * Finds a code by its fingerprint without locking it.
+     *
+     * @param codeHash the SHA-256 fingerprint of the code
+     * @return the code entity, or empty if no code has this fingerprint
+     */
+    @Query("select code from InvitationCodePersistenceEntity code where code.codeHash = :codeHash")
+    Optional<InvitationCodePersistenceEntity> findUnlockedByCodeHash(@Param("codeHash") String codeHash);
+
+    /**
      * Finds a code and locks its row until the transaction ends.
      *
      * @param id the code identifier

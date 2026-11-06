@@ -34,7 +34,7 @@ public class RedemptionRequestRateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> REDEMPTION_PATHS =
             Set.of("/api/v1/cooperative-code-redemptions", "/api/v1/quota-extension-redemptions",
-                    "/api/v1/manager-code-redemptions");
+                    "/api/v1/manager-code-redemptions", "/api/v1/cooperative-code-previews");
 
     private final SlidingWindowCounter requests;
     private final Clock clock;
