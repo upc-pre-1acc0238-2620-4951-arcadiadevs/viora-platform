@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit;
 
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -14,7 +15,8 @@ import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * {@link RedemptionAttemptLimiter} keeping the failed attempts of each producer in memory, in a sliding window.
+ * {@link RedemptionAttemptLimiter} keeping the failed attempts of each producer and each manager in memory, in a
+ * sliding window.
  * <p>Every attempt is reserved before the code is looked up and given back when it did not fail, so once a producer
  * reaches the maximum of failed attempts inside the window, the next attempt waits until the oldest one leaves the
  * window, however many attempts arrive at the same time. The counts live in this instance only and are lost on restart, which is enough to
@@ -22,6 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class InMemoryRedemptionAttemptLimiter implements RedemptionAttemptLimiter {
+
+    private static final String PRODUCER = "producer:";
+    private static final String MANAGER = "manager:";
 
     private final int maxFailedAttempts;
     private final Duration window;
@@ -47,7 +52,36 @@ public class InMemoryRedemptionAttemptLimiter implements RedemptionAttemptLimite
 
     @Override
     public OptionalLong tryAcquire(ProducerId producerId, Instant at) {
-        var attempts = failures.computeIfAbsent(producerId.producerId(), key -> new ArrayDeque<>());
+        return tryAcquire(PRODUCER + producerId.producerId(), at);
+    }
+
+    @Override
+    public void release(ProducerId producerId, Instant at) {
+        release(PRODUCER + producerId.producerId(), at);
+    }
+
+    @Override
+    public void reset(ProducerId producerId) {
+        failures.remove(PRODUCER + producerId.producerId());
+    }
+
+    @Override
+    public OptionalLong tryAcquire(ManagerId managerId, Instant at) {
+        return tryAcquire(MANAGER + managerId.managerId(), at);
+    }
+
+    @Override
+    public void release(ManagerId managerId, Instant at) {
+        release(MANAGER + managerId.managerId(), at);
+    }
+
+    @Override
+    public void reset(ManagerId managerId) {
+        failures.remove(MANAGER + managerId.managerId());
+    }
+
+    private OptionalLong tryAcquire(String key, Instant at) {
+        var attempts = failures.computeIfAbsent(key, ignored -> new ArrayDeque<>());
         synchronized (attempts) {
             prune(attempts, at);
             if (attempts.size() >= maxFailedAttempts) {
@@ -59,20 +93,14 @@ public class InMemoryRedemptionAttemptLimiter implements RedemptionAttemptLimite
         }
     }
 
-    @Override
-    public void release(ProducerId producerId, Instant at) {
-        var attempts = failures.get(producerId.producerId());
+    private void release(String key, Instant at) {
+        var attempts = failures.get(key);
         if (attempts == null) {
             return;
         }
         synchronized (attempts) {
             attempts.removeLastOccurrence(at);
         }
-    }
-
-    @Override
-    public void reset(ProducerId producerId) {
-        failures.remove(producerId.producerId());
     }
 
     private void prune(Deque<Instant> attempts, Instant at) {

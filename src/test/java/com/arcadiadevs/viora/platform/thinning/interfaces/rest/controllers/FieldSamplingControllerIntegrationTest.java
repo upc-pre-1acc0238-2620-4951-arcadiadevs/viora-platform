@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.shared.infrastructure.security.SpringSecurityCurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.GlobalExceptionHandler;
 import com.arcadiadevs.viora.platform.thinning.application.commandservices.FruitThinningPrescriptionCommandService;
@@ -81,11 +82,11 @@ class FieldSamplingControllerIntegrationTest {
                 actorId,
                 new SamplingBatchId("d3b07384-d113-496e-bc35-cf21eb943c5a"),
                 List.of(
-                        TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-02", 10, 100, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-03", 10, 100, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-04", 10, 100, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-05", 14, 140, 150.0, LocalDate.now())
+                        TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-02", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-03", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-04", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-05", 14, 140, 150.0, LocalDate.now(ProducerTimeZone.ZONE))
                 )
         );
 
@@ -133,11 +134,11 @@ class FieldSamplingControllerIntegrationTest {
                 actorId,
                 new SamplingBatchId("e4c18495-e224-497f-cd46-de32fc054d6b"),
                 List.of(
-                        TreeSamplingRecord.create("T-01", 10, 50, null, LocalDate.now()),
-                        TreeSamplingRecord.create("T-02", 10, 50, null, LocalDate.now()),
-                        TreeSamplingRecord.create("T-03", 10, 50, null, LocalDate.now()),
-                        TreeSamplingRecord.create("T-04", 10, 50, null, LocalDate.now()),
-                        TreeSamplingRecord.create("T-05", 10, 50, null, LocalDate.now())
+                        TreeSamplingRecord.create("T-01", 10, 50, null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-02", 10, 50, null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-03", 10, 50, null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-04", 10, 50, null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-05", 10, 50, null, LocalDate.now(ProducerTimeZone.ZONE))
                 )
         );
 

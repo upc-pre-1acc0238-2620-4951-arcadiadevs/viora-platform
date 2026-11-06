@@ -43,6 +43,10 @@ class SubscriptionApiDocsIntegrationTest {
             Map<String, Object> operation = docs.read(route);
             assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Subscriptions"));
         }
+        Map<String, Object> redemption = docs.read("$.paths['/api/v1/manager-code-redemptions'].post");
+        assertThat(redemption.get("tags")).isEqualTo(List.of("Manager Code Redemptions"));
+        Map<String, Object> license = docs.read("$.paths['/api/v1/cooperative-licenses'].get");
+        assertThat(license.get("tags")).isEqualTo(List.of("Cooperative Licenses"));
         List<String> tags = docs.read("$.paths.*.*.tags[*]");
         assertThat(tags).isNotEmpty().noneMatch(tag -> tag.endsWith("-controller"));
     }

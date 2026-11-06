@@ -13,13 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RedemptionRequestRateLimitFilterTest {
 
-    private final RedemptionRequestRateLimitFilter filter = new RedemptionRequestRateLimitFilter(2, 60,
+    private final RedemptionRequestRateLimitFilter filter = new RedemptionRequestRateLimitFilter(3, 60,
             Clock.fixed(Instant.parse("2026-10-28T12:00:00Z"), ZoneOffset.UTC));
 
     @Test
     void refusesAnAddressOnceItSpentItsRedemptionsWhicheverCodeKindItTries() throws Exception {
         assertEquals(200, send("/api/v1/cooperative-code-redemptions", "203.0.113.7"));
         assertEquals(200, send("/api/v1/quota-extension-redemptions", "203.0.113.7"));
+        assertEquals(200, send("/api/v1/manager-code-redemptions", "203.0.113.7"));
 
         assertEquals(429, send("/api/v1/cooperative-code-redemptions", "203.0.113.7"));
         assertEquals(200, send("/api/v1/cooperative-code-redemptions", "198.51.100.4"));

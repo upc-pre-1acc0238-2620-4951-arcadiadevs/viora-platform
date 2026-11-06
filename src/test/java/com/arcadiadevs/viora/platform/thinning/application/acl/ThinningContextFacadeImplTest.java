@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.application.acl;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.PrescriptionTestData;
 import com.arcadiadevs.viora.platform.thinning.application.internal.queryservices.ThinningPrescriptionOutlookService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.ExecutionConfirmationSnapshot;
@@ -59,7 +60,7 @@ class ThinningContextFacadeImplTest {
     @DisplayName("Reports an issued prescription with its percentage and the caliber projection status")
     void reportsAnIssuedPrescription() {
         var base = PrescriptionTestData.representative(plotId).snapshot();
-        var confirmation = new ExecutionConfirmationSnapshot(null, LocalDate.now(), 30.0, 4, null, null, null, null,
+        var confirmation = new ExecutionConfirmationSnapshot(null, LocalDate.now(ProducerTimeZone.ZONE), 30.0, 4, null, null, null, null,
                 null, CaliberProjection.withoutEstimate(CaliberProjectionStatus.NOT_CALIBRATED, 0));
         given(withState(base, PrescriptionStatus.EXECUTED, 30.0, confirmation));
 
@@ -77,9 +78,9 @@ class ThinningContextFacadeImplTest {
                 new com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingBatchId("batch-1"),
                 java.util.List.of(
                         com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord
-                                .create("T-01", 20, 12, 150.0, LocalDate.now()),
+                                .create("T-01", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
                         com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord
-                                .create("T-02", 20, 12, 150.0, LocalDate.now())));
+                                .create("T-02", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE))));
         when(prescriptionRepository.findByPlotIdAndCampaignYear(any(), any())).thenReturn(Optional.of(prescription));
 
         assertThat(facade.findPrescriptionAvailability(plotId.plotId(), campaign))
@@ -146,7 +147,7 @@ class ThinningContextFacadeImplTest {
         var prescription = PrescriptionTestData.representative(plotId);
         when(prescriptionRepository.findByPlotIdAndCampaignYear(any(), any())).thenReturn(Optional.of(prescription));
         when(outlookService.outlookOf(any())).thenReturn(new PrescriptionOutlook(0.6, 0.4, 1.5, null, 5, 0,
-                LocalDate.now(), 14, 49, YieldEstimate.unavailable(YieldEstimateStatus.INSUFFICIENT_HISTORY, 0)));
+                LocalDate.now(ProducerTimeZone.ZONE), 14, 49, YieldEstimate.unavailable(YieldEstimateStatus.INSUFFICIENT_HISTORY, 0)));
 
         var detail = facade.findThinningPlanDetail(plotId.plotId(), campaign).orElseThrow();
 
@@ -238,7 +239,7 @@ class ThinningContextFacadeImplTest {
 
     private static FruitThinningPrescriptionSnapshot withState(FruitThinningPrescriptionSnapshot base,
             PrescriptionStatus status, Double percentage, ExecutionConfirmationSnapshot confirmation) {
-        var load = new SustainableCropLoad(0.4, percentage, LocalDate.now(), LocalDate.now().plusDays(10),
+        var load = new SustainableCropLoad(0.4, percentage, LocalDate.now(ProducerTimeZone.ZONE), LocalDate.now(ProducerTimeZone.ZONE).plusDays(10),
                 "test-1", "SYNTHETIC_DEMO");
         return new FruitThinningPrescriptionSnapshot(base.id(), base.plotId(), base.campaignYear(),
                 base.observedPlotRevision(), status, load, null, base.samplingRounds(), confirmation, 0L, null);

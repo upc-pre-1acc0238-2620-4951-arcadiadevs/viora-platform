@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit;
 
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,5 +62,23 @@ class InMemoryRedemptionAttemptLimiterTest {
     void settingsArePositive() {
         assertThatThrownBy(() -> new InMemoryRedemptionAttemptLimiter(0, 15))
                 .hasMessage("subscription.redemption.limiter.settings.positive");
+    }
+
+    @Test
+    @DisplayName("A manager has attempts of their own, released and reset like a producer's")
+    void managersHaveTheirOwnAttempts() {
+        var manager = new ManagerId(producer.producerId());
+        for (var minute = 0; minute < 3; minute++) {
+            assertThat(limiter.tryAcquire(producer, START.plus(Duration.ofMinutes(minute)))).isEmpty();
+        }
+
+        assertThat(limiter.tryAcquire(manager, START)).isEmpty();
+        limiter.release(manager, START);
+        assertThat(limiter.tryAcquire(manager, START)).isEmpty();
+        assertThat(limiter.tryAcquire(manager, START)).isEmpty();
+        assertThat(limiter.tryAcquire(manager, START)).isEmpty();
+        assertThat(limiter.tryAcquire(manager, START)).isPresent();
+        limiter.reset(manager);
+        assertThat(limiter.tryAcquire(manager, START)).isEmpty();
     }
 }

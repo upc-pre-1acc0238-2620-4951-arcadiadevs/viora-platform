@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.commandservices;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import java.time.ZoneOffset;
 import java.time.Instant;
 import java.time.Clock;
@@ -103,11 +104,11 @@ class FruitThinningPrescriptionCommandServiceImplTest {
                 2026,
                 "batch-101",
                 List.of(
-                        new TreeSampleItem("T-01", 10, 100, 150.0, LocalDate.now()),
-                        new TreeSampleItem("T-02", 12, 120, 160.0, LocalDate.now()),
-                        new TreeSampleItem("T-03", 8, 80, 140.0, LocalDate.now()),
-                        new TreeSampleItem("T-04", 10, 100, 150.0, LocalDate.now()),
-                        new TreeSampleItem("T-05", 10, 100, 150.0, LocalDate.now())
+                        new TreeSampleItem("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSampleItem("T-02", 12, 120, 160.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSampleItem("T-03", 8, 80, 140.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSampleItem("T-04", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSampleItem("T-05", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE))
                 )
         );
 
@@ -135,7 +136,7 @@ class FruitThinningPrescriptionCommandServiceImplTest {
                 actorIdStr,
                 2026,
                 "batch-102",
-                List.of(new TreeSampleItem("T-01", 10, 100, 150.0, LocalDate.now()))
+                List.of(new TreeSampleItem("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)))
         );
 
         var result = commandService.handle(command);

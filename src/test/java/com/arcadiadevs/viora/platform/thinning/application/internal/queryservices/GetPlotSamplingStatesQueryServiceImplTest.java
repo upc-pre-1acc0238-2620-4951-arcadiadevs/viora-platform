@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.queryservices;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.PrescriptionTestData;
 import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
@@ -86,8 +87,8 @@ class GetPlotSamplingStatesQueryServiceImplTest {
         // Plot 2: 2 trees -> IN_PROGRESS
         var p2 = PrescriptionTestData.sampling(plot2);
         var twoRecords = List.of(
-                TreeSamplingRecord.create("T-1", 20, 10, 120.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-2", 20, 10, 120.0, LocalDate.now())
+                TreeSamplingRecord.create("T-1", 20, 10, 120.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-2", 20, 10, 120.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
         p2.ingestSamplingsBatch(new UserId(producerId), new SamplingBatchId("batch-2"), twoRecords);
 

@@ -3,12 +3,10 @@ package com.arcadiadevs.viora.platform.subscription.interfaces.rest.controllers;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.QuotaExtensionCommandService;
-import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemExtensionCodeCommand;
-import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.QuotaExtensionResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.RedeemExtensionCodeResource;
-import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.QuotaExtensionResourceAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.QuotaExtensionResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+
 /**
  * REST controller where a producer adds the hectares of an extension code to the plan their license sponsors.
  * <p>The producer is always the authenticated user; the request never names one.</p>
@@ -34,21 +33,22 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Plan Extensions", description = "Hectares added to a plan in force without changing when it ends")
 public class QuotaExtensionRedemptionController {
 
-    private final QuotaExtensionCommandService commands;
-    private final SubscriptionRepository subscriptions;
+    private final QuotaExtensionCommandService quotaExtensionCommandService;
+    private final QuotaExtensionResourceFromEntityAssembler quotaExtensionResourceAssembler;
     private final CurrentUserProvider users;
 
     /**
      * Creates the controller.
      *
-     * @param commands      the extension use cases
-     * @param subscriptions the plans, to show the quota after the extension
-     * @param users         the authenticated actor
+     * @param quotaExtensionCommandService    the extension use cases
+     * @param quotaExtensionResourceAssembler the assembler showing the quota after the extension
+     * @param users                           the authenticated actor
      */
-    public QuotaExtensionRedemptionController(QuotaExtensionCommandService commands,
-                                              SubscriptionRepository subscriptions, CurrentUserProvider users) {
-        this.commands = commands;
-        this.subscriptions = subscriptions;
+    public QuotaExtensionRedemptionController(QuotaExtensionCommandService quotaExtensionCommandService,
+                                              QuotaExtensionResourceFromEntityAssembler quotaExtensionResourceAssembler,
+                                              CurrentUserProvider users) {
+        this.quotaExtensionCommandService = quotaExtensionCommandService;
+        this.quotaExtensionResourceAssembler = quotaExtensionResourceAssembler;
         this.users = users;
     }
 
@@ -74,12 +74,8 @@ public class QuotaExtensionRedemptionController {
     })
     public ResponseEntity<?> redeem(@Valid @RequestBody RedeemExtensionCodeResource resource) {
         var producerId = users.requireCurrentUserId();
-        var result = commands.handle(new RedeemExtensionCodeCommand(producerId, resource.code()));
-        return ResponseEntityAssembler.toResponseEntityFromResult(result, this::toResource, HttpStatus.CREATED);
-    }
-
-    private QuotaExtensionResource toResource(QuotaExtension extension) {
-        var plan = subscriptions.findById(extension.snapshot().subscriptionId()).orElseThrow();
-        return QuotaExtensionResourceAssembler.toResource(extension, plan, null);
+        var result = quotaExtensionCommandService.handle(new RedeemExtensionCodeCommand(producerId, resource.code()));
+        return ResponseEntityAssembler.toResponseEntityFromResult(result,
+                extension -> quotaExtensionResourceAssembler.toResource(extension, null), HttpStatus.CREATED);
     }
 }

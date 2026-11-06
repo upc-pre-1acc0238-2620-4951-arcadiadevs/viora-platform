@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl;
 
 import com.arcadiadevs.viora.platform.iam.interfaces.acl.IamContextFacade;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 public class ExternalIamService {
 
     private static final String PRODUCER_ROLE = "ROLE_PRODUCER";
+    private static final String TECHNICAL_MANAGER_ROLE = "ROLE_TECHNICAL_MANAGER";
 
     private final IamContextFacade iamContextFacade;
 
@@ -39,6 +41,21 @@ public class ExternalIamService {
         }
         return iamContextFacade.findUserRole(producerId.producerId())
                 .map(PRODUCER_ROLE::equals)
+                .orElse(false);
+    }
+
+    /**
+     * Checks whether a user may take charge of a cooperative license: only technical managers IAM knows do.
+     *
+     * @param managerId the user asking to redeem a manager code
+     * @return true if IAM knows the user as a technical manager; false otherwise
+     */
+    public boolean isTechnicalManager(ManagerId managerId) {
+        if (managerId == null) {
+            return false;
+        }
+        return iamContextFacade.findUserRole(managerId.managerId())
+                .map(TECHNICAL_MANAGER_ROLE::equals)
                 .orElse(false);
     }
 }

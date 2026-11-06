@@ -26,14 +26,15 @@ import java.util.Set;
  * Limits the code redemptions per client address, on top of the failed attempts each producer may make.
  *
  * <p>The codes are short, and signing up is free: without this, many accounts from one address could try codes
- * until one works. A real producer redeems one code, maybe two.</p>
+ * until one works. A real producer redeems one code, maybe two, and a manager one.</p>
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class RedemptionRequestRateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> REDEMPTION_PATHS =
-            Set.of("/api/v1/cooperative-code-redemptions", "/api/v1/quota-extension-redemptions");
+            Set.of("/api/v1/cooperative-code-redemptions", "/api/v1/quota-extension-redemptions",
+                    "/api/v1/manager-code-redemptions");
 
     private final SlidingWindowCounter requests;
     private final Clock clock;

@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.application.internal.queryservices;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.PrescriptionTestData;
 import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.ExecutionConfirmationSnapshot;
@@ -127,11 +128,11 @@ class GetThinningEventsQueryServiceImplTest {
                 new SamplingBatchId(UUID.randomUUID().toString()),
                 true,
                 List.of(
-                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-1"), new ShootFruitCount(10, 60), null, LocalDate.now()),
-                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-2"), new ShootFruitCount(10, 60), null, LocalDate.now()),
-                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-3"), new ShootFruitCount(10, 60), null, LocalDate.now()),
-                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-4"), new ShootFruitCount(10, 60), null, LocalDate.now()),
-                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-5"), new ShootFruitCount(10, 60), null, LocalDate.now())
+                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-1"), new ShootFruitCount(10, 60), null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-2"), new ShootFruitCount(10, 60), null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-3"), new ShootFruitCount(10, 60), null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-4"), new ShootFruitCount(10, 60), null, LocalDate.now(ProducerTimeZone.ZONE)),
+                        new TreeSamplingRecordSnapshot(new SamplingRecordId(), new TreeTag("T-5"), new ShootFruitCount(10, 60), null, LocalDate.now(ProducerTimeZone.ZONE))
                 ),
                 samplingInstant
         );

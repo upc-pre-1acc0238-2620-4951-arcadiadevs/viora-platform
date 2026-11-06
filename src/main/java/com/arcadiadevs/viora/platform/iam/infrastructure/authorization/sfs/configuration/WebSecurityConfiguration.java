@@ -133,6 +133,10 @@ public class WebSecurityConfiguration {
                                 "/api/v1/subscription-plans/**",
                                 "/api/v1/cooperative-code-redemptions/**",
                                 "/api/v1/quota-extension-redemptions/**").authenticated()
+                        // A technical manager activates and reads the license it is in charge of
+                        .requestMatchers(
+                                "/api/v1/manager-code-redemptions/**",
+                                "/api/v1/cooperative-licenses/**").hasRole("TECHNICAL_MANAGER")
                         .requestMatchers("/api/v1/**").hasRole("PRODUCER")
                         .anyRequest().authenticated());
 

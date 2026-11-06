@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Coope
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPeriod;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.entities.CooperativeLicensePersistenceEntity;
 
@@ -55,6 +56,7 @@ public final class CooperativeLicensePersistenceAssembler {
         target.setCommittedAreaHa(snapshot.committedAreaHa());
         target.setStartsAt(snapshot.period().startsAt());
         target.setEndsAt(snapshot.period().endsAt());
+        target.setManagerUserId(snapshot.managerId() == null ? null : UUID.fromString(snapshot.managerId().managerId()));
         return target;
     }
 
@@ -77,6 +79,7 @@ public final class CooperativeLicensePersistenceAssembler {
                 new HectaresQuota(entity.getContractedAreaHa()),
                 entity.getCommittedAreaHa(),
                 new SubscriptionPeriod(entity.getStartsAt(), entity.getEndsAt()),
+                entity.getManagerUserId() == null ? null : new ManagerId(entity.getManagerUserId().toString()),
                 entity.getRevision()));
     }
 }

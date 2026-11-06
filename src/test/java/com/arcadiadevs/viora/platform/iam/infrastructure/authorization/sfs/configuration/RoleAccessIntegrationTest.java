@@ -73,6 +73,21 @@ class RoleAccessIntegrationTest {
     }
 
     @Test
+    @DisplayName("Only a technical manager reaches its license, and a producer is refused with the usual error body")
+    void licenseIsTheManagers() throws Exception {
+        var manager = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
+        var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
+
+        mvc.perform(get("/api/v1/cooperative-licenses").header(HttpHeaders.AUTHORIZATION, manager))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/cooperative-licenses").header(HttpHeaders.AUTHORIZATION, producer))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+        mvc.perform(get("/api/v1/cooperative-licenses")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("Without a token the producer API answers 401 and the plan catalog stays public")
     void withoutToken() throws Exception {
         mvc.perform(get("/api/v1/plots")).andExpect(status().isUnauthorized());
