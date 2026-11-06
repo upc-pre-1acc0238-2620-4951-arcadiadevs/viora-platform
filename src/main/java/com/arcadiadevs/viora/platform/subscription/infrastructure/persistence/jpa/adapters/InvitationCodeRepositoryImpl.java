@@ -82,4 +82,10 @@ public class InvitationCodeRepositoryImpl implements InvitationCodeRepository {
                 .orElseGet(() -> InvitationCodePersistenceAssembler.toPersistenceFromDomain(code));
         return InvitationCodePersistenceAssembler.toDomainFromPersistence(persistenceRepository.saveAndFlush(entity));
     }
+
+    @Override
+    public Optional<InvitationCode> findById(InvitationCodeId id) {
+        return persistenceRepository.findById(UUID.fromString(id.invitationCodeId()))
+                .map(InvitationCodePersistenceAssembler::toDomainFromPersistence);
+    }
 }

@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.interfaces.acl;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,4 +43,26 @@ public interface SubscriptionContextFacade {
      * @return the producers' user identifiers; empty for an unknown license
      */
     List<String> findSponsoredProducerIds(String licenseId);
+
+    /**
+     * Lists the members a cooperative license sponsors now, with whether they share their data with it.
+     *
+     * @param licenseId the license identifier
+     * @return the members; empty for an unknown license
+     */
+    List<LicenseMember> findLicenseMembers(String licenseId);
+
+    /**
+     * A member of a cooperative license as other contexts may know it.
+     *
+     * @param producerId    the producer's user identifier
+     * @param memberSince   when their sponsored plan started
+     * @param quotaHectares the hectares the plan covers
+     * @param maskedCode    the code they redeemed, with only its last two characters; null if unknown
+     * @param sharing       {@code SHARING}, {@code WITHDRAWN} or {@code NOT_SHARING}
+     * @param withdrawnAt   when they stopped sharing; null unless {@code WITHDRAWN}
+     */
+    record LicenseMember(String producerId, Instant memberSince, BigDecimal quotaHectares, String maskedCode,
+                         String sharing, Instant withdrawnAt) {
+    }
 }

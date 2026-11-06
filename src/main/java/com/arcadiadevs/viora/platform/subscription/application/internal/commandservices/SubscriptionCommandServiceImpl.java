@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import com.arcadiadevs.viora.platform.shared.application.result.*;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
 import com.arcadiadevs.viora.platform.subscription.application.ports.*;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
@@ -25,7 +27,8 @@ public class SubscriptionCommandServiceImpl implements SubscriptionCommandServic
     private final SubscriptionRepository subscriptions;
     private final SubscriptionUnitOfWork work;
     private final SubscriptionCatalog catalog;
-    private final ProducerProfilePort profiles;
+    private final ExternalIamService externalIamService;
+    private final ExternalProfileService externalProfileService;
     private final Clock clock;
     private final CheckoutService checkouts;
 
@@ -37,16 +40,19 @@ public class SubscriptionCommandServiceImpl implements SubscriptionCommandServic
      * @param subscriptions shared persistence port
      * @param work transactional owner serialization
      * @param catalog server-owned tariff
-     * @param profiles producer authorization and profile readiness
+     * @param externalIamService who IAM knows as a producer
+     * @param externalProfileService whose profile is complete
      * @param clock application clock
      * @param checkouts closes the unpaid checkout of a purchase before its terms change
      */
     public SubscriptionCommandServiceImpl(SubscriptionRepository subscriptions, SubscriptionUnitOfWork work,
-            SubscriptionCatalog catalog, ProducerProfilePort profiles, Clock clock, CheckoutService checkouts) {
+            SubscriptionCatalog catalog, ExternalIamService externalIamService,
+            ExternalProfileService externalProfileService, Clock clock, CheckoutService checkouts) {
         this.subscriptions = subscriptions;
         this.work = work;
         this.catalog = catalog;
-        this.profiles = profiles;
+        this.externalIamService = externalIamService;
+        this.externalProfileService = externalProfileService;
         this.clock = clock;
         this.checkouts = checkouts;
     }
@@ -72,7 +78,8 @@ public class SubscriptionCommandServiceImpl implements SubscriptionCommandServic
         } catch (IllegalArgumentException exception) {
             return Result.failure(ApplicationError.businessRuleViolation("subscription", exception.getMessage()));
         }
-        if (!profiles.isReady(owner.producerId())) {
+        // Only a producer IAM knows, with a completed profile, may buy a plan.
+        if (!externalIamService.isProducer(owner) || !externalProfileService.hasProfile(owner)) {
             return Result.failure(ApplicationError.forbidden("subscription", "subscription.profile.required"));
         }
         var fingerprint = command.planCode() + ":" + quota.value().toPlainString();

@@ -36,6 +36,16 @@ public class ExternalIamService {
      * @return true if IAM knows the user as a producer; false otherwise
      */
     public boolean mayRedeemCooperativeCodes(ProducerId producerId) {
+        return isProducer(producerId);
+    }
+
+    /**
+     * Checks whether IAM knows a user as a producer, such as before an individual purchase.
+     *
+     * @param producerId the user
+     * @return true if IAM knows the user as a producer; false for an unknown user or another role
+     */
+    public boolean isProducer(ProducerId producerId) {
         if (producerId == null) {
             return false;
         }

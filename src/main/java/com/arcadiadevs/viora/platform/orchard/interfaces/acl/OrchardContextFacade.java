@@ -81,4 +81,12 @@ public interface OrchardContextFacade {
      * @return Optional containing the surface area in hectares, or empty if plot is not found or not active
      */
     Optional<Double> findPlotAreaHectares(String plotId);
+
+    /**
+     * Retrieves the polygon of an active plot, as its producer drew it.
+     *
+     * @param plotId the plot identifier string (UUID)
+     * @return the GeoJSON polygon, or empty if the plot is not found or not active
+     */
+    Optional<String> findPlotGeoJson(String plotId);
 }
