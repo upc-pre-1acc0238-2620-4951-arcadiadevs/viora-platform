@@ -27,7 +27,7 @@ class TerritoryApiDocsIntegrationTest {
     @Autowired WebApplicationContext context;
 
     @Test
-    @DisplayName("keeps the sector routes under their aggregate's name")
+    @DisplayName("keeps the sector, member and plot routes under their own names")
     void describesTheTerritoryApi() throws Exception {
         var body = MockMvcBuilders.webAppContextSetup(context).build()
                 .perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
@@ -48,6 +48,18 @@ class TerritoryApiDocsIntegrationTest {
                 "$.paths['/api/v1/plot-sector-assignments/{plotId}/resolutions'].post")) {
             Map<String, Object> operation = docs.read(route);
             assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Plot Sector Assignments"));
+        }
+        for (var route : List.of(
+                "$.paths['/api/v1/cooperative-members'].get",
+                "$.paths['/api/v1/cooperative-members/{id}'].get")) {
+            Map<String, Object> operation = docs.read(route);
+            assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Cooperative Members"));
+        }
+        for (var route : List.of(
+                "$.paths['/api/v1/member-plots'].get",
+                "$.paths['/api/v1/member-plots/{id}'].get")) {
+            Map<String, Object> operation = docs.read(route);
+            assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Member Plots"));
         }
     }
 }

@@ -127,6 +127,23 @@ class RoleAccessIntegrationTest {
     }
 
     @Test
+    @DisplayName("Only a technical manager reads members and member plots")
+    void memberViewIsTheManagers() throws Exception {
+        var manager = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
+        var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
+
+        for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots"}) {
+            mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, producer))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
+            // Past the filter, a manager without a license gets the territory reason.
+            mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, manager))
+                    .andExpect(jsonPath("$.reason").value("territory.manager.no_license"));
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
     @DisplayName("Without a token the producer API answers 401 and the plan catalog stays public")
     void withoutToken() throws Exception {
         mvc.perform(get("/api/v1/plots")).andExpect(status().isUnauthorized());

@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.territory.application.internal.outboundse
 
 import com.arcadiadevs.viora.platform.iam.interfaces.acl.IamContextFacade;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.UserId;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ProducerId;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -31,5 +32,15 @@ public class ExternalIamService {
      */
     public Optional<String> findRole(UserId userId) {
         return iamContextFacade.findUserRole(userId.userId());
+    }
+
+    /**
+     * Finds the email of a member.
+     *
+     * @param producerId the member
+     * @return the email, or empty
+     */
+    public Optional<String> findEmail(ProducerId producerId) {
+        return iamContextFacade.findUserEmail(producerId.producerId());
     }
 }
