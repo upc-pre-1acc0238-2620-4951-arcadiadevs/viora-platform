@@ -7,12 +7,10 @@ import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseE
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.QuotaExtensionCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.QuotaExtensionQueryService;
-import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RequestQuotaExtensionCommand;
-import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
-import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.QuotaExtensionResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.RequestQuotaExtensionResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.QuotaExtensionResourceAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.QuotaExtensionResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,28 +36,29 @@ import java.util.UUID;
 @Tag(name = "Plan Extensions", description = "Hectares added to a plan in force without changing when it ends")
 public class QuotaExtensionController {
 
-    private final QuotaExtensionCommandService commands;
-    private final QuotaExtensionQueryService queries;
+    private final QuotaExtensionCommandService quotaExtensionCommandService;
+    private final QuotaExtensionQueryService quotaExtensionQueryService;
     private final CheckoutService payments;
-    private final SubscriptionRepository subscriptions;
+    private final QuotaExtensionResourceFromEntityAssembler quotaExtensionResourceAssembler;
     private final CurrentUserProvider users;
 
     /**
      * Creates the controller.
      *
-     * @param commands      the extension use cases
-     * @param queries       the extension reads
-     * @param payments      the durable checkout use case
-     * @param subscriptions the plans, to show the quota after an extension
-     * @param users         the authenticated actor
+     * @param quotaExtensionCommandService    the extension use cases
+     * @param quotaExtensionQueryService      the extension reads
+     * @param payments                        the durable checkout use case
+     * @param quotaExtensionResourceAssembler the assembler showing the quota after an extension
+     * @param users                           the authenticated actor
      */
-    public QuotaExtensionController(QuotaExtensionCommandService commands, QuotaExtensionQueryService queries,
-                                    CheckoutService payments, SubscriptionRepository subscriptions,
+    public QuotaExtensionController(QuotaExtensionCommandService quotaExtensionCommandService,
+                                    QuotaExtensionQueryService quotaExtensionQueryService, CheckoutService payments,
+                                    QuotaExtensionResourceFromEntityAssembler quotaExtensionResourceAssembler,
                                     CurrentUserProvider users) {
-        this.commands = commands;
-        this.queries = queries;
+        this.quotaExtensionCommandService = quotaExtensionCommandService;
+        this.quotaExtensionQueryService = quotaExtensionQueryService;
         this.payments = payments;
-        this.subscriptions = subscriptions;
+        this.quotaExtensionResourceAssembler = quotaExtensionResourceAssembler;
         this.users = users;
     }
 
@@ -72,7 +71,7 @@ public class QuotaExtensionController {
     @GetMapping("/extension-terms")
     @Operation(summary = "Get how an owned plan can grow now")
     public ResponseEntity<?> terms(@PathVariable UUID subscriptionId) {
-        return queries.terms(users.requireCurrentUserId(), subscriptionId)
+        return quotaExtensionQueryService.terms(users.requireCurrentUserId(), subscriptionId)
                 .<ResponseEntity<?>>map(terms -> ResponseEntity.ok(QuotaExtensionResourceAssembler.toResource(terms)))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("subscription", subscriptionId.toString())));
@@ -92,7 +91,8 @@ public class QuotaExtensionController {
                                      @Valid @RequestBody RequestQuotaExtensionResource request,
                                      @RequestHeader("Idempotency-Key") String key) {
         var owner = users.requireCurrentUserId();
-        var result = commands.handle(new RequestQuotaExtensionCommand(owner, subscriptionId, request.addedHa(), key));
+        var result = quotaExtensionCommandService.handle(
+                new RequestQuotaExtensionCommand(owner, subscriptionId, request.addedHa(), key));
         if (result.isFailure()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(result.failure().orElseThrow());
         }
@@ -101,7 +101,7 @@ public class QuotaExtensionController {
         return ResponseEntity.status(requested.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .location(URI.create("/api/v1/subscriptions/" + subscriptionId + "/extensions/"
                         + extension.snapshot().id().quotaExtensionId()))
-                .body(toResource(extension, null));
+                .body(quotaExtensionResourceAssembler.toResource(extension, null));
     }
 
     /**
@@ -114,8 +114,9 @@ public class QuotaExtensionController {
     @GetMapping("/extensions/{extensionId}")
     @Operation(summary = "Get an extension of an owned plan")
     public ResponseEntity<?> get(@PathVariable UUID subscriptionId, @PathVariable UUID extensionId) {
-        return queries.find(users.requireCurrentUserId(), subscriptionId, extensionId)
-                .<ResponseEntity<?>>map(found -> ResponseEntity.ok(toResource(found, queries.paymentStatus(extensionId))))
+        return quotaExtensionQueryService.find(users.requireCurrentUserId(), subscriptionId, extensionId)
+                .<ResponseEntity<?>>map(found -> ResponseEntity.ok(quotaExtensionResourceAssembler.toResource(found,
+                        quotaExtensionQueryService.paymentStatus(extensionId))))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("quota_extension", extensionId.toString())));
     }
@@ -135,10 +136,5 @@ public class QuotaExtensionController {
         return ResponseEntityAssembler.toResponseEntityFromResult(
                 payments.createForExtension(users.requireCurrentUserId(), subscriptionId, extensionId, key),
                 result -> result, HttpStatus.CREATED);
-    }
-
-    private QuotaExtensionResource toResource(QuotaExtension extension, String paymentStatus) {
-        var plan = subscriptions.findById(extension.snapshot().subscriptionId()).orElseThrow();
-        return QuotaExtensionResourceAssembler.toResource(extension, plan, paymentStatus);
     }
 }
