@@ -15,6 +15,11 @@ import java.time.Instant;
  * @param startsAt         when it comes into force
  * @param endsAt           when it ends, exclusive
  * @param active           whether it is in force now
+ * @param seatsUsed        the seats held by codes still to redeem and by redeemed ones
+ * @param seatsFree        the seats left for new codes
+ * @param reservedAreaHa   the hectares held by those codes
+ * @param freeAreaHa       the hectares left for new codes
+ * @param suggestedHectaresPerCode the free hectares split among the free seats, rounded down to half a hectare
  */
 @Schema(name = "CooperativeLicenseResource", description = "License a technical manager is in charge of")
 public record CooperativeLicenseResource(
@@ -24,6 +29,11 @@ public record CooperativeLicenseResource(
         @Schema(example = "200.00") BigDecimal contractedAreaHa,
         Instant startsAt,
         Instant endsAt,
-        boolean active
+        boolean active,
+        @Schema(example = "48") int seatsUsed,
+        @Schema(example = "12") int seatsFree,
+        @Schema(example = "138.00") BigDecimal reservedAreaHa,
+        @Schema(example = "62.00") BigDecimal freeAreaHa,
+        @Schema(example = "5.0") BigDecimal suggestedHectaresPerCode
 ) {
 }

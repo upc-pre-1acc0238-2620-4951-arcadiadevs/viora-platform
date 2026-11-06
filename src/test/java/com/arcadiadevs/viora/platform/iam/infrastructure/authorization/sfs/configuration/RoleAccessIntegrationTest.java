@@ -85,6 +85,11 @@ class RoleAccessIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
         mvc.perform(get("/api/v1/cooperative-licenses")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/invitation-codes").header(HttpHeaders.AUTHORIZATION, manager))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/invitation-codes").header(HttpHeaders.AUTHORIZATION, producer))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));
     }
 
     @Test

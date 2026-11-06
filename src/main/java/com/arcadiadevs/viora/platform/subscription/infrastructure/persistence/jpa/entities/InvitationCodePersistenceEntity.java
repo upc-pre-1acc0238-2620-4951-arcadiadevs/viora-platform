@@ -52,6 +52,17 @@ public class InvitationCodePersistenceEntity extends AuditableAbstractPersistenc
     @Column(name = "redeemed_at")
     private Instant redeemedAt;
 
+    /** The last two characters of the code, to show it masked. */
+    @Column(name = "code_hint", length = 2)
+    private String codeHint;
+
+    /** The code encrypted, kept only while it can be redeemed. */
+    @Column(name = "sealed_code", length = 255)
+    private String sealedCode;
+
+    @Column(name = "issued_at")
+    private Instant issuedAt;
+
     @Version
     @Column(name = "revision", nullable = false)
     private Long revision;
