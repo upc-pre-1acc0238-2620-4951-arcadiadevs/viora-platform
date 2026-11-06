@@ -7,7 +7,7 @@ import com.arcadiadevs.viora.platform.subscription.application.queryservices.Coo
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetAllCooperativeLicensesByManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.CooperativeLicenseResource;
-import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.CooperativeLicenseResourceAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.CooperativeLicenseResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,26 +37,27 @@ import java.util.UUID;
 public class CooperativeLicenseController {
 
     private final CooperativeLicenseQueryService cooperativeLicenseQueryService;
+    private final CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler;
     private final CurrentUserProvider users;
-    private final Clock clock;
 
     /**
      * Creates the controller.
      *
-     * @param cooperativeLicenseQueryService the license reads
-     * @param users                          the authenticated user
-     * @param clock                          the application clock
+     * @param cooperativeLicenseQueryService      the license reads
+     * @param cooperativeLicenseResourceAssembler the assembler adding what each license has left
+     * @param users                               the authenticated user
      * @throws IllegalArgumentException if any dependency is null
      */
-    public CooperativeLicenseController(CooperativeLicenseQueryService cooperativeLicenseQueryService,
-                                        CurrentUserProvider users,
-                                        Clock clock) {
-        if (cooperativeLicenseQueryService == null || users == null || clock == null) {
+    public CooperativeLicenseController(
+            CooperativeLicenseQueryService cooperativeLicenseQueryService,
+            CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler,
+            CurrentUserProvider users) {
+        if (cooperativeLicenseQueryService == null || cooperativeLicenseResourceAssembler == null || users == null) {
             throw new IllegalArgumentException("subscription.license_controller.dependency.null");
         }
         this.cooperativeLicenseQueryService = cooperativeLicenseQueryService;
+        this.cooperativeLicenseResourceAssembler = cooperativeLicenseResourceAssembler;
         this.users = users;
-        this.clock = clock;
     }
 
     /**
@@ -79,10 +79,9 @@ public class CooperativeLicenseController {
             @ApiResponse(responseCode = "403", description = "The user is not a technical manager")
     })
     public List<CooperativeLicenseResource> list() {
-        var now = clock.instant();
         var query = new GetAllCooperativeLicensesByManagerIdQuery(users.requireCurrentUserId());
         return cooperativeLicenseQueryService.handle(query).stream()
-                .map(license -> CooperativeLicenseResourceAssembler.toResource(license, now))
+                .map(cooperativeLicenseResourceAssembler::toResource)
                 .toList();
     }
 
@@ -106,8 +105,7 @@ public class CooperativeLicenseController {
     public ResponseEntity<?> get(@PathVariable UUID id) {
         var query = new GetCooperativeLicenseByIdAndManagerIdQuery(id.toString(), users.requireCurrentUserId());
         return cooperativeLicenseQueryService.handle(query)
-                .<ResponseEntity<?>>map(license ->
-                        ResponseEntity.ok(CooperativeLicenseResourceAssembler.toResource(license, clock.instant())))
+                .<ResponseEntity<?>>map(license -> ResponseEntity.ok(cooperativeLicenseResourceAssembler.toResource(license)))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("license", id.toString())));
     }

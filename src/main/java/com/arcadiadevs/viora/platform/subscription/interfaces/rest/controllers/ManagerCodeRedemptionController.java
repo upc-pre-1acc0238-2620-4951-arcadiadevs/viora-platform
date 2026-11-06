@@ -6,7 +6,7 @@ import com.arcadiadevs.viora.platform.subscription.application.commandservices.M
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemManagerCodeCommand;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.CooperativeLicenseResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.RedeemManagerCodeResource;
-import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.CooperativeLicenseResourceAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.CooperativeLicenseResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.time.Clock;
 
 /**
  * REST controller where a technical manager redeems the code that puts them in charge of their organization's
@@ -36,26 +35,28 @@ import java.time.Clock;
 public class ManagerCodeRedemptionController {
 
     private final ManagerCodeRedemptionCommandService managerCodeRedemptionCommandService;
+    private final CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler;
     private final CurrentUserProvider users;
-    private final Clock clock;
 
     /**
      * Creates the controller.
      *
      * @param managerCodeRedemptionCommandService the redemption use case
+     * @param cooperativeLicenseResourceAssembler the assembler of the license the manager takes charge of
      * @param users                               the authenticated user
-     * @param clock                               the application clock
      * @throws IllegalArgumentException if any dependency is null
      */
-    public ManagerCodeRedemptionController(ManagerCodeRedemptionCommandService managerCodeRedemptionCommandService,
-                                           CurrentUserProvider users,
-                                           Clock clock) {
-        if (managerCodeRedemptionCommandService == null || users == null || clock == null) {
+    public ManagerCodeRedemptionController(
+            ManagerCodeRedemptionCommandService managerCodeRedemptionCommandService,
+            CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler,
+            CurrentUserProvider users) {
+        if (managerCodeRedemptionCommandService == null || cooperativeLicenseResourceAssembler == null
+                || users == null) {
             throw new IllegalArgumentException("subscription.manager_redemption_controller.dependency.null");
         }
         this.managerCodeRedemptionCommandService = managerCodeRedemptionCommandService;
+        this.cooperativeLicenseResourceAssembler = cooperativeLicenseResourceAssembler;
         this.users = users;
-        this.clock = clock;
     }
 
     /**
@@ -87,7 +88,7 @@ public class ManagerCodeRedemptionController {
         if (result.isFailure()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(result.failure().orElseThrow());
         }
-        var license = CooperativeLicenseResourceAssembler.toResource(result.success().orElseThrow(), clock.instant());
+        var license = cooperativeLicenseResourceAssembler.toResource(result.success().orElseThrow());
         return ResponseEntity.created(URI.create("/api/v1/cooperative-licenses/" + license.id())).body(license);
     }
 }
