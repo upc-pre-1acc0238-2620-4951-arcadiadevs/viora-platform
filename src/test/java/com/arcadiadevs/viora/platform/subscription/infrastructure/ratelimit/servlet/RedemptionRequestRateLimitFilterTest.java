@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit.servlet;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;

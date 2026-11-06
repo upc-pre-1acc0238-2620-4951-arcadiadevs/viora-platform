@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit.inmemory;
 
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;

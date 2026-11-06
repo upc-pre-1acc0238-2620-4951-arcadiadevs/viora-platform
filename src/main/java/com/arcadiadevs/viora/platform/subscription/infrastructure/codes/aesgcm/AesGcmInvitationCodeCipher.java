@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.codes;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.codes.aesgcm;
 
 import com.arcadiadevs.viora.platform.subscription.application.ports.InvitationCodeCipher;
 import org.slf4j.Logger;

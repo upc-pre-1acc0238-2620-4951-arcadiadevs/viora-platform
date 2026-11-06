@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.codes;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.codes.securerandom;
 
 import com.arcadiadevs.viora.platform.subscription.application.ports.InvitationCodeGenerator;
 import org.springframework.stereotype.Component;

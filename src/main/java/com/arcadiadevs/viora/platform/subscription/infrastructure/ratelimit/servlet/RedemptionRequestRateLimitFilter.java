@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.ratelimit.servlet;
 
 import com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit.ClientAddress;
 import com.arcadiadevs.viora.platform.shared.infrastructure.ratelimit.SlidingWindowCounter;

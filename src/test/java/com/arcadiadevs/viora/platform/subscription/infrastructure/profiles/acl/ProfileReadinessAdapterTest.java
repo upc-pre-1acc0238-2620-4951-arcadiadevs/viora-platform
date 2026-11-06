@@ -1,10 +1,9 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.profiles.acl;
 
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import com.arcadiadevs.viora.platform.iam.interfaces.acl.IamContextFacade;
 import com.arcadiadevs.viora.platform.profiles.interfaces.acl.ProfileContextFacade;
-import com.arcadiadevs.viora.platform.subscription.infrastructure.acl.ProfileReadinessAdapter;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
