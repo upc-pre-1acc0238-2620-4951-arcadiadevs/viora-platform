@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.domain.services;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.SamplingRoundSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.SamplingRound;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
@@ -25,9 +26,9 @@ class SamplingCoverageEvaluatorTest {
 
         // Round 1: 3 trees, each with 10 shoots, each shoot 10 fruits -> 30 shoots, 300 fruits
         List<TreeSamplingRecord> round1Trees = List.of(
-                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-02", 10, 100, 150.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-03", 10, 100, 150.0, LocalDate.now())
+                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-02", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-03", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
         SamplingRound round1 = SamplingRound.create(actorId, new SamplingBatchId("batch-1"), round1Trees);
 
@@ -43,8 +44,8 @@ class SamplingCoverageEvaluatorTest {
 
         // Round 2: 2 more trees -> total 5 trees
         List<TreeSamplingRecord> round2Trees = List.of(
-                TreeSamplingRecord.create("T-04", 10, 100, 150.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-05", 10, 100, 150.0, LocalDate.now())
+                TreeSamplingRecord.create("T-04", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-05", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
         SamplingRound round2 = SamplingRound.create(actorId, new SamplingBatchId("batch-2"), round2Trees);
 

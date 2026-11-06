@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.application.internal.outboundservices.ThinningProfile;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThinningPrescription;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
@@ -37,11 +38,11 @@ public final class PrescriptionTestData {
                 new UserId(UUID.randomUUID().toString()),
                 new SamplingBatchId("batch-" + UUID.randomUUID()),
                 List.of(
-                        TreeSamplingRecord.create("T-01", 20, 12, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-02", 20, 12, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-03", 20, 12, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-04", 20, 12, 150.0, LocalDate.now()),
-                        TreeSamplingRecord.create("T-05", 20, 12, 150.0, LocalDate.now())
+                        TreeSamplingRecord.create("T-01", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-02", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-03", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-04", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                        TreeSamplingRecord.create("T-05", 20, 12, 150.0, LocalDate.now(ProducerTimeZone.ZONE))
                 )
         );
         prescription.clearDomainEvents();

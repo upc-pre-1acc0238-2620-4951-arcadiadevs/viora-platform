@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
 import com.arcadiadevs.viora.platform.thinning.domain.model.events.SamplingRoundCompletedEvent;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.CampaignYear;
@@ -45,9 +46,9 @@ class FruitThinningPrescriptionTest {
         var prescription = FruitThinningPrescription.createForPlot(plotId, year, 1L);
 
         List<TreeSamplingRecord> recordsBatch1 = List.of(
-                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-02", 12, 120, 160.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-03", 8, 80, 140.0, LocalDate.now())
+                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-02", 12, 120, 160.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-03", 8, 80, 140.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
 
         prescription.ingestSamplingsBatch(actorId, new SamplingBatchId("batch-1"), recordsBatch1);
@@ -62,8 +63,8 @@ class FruitThinningPrescriptionTest {
 
         // Batch 2 with 2 more trees reaching 5 unique trees
         List<TreeSamplingRecord> recordsBatch2 = List.of(
-                TreeSamplingRecord.create("T-04", 10, 110, 155.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-05", 14, 150, 170.0, LocalDate.now())
+                TreeSamplingRecord.create("T-04", 10, 110, 155.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-05", 14, 150, 170.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
 
         prescription.ingestSamplingsBatch(actorId, new SamplingBatchId("batch-2"), recordsBatch2);
@@ -87,8 +88,8 @@ class FruitThinningPrescriptionTest {
         var prescription = FruitThinningPrescription.createForPlot(plotId, year, 1L);
 
         List<TreeSamplingRecord> duplicateBatch = List.of(
-                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now()),
-                TreeSamplingRecord.create("T-01", 12, 120, 160.0, LocalDate.now())
+                TreeSamplingRecord.create("T-01", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)),
+                TreeSamplingRecord.create("T-01", 12, 120, 160.0, LocalDate.now(ProducerTimeZone.ZONE))
         );
 
         assertThatThrownBy(() -> prescription.ingestSamplingsBatch(actorId, new SamplingBatchId("batch-dup"), duplicateBatch))
@@ -99,9 +100,9 @@ class FruitThinningPrescriptionTest {
     @Test
     @DisplayName("Should refuse a new sampling round once the prescription is issued")
     void shouldRefuseANewSamplingRoundOnceIssued() {
-        var prescription = com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.prescribed(LocalDate.now());
+        var prescription = com.arcadiadevs.viora.platform.thinning.ThinningExecutionFixtures.prescribed(LocalDate.now(ProducerTimeZone.ZONE));
         var actorId = new UserId(UUID.randomUUID().toString());
-        var records = List.of(TreeSamplingRecord.create("T-09", 10, 100, 150.0, LocalDate.now()));
+        var records = List.of(TreeSamplingRecord.create("T-09", 10, 100, 150.0, LocalDate.now(ProducerTimeZone.ZONE)));
 
         assertThatThrownBy(() -> prescription.ingestSamplingsBatch(actorId, new SamplingBatchId("late-batch"), records))
                 .isInstanceOf(IllegalStateException.class)
