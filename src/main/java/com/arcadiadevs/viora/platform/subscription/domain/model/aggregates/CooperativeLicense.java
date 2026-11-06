@@ -3,12 +3,15 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ExtensionCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseSeatsException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRevocableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ManagerCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.LicenseCapacity;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.PlanMode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
@@ -18,11 +21,14 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Sub
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Aggregate root of the collective license a cooperative contracts for its producers.
- * <p>Each invitation code holds one of its seats and its hectares from the moment it is issued; the committed
- * hectares can never exceed the contracted area. Redeeming a code does not change the area.</p>
+ * <p>Each invitation code holds one of its seats and its hectares from the moment it is issued until it expires or
+ * is revoked; a redeemed code keeps them for its producer. The committed hectares can never exceed the contracted area,
+ * nor the codes the seats. Redeeming a code does not change the area.</p>
  * <p>One technical manager at a time is in charge of the license: whoever redeemed its latest manager code. The
  * organization that contracted it never signs in; it is only the name the license carries.</p>
  */
@@ -116,6 +122,113 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
         var code = InvitationCode.issue(id, fingerprint, quota, expiresAt);
         this.committedAreaHa = committed;
         return code;
+    }
+
+    /**
+     * Issues a batch of codes that each cover {@code quota} hectares, holding a seat and committing the hectares of
+     * every one, or changes nothing.
+     *
+     * @param codes     the fingerprint, hint and sealed value of each new code; at least one
+     * @param quota     the hectares each code covers
+     * @param seatsUsed the seats already held by codes still to redeem and by redeemed ones
+     * @param issuedAt  the instant of the issue; the license must be in force
+     * @param expiresAt the last instant the codes can be redeemed, exclusive; never after the license ends
+     * @return the available codes, all of one batch
+     * @throws IllegalArgumentException          if an argument is missing, there are no codes, the license is not in
+     *                                           force or the codes would outlive it
+     * @throws InsufficientLicenseSeatsException if the license has fewer free seats than codes
+     * @throws InsufficientLicenseAreaException  if the license has fewer free hectares than the codes cover
+     */
+    public List<InvitationCode> issueCodes(List<InvitationCode.IssuedCode> codes, HectaresQuota quota, int seatsUsed,
+                                           Instant issuedAt, Instant expiresAt) {
+        if (codes == null || codes.isEmpty() || quota == null || issuedAt == null || expiresAt == null) {
+            throw new IllegalArgumentException("subscription.invitation_code.batch.incomplete");
+        }
+        if (!isInForce(issuedAt)) {
+            throw new IllegalArgumentException("subscription.license.not_in_force");
+        }
+        if (!expiresAt.isAfter(issuedAt) || expiresAt.isAfter(period.endsAt())) {
+            throw new IllegalArgumentException("subscription.invitation_code.expires_after_license");
+        }
+        if (seatsUsed + codes.size() > seats) {
+            throw new InsufficientLicenseSeatsException();
+        }
+        var committed = committedAreaHa.add(quota.hectares().multiply(BigDecimal.valueOf(codes.size())));
+        if (committed.compareTo(contractedArea.hectares()) > 0) {
+            throw new InsufficientLicenseAreaException();
+        }
+        var batchId = UUID.randomUUID().toString();
+        var issued = codes.stream()
+                .map(code -> InvitationCode.issue(id, batchId, code, quota, issuedAt, expiresAt))
+                .toList();
+        this.committedAreaHa = committed;
+        return issued;
+    }
+
+    /**
+     * Withdraws one of the license's codes nobody redeemed yet, giving its seat and hectares back, or changes nothing.
+     *
+     * @param code the code; it must belong to this license
+     * @param at   the instant of the revocation
+     * @throws IllegalArgumentException            if an argument is null or the code belongs to another license
+     * @throws InvitationCodeNotRevocableException if the code was redeemed, expired or was already revoked
+     */
+    public void revokeCode(InvitationCode code, Instant at) {
+        requireOwnCode(code, at);
+        code.revoke(at);
+        release(code);
+    }
+
+    /**
+     * Marks as expired one of the license's codes whose time is over, giving its seat and hectares back. A code still
+     * in time, or no longer available, is left as it is.
+     *
+     * @param code the code; it must belong to this license
+     * @param at   the instant to check
+     * @return true if the code expired now
+     * @throws IllegalArgumentException if an argument is null or the code belongs to another license
+     */
+    public boolean expireCode(InvitationCode code, Instant at) {
+        requireOwnCode(code, at);
+        if (!code.expire(at)) {
+            return false;
+        }
+        release(code);
+        return true;
+    }
+
+    /**
+     * Tells what the license still has to give.
+     *
+     * @param seatsUsed     the seats held by codes still to redeem and by redeemed ones
+     * @param overdueAreaHa the hectares of codes whose time is over but are not marked as expired yet; they are free
+     * @return the capacity of the license
+     * @throws IllegalArgumentException if {@code overdueAreaHa} is null
+     */
+    public LicenseCapacity capacity(int seatsUsed, BigDecimal overdueAreaHa) {
+        if (overdueAreaHa == null) {
+            throw new IllegalArgumentException("subscription.license.capacity.incomplete");
+        }
+        var reserved = committedAreaHa.subtract(overdueAreaHa).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        var free = contractedArea.hectares().subtract(reserved).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        var seatsFree = Math.max(0, seats - seatsUsed);
+        var suggested = seatsFree == 0 ? BigDecimal.ZERO
+                : free.multiply(BigDecimal.TWO).divide(BigDecimal.valueOf(seatsFree), 0, RoundingMode.FLOOR)
+                        .divide(BigDecimal.TWO, 1, RoundingMode.UNNECESSARY);
+        return new LicenseCapacity(Math.min(seatsUsed, seats), seatsFree, reserved, free, suggested);
+    }
+
+    private void requireOwnCode(InvitationCode code, Instant at) {
+        if (code == null || at == null) {
+            throw new IllegalArgumentException("subscription.license.code.incomplete");
+        }
+        if (!id.equals(code.snapshot().licenseId())) {
+            throw new IllegalArgumentException("subscription.license.code_of_another_license");
+        }
+    }
+
+    private void release(InvitationCode code) {
+        committedAreaHa = committedAreaHa.subtract(code.snapshot().quota().hectares()).max(BigDecimal.ZERO);
     }
 
     /**
