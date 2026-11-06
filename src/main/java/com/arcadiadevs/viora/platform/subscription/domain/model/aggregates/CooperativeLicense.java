@@ -4,10 +4,12 @@ import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDom
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ExtensionCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ManagerCodeNotRedeemableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.PlanMode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.RedeemedCode;
@@ -21,6 +23,8 @@ import java.time.Instant;
  * Aggregate root of the collective license a cooperative contracts for its producers.
  * <p>Each invitation code holds one of its seats and its hectares from the moment it is issued; the committed
  * hectares can never exceed the contracted area. Redeeming a code does not change the area.</p>
+ * <p>One technical manager at a time is in charge of the license: whoever redeemed its latest manager code. The
+ * organization that contracted it never signs in; it is only the name the license carries.</p>
  */
 public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeLicense> {
 
@@ -31,6 +35,7 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     private HectaresQuota contractedArea;
     private BigDecimal committedAreaHa;
     private final SubscriptionPeriod period;
+    private ManagerId managerId;
     private final Long revision;
 
     private CooperativeLicense(CooperativeLicenseSnapshot snapshot) {
@@ -41,6 +46,7 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
         this.contractedArea = snapshot.contractedArea();
         this.committedAreaHa = snapshot.committedAreaHa().setScale(2, RoundingMode.HALF_UP);
         this.period = snapshot.period();
+        this.managerId = snapshot.managerId();
         this.revision = snapshot.revision();
     }
 
@@ -58,7 +64,7 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     public static CooperativeLicense grant(CooperativeId cooperativeId, String cooperativeName, int seats,
                                            HectaresQuota contractedArea, SubscriptionPeriod period) {
         return reconstitute(new CooperativeLicenseSnapshot(new CooperativeLicenseId(), cooperativeId, cooperativeName,
-                seats, contractedArea, BigDecimal.ZERO, period, 0L));
+                seats, contractedArea, BigDecimal.ZERO, period, null, 0L));
     }
 
     /**
@@ -185,6 +191,78 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     }
 
     /**
+     * Issues the single-use code that puts a technical manager in charge of this license. It expires with the license
+     * at the latest.
+     *
+     * @param fingerprint the fingerprint of the code
+     * @param expiresAt   the last instant the code can be redeemed, exclusive
+     * @return the available code
+     * @throws IllegalArgumentException if an argument is null or the code would outlive the license
+     */
+    public ManagerActivationCode issueManagerCode(CodeFingerprint fingerprint, Instant expiresAt) {
+        if (fingerprint == null || expiresAt == null) {
+            throw new IllegalArgumentException("subscription.manager_code.issue.incomplete");
+        }
+        if (expiresAt.isAfter(period.endsAt())) {
+            throw new IllegalArgumentException("subscription.manager_code.expires_after_license");
+        }
+        return ManagerActivationCode.issue(id, fingerprint, expiresAt);
+    }
+
+    /**
+     * Puts a technical manager in charge of this license by redeeming one of its manager codes: the code is consumed
+     * and the manager replaces whoever held the license before, or nothing changes.
+     *
+     * @param code    the code being redeemed; it must belong to this license
+     * @param manager the manager redeeming it
+     * @param at      the instant of the redemption
+     * @throws IllegalArgumentException          if an argument is null or the code belongs to another license
+     * @throws ManagerCodeNotRedeemableException if the license is not in force or the code cannot be redeemed
+     */
+    public void assignManager(ManagerActivationCode code, ManagerId manager, Instant at) {
+        if (code == null || manager == null || at == null) {
+            throw new IllegalArgumentException("subscription.license.manager_assignment.incomplete");
+        }
+        if (!id.equals(code.snapshot().licenseId())) {
+            throw new IllegalArgumentException("subscription.license.code_of_another_license");
+        }
+        if (!isInForce(at)) {
+            throw new ManagerCodeNotRedeemableException();
+        }
+        code.redeem(manager, at);
+        this.managerId = manager;
+    }
+
+    /**
+     * Leaves the license without a manager when {@code manager} is the one in charge, such as when that account is
+     * deleted. Producers and codes stay as they are; Viora issues another manager code.
+     *
+     * @param manager the manager who leaves
+     * @return true if {@code manager} was in charge and the license is now without one
+     * @throws IllegalArgumentException if {@code manager} is null
+     */
+    public boolean releaseManager(ManagerId manager) {
+        if (manager == null) {
+            throw new IllegalArgumentException("subscription.manager.id.null_or_empty");
+        }
+        if (!manager.equals(managerId)) {
+            return false;
+        }
+        this.managerId = null;
+        return true;
+    }
+
+    /**
+     * Checks whether the license is in force.
+     *
+     * @param at the instant to check
+     * @return true if {@code at} falls inside the period of the license
+     */
+    public boolean isInForce(Instant at) {
+        return period.contains(at);
+    }
+
+    /**
      * Grows the area the cooperative contracted, such as when it buys more hectares for its producers.
      *
      * @param extra the hectares added to the contract
@@ -213,6 +291,6 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
      */
     public CooperativeLicenseSnapshot snapshot() {
         return new CooperativeLicenseSnapshot(id, cooperativeId, cooperativeName, seats, contractedArea,
-                committedAreaHa, period, revision);
+                committedAreaHa, period, managerId, revision);
     }
 }

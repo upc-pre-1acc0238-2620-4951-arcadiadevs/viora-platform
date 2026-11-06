@@ -44,6 +44,10 @@ public class CooperativeLicensePersistenceEntity extends AuditableAbstractPersis
     @Column(name = "ends_at", nullable = false)
     private Instant endsAt;
 
+    /** The IAM user in charge of the license; one license per manager. */
+    @Column(name = "manager_user_id", unique = true)
+    private UUID managerUserId;
+
     @Version
     @Column(name = "revision", nullable = false)
     private Long revision;

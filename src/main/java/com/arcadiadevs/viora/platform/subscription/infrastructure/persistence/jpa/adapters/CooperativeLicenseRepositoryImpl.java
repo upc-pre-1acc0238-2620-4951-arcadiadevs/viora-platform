@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.j
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.assemblers.CooperativeLicensePersistenceAssembler;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.CooperativeLicensePersistenceRepository;
@@ -36,6 +37,18 @@ public class CooperativeLicenseRepositoryImpl implements CooperativeLicenseRepos
     @Override
     public Optional<CooperativeLicense> findByIdForRedemption(CooperativeLicenseId id) {
         return persistenceRepository.findLockedById(UUID.fromString(id.cooperativeLicenseId()))
+                .map(CooperativeLicensePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<CooperativeLicense> findByManagerId(ManagerId managerId) {
+        return persistenceRepository.findByManagerUserId(UUID.fromString(managerId.managerId()))
+                .map(CooperativeLicensePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<CooperativeLicense> findByManagerIdForUpdate(ManagerId managerId) {
+        return persistenceRepository.findLockedByManagerUserId(UUID.fromString(managerId.managerId()))
                 .map(CooperativeLicensePersistenceAssembler::toDomainFromPersistence);
     }
 

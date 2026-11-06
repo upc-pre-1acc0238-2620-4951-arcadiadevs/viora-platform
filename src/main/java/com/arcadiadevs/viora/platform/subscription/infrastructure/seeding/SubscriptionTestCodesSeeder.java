@@ -84,7 +84,7 @@ public class SubscriptionTestCodesSeeder implements ApplicationRunner {
             var area = CODES.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
             var license = CooperativeLicense.reconstitute(new CooperativeLicenseSnapshot(LICENSE_ID, new CooperativeId(),
                     COOPERATIVE_NAME, CODES.size(), new HectaresQuota(area), BigDecimal.ZERO,
-                    new SubscriptionPeriod(now.minus(Duration.ofDays(1)), now.plus(Duration.ofDays(730))), 0L));
+                    new SubscriptionPeriod(now.minus(Duration.ofDays(1)), now.plus(Duration.ofDays(730))), null, 0L));
             var codesExpireAt = now.plus(Duration.ofDays(365));
             var codes = new ArrayList<InvitationCode>();
             CODES.forEach((code, hectares) -> codes.add(license.issueCode(

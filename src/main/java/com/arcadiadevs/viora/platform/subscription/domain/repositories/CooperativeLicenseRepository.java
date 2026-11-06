@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.repositories;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 
 import java.util.Optional;
 
@@ -26,6 +27,22 @@ public interface CooperativeLicenseRepository {
      * @return the license, or empty if it does not exist
      */
     Optional<CooperativeLicense> findByIdForRedemption(CooperativeLicenseId id);
+
+    /**
+     * Finds the license a technical manager is in charge of, whether or not it is still in force.
+     *
+     * @param managerId the manager
+     * @return the license, or empty if the manager is in charge of none
+     */
+    Optional<CooperativeLicense> findByManagerId(ManagerId managerId);
+
+    /**
+     * Finds the license a technical manager is in charge of and locks it until the transaction ends.
+     *
+     * @param managerId the manager
+     * @return the license, or empty if the manager is in charge of none
+     */
+    Optional<CooperativeLicense> findByManagerIdForUpdate(ManagerId managerId);
 
     /**
      * Checks whether any license is stored.
