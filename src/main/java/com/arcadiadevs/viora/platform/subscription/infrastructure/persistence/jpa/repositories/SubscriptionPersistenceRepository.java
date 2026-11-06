@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Spring Data JPA repository for {@link SubscriptionPersistenceEntity}.
@@ -69,4 +70,19 @@ public interface SubscriptionPersistenceRepository extends JpaRepository<Subscri
 
     /** Everything of a deleted account, for the account purge. */
     List<SubscriptionPersistenceEntity> findAllByProducerId(UUID producerId);
+
+    /**
+     * Lists the producers with an active plan of a license in force at an instant.
+     *
+     * @param licenseId the license
+     * @param status    the active status
+     * @param at        the instant
+     * @return the producers, without repetitions
+     */
+    @Query("select distinct subscription.producerId from SubscriptionPersistenceEntity subscription "
+            + "where subscription.licenseId = :licenseId and subscription.status = :status "
+            + "and subscription.startsAt <= :at and subscription.endsAt > :at")
+    List<UUID> findProducerIdsInForceByLicenseId(@Param("licenseId") UUID licenseId,
+                                                 @Param("status") SubscriptionStatus status,
+                                                 @Param("at") Instant at);
 }

@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.adapters;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionStatus;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
@@ -9,6 +10,7 @@ import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jp
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
@@ -95,5 +97,14 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
         return persistenceRepository.findByIdAndProducerId(UUID.fromString(id.subscriptionId()),
                 UUID.fromString(producerId.producerId()))
                 .map(SubscriptionPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<ProducerId> findSponsoredProducerIds(CooperativeLicenseId licenseId, Instant at) {
+        return persistenceRepository.findProducerIdsInForceByLicenseId(
+                        UUID.fromString(licenseId.cooperativeLicenseId()), SubscriptionStatus.ACTIVE, at)
+                .stream()
+                .map(producerId -> new ProducerId(producerId.toString()))
+                .toList();
     }
 }
