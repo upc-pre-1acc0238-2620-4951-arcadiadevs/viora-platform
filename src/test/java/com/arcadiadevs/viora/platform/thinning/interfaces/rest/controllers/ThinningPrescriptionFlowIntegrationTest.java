@@ -114,7 +114,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         for (int tree = 1; tree <= 5; tree++) {
             samples.append("""
                     {"treeTag":"T-%d","shootCount":20,"fruitSetCount":12,"trunkDiameterMm":150.0,"samplingDate":"%s"}%s
-                    """.formatted(tree, LocalDate.now(), tree < 5 ? "," : ""));
+                    """.formatted(tree, LocalDate.now(ProducerTimeZone.ZONE), tree < 5 ? "," : ""));
         }
         var body = """
                 {"clientBatchId":"%s","campaignYear":%d,"samples":[%s]}
@@ -202,7 +202,7 @@ class ThinningPrescriptionFlowIntegrationTest {
         var correction = """
                 {"clientBatchId":"%s","campaignYear":%d,"samples":[
                  {"treeTag":"T-3","shootCount":20,"fruitSetCount":32,"trunkDiameterMm":150.0,"samplingDate":"%s"}]}
-                """.formatted(UUID.randomUUID(), campaign, LocalDate.now());
+                """.formatted(UUID.randomUUID(), campaign, LocalDate.now(ProducerTimeZone.ZONE));
         mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
                         .content(correction))
                 .andExpect(status().isCreated())
@@ -317,7 +317,7 @@ class ThinningPrescriptionFlowIntegrationTest {
                 .andExpect(jsonPath("$.currentLoad.loadState").value("SEVERE_OVERLOAD"))
                 .andExpect(jsonPath("$.sampledTrees").value(5))
                 .andExpect(jsonPath("$.treesNeeded").value(0))
-                .andExpect(jsonPath("$.lastSampledOn").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.lastSampledOn").value(LocalDate.now(ProducerTimeZone.ZONE).toString()))
                 .andExpect(jsonPath("$.windowOpensDaysAfterBloom").value(14))
                 .andExpect(jsonPath("$.windowClosesDaysAfterBloom").value(49))
                 .andExpect(jsonPath("$.yieldEstimate.status").value("INSUFFICIENT_HISTORY"))

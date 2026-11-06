@@ -26,4 +26,22 @@ public interface CooperativeLicensePersistenceRepository extends JpaRepository<C
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select license from CooperativeLicensePersistenceEntity license where license.id = :id")
     Optional<CooperativeLicensePersistenceEntity> findLockedById(@Param("id") UUID id);
+
+    /**
+     * Finds the license a manager is in charge of.
+     *
+     * @param managerUserId the manager
+     * @return the license entity, or empty if the manager is in charge of none
+     */
+    Optional<CooperativeLicensePersistenceEntity> findByManagerUserId(UUID managerUserId);
+
+    /**
+     * Finds the license a manager is in charge of and locks its row until the transaction ends.
+     *
+     * @param managerUserId the manager
+     * @return the license entity, or empty if the manager is in charge of none
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select license from CooperativeLicensePersistenceEntity license where license.managerUserId = :managerUserId")
+    Optional<CooperativeLicensePersistenceEntity> findLockedByManagerUserId(@Param("managerUserId") UUID managerUserId);
 }

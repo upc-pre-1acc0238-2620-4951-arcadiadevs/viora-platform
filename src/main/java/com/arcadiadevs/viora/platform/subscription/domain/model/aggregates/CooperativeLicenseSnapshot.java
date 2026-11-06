@@ -3,6 +3,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPeriod;
 
 import java.math.BigDecimal;
@@ -17,6 +18,7 @@ import java.math.BigDecimal;
  * @param contractedArea   the hectares the license covers in total
  * @param committedAreaHa  the hectares already committed to producers, with two decimals
  * @param period           the window in which the license is in force
+ * @param managerId        the technical manager in charge of the license; null while nobody redeemed its code
  * @param revision         the optimistic locking revision
  */
 public record CooperativeLicenseSnapshot(
@@ -27,6 +29,7 @@ public record CooperativeLicenseSnapshot(
         HectaresQuota contractedArea,
         BigDecimal committedAreaHa,
         SubscriptionPeriod period,
+        ManagerId managerId,
         Long revision
 ) {
 }

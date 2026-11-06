@@ -3,12 +3,10 @@ package com.arcadiadevs.viora.platform.subscription.interfaces.rest.controllers;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CooperativeCodeRedemptionCommandService;
-import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
-import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.RedeemCooperativeCodeResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.SubscriptionResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.RedeemCooperativeCodeCommandFromResourceAssembler;
-import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.SubscriptionResourceAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.SubscriptionResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
 
 /**
  * REST controller where a producer redeems the invitation code their cooperative gave them.
@@ -37,42 +34,35 @@ import java.time.Clock;
 @Tag(name = "Cooperative Code Redemptions", description = "Redemption of cooperative invitation codes by producers")
 public class CooperativeCodeRedemptionController {
 
-    private final CooperativeCodeRedemptionCommandService redemptionCommandService;
-    private final CooperativeLicenseRepository cooperativeLicenseRepository;
+    private final CooperativeCodeRedemptionCommandService cooperativeCodeRedemptionCommandService;
+    private final SubscriptionResourceFromEntityAssembler subscriptionResourceAssembler;
     private final CurrentUserProvider currentUserProvider;
-    private final Clock clock;
 
     /**
      * Creates the controller.
      *
-     * @param redemptionCommandService     the redemption use case
-     * @param cooperativeLicenseRepository the cooperative licenses, to name the sponsoring cooperative
-     * @param currentUserProvider          the authenticated user
-     * @param clock                        the application clock
+     * @param cooperativeCodeRedemptionCommandService the redemption use case
+     * @param subscriptionResourceAssembler           the assembler of the sponsored subscription
+     * @param currentUserProvider                     the authenticated user
      * @throws IllegalArgumentException if any dependency is null
      */
     public CooperativeCodeRedemptionController(
-            CooperativeCodeRedemptionCommandService redemptionCommandService,
-            CooperativeLicenseRepository cooperativeLicenseRepository,
-            CurrentUserProvider currentUserProvider,
-            Clock clock
+            CooperativeCodeRedemptionCommandService cooperativeCodeRedemptionCommandService,
+            SubscriptionResourceFromEntityAssembler subscriptionResourceAssembler,
+            CurrentUserProvider currentUserProvider
     ) {
-        if (redemptionCommandService == null) {
+        if (cooperativeCodeRedemptionCommandService == null) {
             throw new IllegalArgumentException("subscription.redemption_service.null");
         }
-        if (cooperativeLicenseRepository == null) {
-            throw new IllegalArgumentException("subscription.license_repository.null");
+        if (subscriptionResourceAssembler == null) {
+            throw new IllegalArgumentException("subscription.resource_assembler.null");
         }
         if (currentUserProvider == null) {
             throw new IllegalArgumentException("subscription.current_user_provider.null");
         }
-        if (clock == null) {
-            throw new IllegalArgumentException("subscription.clock.null");
-        }
-        this.redemptionCommandService = redemptionCommandService;
-        this.cooperativeLicenseRepository = cooperativeLicenseRepository;
+        this.cooperativeCodeRedemptionCommandService = cooperativeCodeRedemptionCommandService;
+        this.subscriptionResourceAssembler = subscriptionResourceAssembler;
         this.currentUserProvider = currentUserProvider;
-        this.clock = clock;
     }
 
     /**
@@ -100,15 +90,8 @@ public class CooperativeCodeRedemptionController {
     public ResponseEntity<?> redeem(@Valid @RequestBody RedeemCooperativeCodeResource resource) {
         var producerId = currentUserProvider.requireCurrentUserId();
         var command = RedeemCooperativeCodeCommandFromResourceAssembler.toCommandFromResource(producerId, resource);
-        var result = redemptionCommandService.handle(command);
-        return ResponseEntityAssembler.toResponseEntityFromResult(result, this::toResource, HttpStatus.CREATED);
-    }
-
-    private SubscriptionResource toResource(Subscription subscription) {
-        var licenseId = subscription.snapshot().licenseId();
-        var cooperativeName = licenseId == null ? null : cooperativeLicenseRepository.findById(licenseId)
-                .map(license -> license.snapshot().cooperativeName())
-                .orElse(null);
-        return SubscriptionResourceAssembler.toResource(subscription, cooperativeName, clock.instant());
+        var result = cooperativeCodeRedemptionCommandService.handle(command);
+        return ResponseEntityAssembler.toResponseEntityFromResult(result, subscriptionResourceAssembler::toResource,
+                HttpStatus.CREATED);
     }
 }

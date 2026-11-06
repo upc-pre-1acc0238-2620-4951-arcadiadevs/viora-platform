@@ -10,8 +10,6 @@ import com.arcadiadevs.viora.platform.subscription.application.commandservices.S
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionQueryService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
-import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.CreateSubscriptionResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.SubscriptionDetailsAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,32 +40,29 @@ import java.util.UUID;
 public class SubscriptionController {
 
     private final SubscriptionCatalog catalog;
-    private final SubscriptionCommandService commands;
-    private final SubscriptionQueryService queries;
+    private final SubscriptionCommandService subscriptionCommandService;
+    private final SubscriptionQueryService subscriptionQueryService;
     private final CheckoutService payments;
-    private final SubscriptionRepository subscriptions;
     private final CurrentUserProvider users;
     private final Clock clock;
 
     /**
      * Creates the controller.
      *
-     * @param catalog       server-owned plan query contract
-     * @param commands      individual purchase use case
-     * @param queries       owned contract queries
-     * @param payments      durable payment use case
-     * @param subscriptions domain read port
-     * @param users         verified actor context
-     * @param clock         application clock
+     * @param catalog                    server-owned plan query contract
+     * @param subscriptionCommandService individual purchase use case
+     * @param subscriptionQueryService   owned contract queries
+     * @param payments                   durable payment use case
+     * @param users                      verified actor context
+     * @param clock                      application clock
      */
-    public SubscriptionController(SubscriptionCatalog catalog, SubscriptionCommandService commands,
-                                  SubscriptionQueryService queries, CheckoutService payments,
-                                  SubscriptionRepository subscriptions, CurrentUserProvider users, Clock clock) {
+    public SubscriptionController(SubscriptionCatalog catalog, SubscriptionCommandService subscriptionCommandService,
+                                  SubscriptionQueryService subscriptionQueryService, CheckoutService payments,
+                                  CurrentUserProvider users, Clock clock) {
         this.catalog = catalog;
-        this.commands = commands;
-        this.queries = queries;
+        this.subscriptionCommandService = subscriptionCommandService;
+        this.subscriptionQueryService = subscriptionQueryService;
         this.payments = payments;
-        this.subscriptions = subscriptions;
         this.users = users;
         this.clock = clock;
     }
@@ -95,12 +90,12 @@ public class SubscriptionController {
     public ResponseEntity<?> create(@Valid @RequestBody CreateSubscriptionResource request,
                                     @RequestHeader("Idempotency-Key") String key) {
         var owner = users.requireCurrentUserId();
-        var result = commands.handle(new CreateSubscriptionCommand(owner, request.planCode(), request.requestedQuotaHa(), key));
+        var result = subscriptionCommandService.handle(new CreateSubscriptionCommand(owner, request.planCode(), request.requestedQuotaHa(), key));
         if (result.isFailure()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(result.failure().orElseThrow());
         }
         var created = result.success().orElseThrow();
-        var subscription = subscriptions.findById(new SubscriptionId(created.id().toString())).orElseThrow();
+        var subscription = subscriptionQueryService.find(owner, created.id()).orElseThrow();
         return ResponseEntity.status(created.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .location(URI.create("/api/v1/subscriptions/" + created.id()))
                 .body(SubscriptionDetailsAssembler.toResource(subscription, clock.instant()));
@@ -115,10 +110,10 @@ public class SubscriptionController {
     @GetMapping("/subscriptions")
     @Operation(summary = "Get the signed-in producer's current subscription")
     public ResponseEntity<?> current() {
-        var current = queries.current(users.requireCurrentUserId());
+        var current = subscriptionQueryService.current(users.requireCurrentUserId());
         return current.<ResponseEntity<?>>map(subscription -> ResponseEntity.ok(
                 SubscriptionDetailsAssembler.toResource(subscription, clock.instant(),
-                        queries.paymentStatus(users.requireCurrentUserId(),
+                        subscriptionQueryService.paymentStatus(users.requireCurrentUserId(),
                                 UUID.fromString(subscription.snapshot().id().subscriptionId())))))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
@@ -133,13 +128,13 @@ public class SubscriptionController {
     @GetMapping("/subscriptions/{id}")
     @Operation(summary = "Get a subscription owned by the signed-in producer")
     public ResponseEntity<?> get(@PathVariable UUID id) {
-        var found = queries.find(users.requireCurrentUserId(), id);
+        var found = subscriptionQueryService.find(users.requireCurrentUserId(), id);
         if (found.isEmpty()) {
             return ErrorResponseAssembler.toErrorResponseFromApplicationError(
                     ApplicationError.notFound("subscription", id.toString()));
         }
         return ResponseEntity.ok(SubscriptionDetailsAssembler.toResource(found.orElseThrow(), clock.instant(),
-                queries.paymentStatus(users.requireCurrentUserId(), id)));
+                subscriptionQueryService.paymentStatus(users.requireCurrentUserId(), id)));
     }
 
     /**
