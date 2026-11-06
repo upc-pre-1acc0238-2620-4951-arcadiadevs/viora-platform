@@ -7,18 +7,23 @@ import com.arcadiadevs.viora.platform.subscription.application.internal.outbound
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
 import com.arcadiadevs.viora.platform.subscription.application.ports.SubscriptionUnitOfWork;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.DataSharingConsent;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemCooperativeCodeCommand;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ConsentTextVersion;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeCode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
+import com.arcadiadevs.viora.platform.subscription.domain.repositories.DataSharingConsentRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.InvitationCodeRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Application service redeeming cooperative invitation codes.
@@ -26,11 +31,15 @@ import java.time.Instant;
  * code's hectares, is created, and all of them are stored in one transaction. A code that does not exist, expired, was
  * already redeemed or was revoked answers the same validation error, and counts as a failed attempt. The attempt is
  * reserved before the code is looked up and given back for any other outcome.</p>
+ * <p>When the producer accepted to share their data, the consent is recorded in the same transaction, for the version
+ * of the text in force; a redemption without it activates the plan without sharing anything.</p>
  */
 @Service
 public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeCodeRedemptionCommandService {
 
     private static final String RESOURCE = "cooperative-code-redemption";
+    private static final String ALREADY_ACTIVE = "subscription.producer.already_active";
+    private static final String TEXT_OUTDATED = "subscription.consent.text_outdated";
 
     private final InvitationCodeRepository invitationCodeRepository;
     private final CooperativeLicenseRepository cooperativeLicenseRepository;
@@ -40,6 +49,8 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
     private final SubscriptionUnitOfWork work;
+    private final DataSharingConsentRepository dataSharingConsentRepository;
+    private final String consentTextVersion;
 
     /**
      * Creates the service.
@@ -51,6 +62,9 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
      * @param attemptLimiter               the limiter of failed attempts
      * @param eventPublisher               the domain event publisher
      * @param clock                        the application clock
+     * @param work                         the per producer lock and transaction
+     * @param dataSharingConsentRepository the data sharing consents
+     * @param consentTextVersion           the version of the consent text in force
      * @throws IllegalArgumentException if any dependency is null
      */
     public CooperativeCodeRedemptionCommandServiceImpl(
@@ -61,7 +75,9 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             RedemptionAttemptLimiter attemptLimiter,
             ApplicationEventPublisher eventPublisher,
             Clock clock,
-            SubscriptionUnitOfWork work
+            SubscriptionUnitOfWork work,
+            DataSharingConsentRepository dataSharingConsentRepository,
+            @Value("${viora.subscription.consent.text-version}") String consentTextVersion
     ) {
         if (invitationCodeRepository == null) {
             throw new IllegalArgumentException("subscription.invitation_code_repository.null");
@@ -87,6 +103,11 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
         if (work == null) {
             throw new IllegalArgumentException("subscription.unit_of_work.null");
         }
+        if (dataSharingConsentRepository == null || consentTextVersion == null) {
+            throw new IllegalArgumentException("subscription.consent.dependency.null");
+        }
+        this.dataSharingConsentRepository = dataSharingConsentRepository;
+        this.consentTextVersion = consentTextVersion;
         this.work = work;
         this.invitationCodeRepository = invitationCodeRepository;
         this.cooperativeLicenseRepository = cooperativeLicenseRepository;
@@ -107,6 +128,13 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             if (!externalIamService.mayRedeemCooperativeCodes(producerId)) {
                 return Result.failure(ApplicationError.forbidden(RESOURCE, "subscription.redemption.producer_only"));
             }
+            var accepted = command.consentTextVersion() == null ? null
+                    : new ConsentTextVersion(command.consentTextVersion());
+            // A producer who read another wording accepts it again, so the record tells what they agreed to.
+            if (accepted != null && !accepted.value().equals(consentTextVersion)) {
+                return Result.failure(ApplicationError.conflict("consent", TEXT_OUTDATED,
+                        Map.of("reason", TEXT_OUTDATED, "consentTextVersion", consentTextVersion)));
+            }
             var now = clock.instant();
             var retryAfter = attemptLimiter.tryAcquire(producerId, now);
             if (retryAfter.isPresent()) {
@@ -116,7 +144,8 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             // In one transaction under the producer's lock, as purchases do: two codes redeemed at once see each
             // other's subscription, so only the first one creates it. The instant is read once the lock is held, so
             // it is never earlier than the start of a subscription committed while this request waited.
-            var result = work.exclusive(producerId.producerId(), () -> redeem(command, producerId, clock.instant()));
+            var result = work.exclusive(producerId.producerId(),
+                    () -> redeem(command, producerId, accepted, clock.instant()));
             if (result.isSuccess()) {
                 attemptLimiter.reset(producerId);
             } else if (!isNotRedeemable(result)) {
@@ -133,11 +162,12 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
      * tell which attempts count as failed.
      */
     private Result<Subscription, ApplicationError> redeem(RedeemCooperativeCodeCommand command, ProducerId producerId,
-                                                          Instant now) {
+                                                          ConsentTextVersion accepted, Instant now) {
         try {
             var code = new CooperativeCode(command.code());
             if (subscriptionRepository.existsActiveByProducerId(producerId, now)) {
-                return Result.failure(ApplicationError.conflict("subscription", "subscription.producer.already_active"));
+                return Result.failure(ApplicationError.conflict("subscription", ALREADY_ACTIVE,
+                        Map.of("reason", ALREADY_ACTIVE)));
             }
 
             var invitationCode = invitationCodeRepository.findByFingerprintForRedemption(code.fingerprint());
@@ -154,6 +184,10 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             invitationCodeRepository.save(invitationCode.get());
             cooperativeLicenseRepository.save(license.get());
             var savedSubscription = subscriptionRepository.save(subscription);
+            if (accepted != null) {
+                dataSharingConsentRepository.save(DataSharingConsent.accept(redeemedCode, subscription,
+                        license.get().snapshot().managerId(), accepted, now));
+            }
 
             for (var event : subscription.domainEvents()) {
                 eventPublisher.publishEvent(event);
@@ -175,6 +209,7 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
     }
 
     private static Result<Subscription, ApplicationError> notRedeemable() {
-        return Result.failure(ApplicationError.validationError("code", InvitationCodeNotRedeemableException.MESSAGE_KEY));
+        return Result.failure(ApplicationError.validationError("code", InvitationCodeNotRedeemableException.MESSAGE_KEY,
+                Map.of("reason", InvitationCodeNotRedeemableException.MESSAGE_KEY)));
     }
 }

@@ -54,6 +54,15 @@ class SubscriptionApiDocsIntegrationTest {
             Map<String, Object> operation = docs.read(route);
             assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Invitation Codes"));
         }
+        Map<String, Object> preview = docs.read("$.paths['/api/v1/cooperative-code-previews'].post");
+        assertThat(preview.get("tags")).isEqualTo(List.of("Cooperative Code Previews"));
+        for (var route : List.of(
+                "$.paths['/api/v1/data-sharing-consents'].get",
+                "$.paths['/api/v1/data-sharing-consents/{id}'].get",
+                "$.paths['/api/v1/data-sharing-consents/{id}/withdrawals'].post")) {
+            Map<String, Object> operation = docs.read(route);
+            assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Data Sharing Consents"));
+        }
         List<String> tags = docs.read("$.paths.*.*.tags[*]");
         assertThat(tags).isNotEmpty().noneMatch(tag -> tag.endsWith("-controller"));
     }

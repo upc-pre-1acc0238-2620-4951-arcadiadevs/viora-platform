@@ -8,7 +8,9 @@ import jakarta.validation.constraints.NotBlank;
  *
  * <p>The hectares come from the code itself, so the producer never sends them.</p>
  *
- * @param code the code the cooperative gave the producer
+ * @param code               the code the cooperative gave the producer
+ * @param consentTextVersion the version of the consent text the producer accepted, as the preview returned it; left
+ *                           out, the plan is activated without sharing any data
  */
 @Schema(
         name = "RedeemCooperativeCodeResource",
@@ -19,6 +21,9 @@ public record RedeemCooperativeCodeResource(
         @NotBlank(message = "Code cannot be blank")
         @Schema(description = "Invitation code given by the cooperative, COOP- followed by four letters or digits",
                 example = "COOP-7K2Q")
-        String code
+        String code,
+        @Schema(description = "Version of the consent text the producer accepted to share their data; without it no "
+                + "data is shared", example = "2026-11-v1", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String consentTextVersion
 ) {
 }
