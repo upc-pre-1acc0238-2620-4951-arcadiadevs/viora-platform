@@ -4,8 +4,10 @@ import com.arcadiadevs.viora.platform.subscription.interfaces.acl.SubscriptionCo
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.LicenseId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ManagerId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.DataSharingState;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,5 +60,19 @@ public class ExternalSubscriptionService {
         return subscriptionContextFacade.findSponsoredProducerIds(licenseId.licenseId()).stream()
                 .map(ProducerId::new)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Lists the members a license sponsors now, with whether they share their data.
+     *
+     * @param licenseId the license
+     * @return the members
+     */
+    public List<SponsoredMember> findMembers(LicenseId licenseId) {
+        return subscriptionContextFacade.findLicenseMembers(licenseId.licenseId()).stream()
+                .map(member -> new SponsoredMember(new ProducerId(member.producerId()), member.memberSince(),
+                        member.quotaHectares(), member.maskedCode(), DataSharingState.valueOf(member.sharing()),
+                        member.withdrawnAt()))
+                .toList();
     }
 }

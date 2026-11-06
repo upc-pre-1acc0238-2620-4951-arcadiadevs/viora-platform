@@ -40,6 +40,14 @@ public interface InvitationCodeRepository {
     Optional<InvitationCode> findByIdForUpdate(InvitationCodeId id);
 
     /**
+     * Finds a code by its identifier without locking it.
+     *
+     * @param id the code
+     * @return the code, or empty if it does not exist
+     */
+    Optional<InvitationCode> findById(InvitationCodeId id);
+
+    /**
      * Lists every code of a license, whatever its status.
      *
      * @param licenseId the license

@@ -137,7 +137,9 @@ public class WebSecurityConfiguration {
                         .requestMatchers(
                                 "/api/v1/manager-code-redemptions/**",
                                 "/api/v1/cooperative-licenses/**",
-                                "/api/v1/invitation-codes/**").hasRole("TECHNICAL_MANAGER")
+                                "/api/v1/invitation-codes/**",
+                                "/api/v1/cooperative-members/**",
+                                "/api/v1/member-plots/**").hasRole("TECHNICAL_MANAGER")
                         // A manager keeps the sector list of the license; its members read it and sector their plots
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/sector-zones/**",

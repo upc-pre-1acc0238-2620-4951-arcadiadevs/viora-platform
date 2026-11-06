@@ -54,4 +54,17 @@ public class ExternalProfileService {
         }
         return profileContextFacade.findFullNameByUserId(managerId.managerId());
     }
+
+    /**
+     * Checks whether a producer completed their profile, which an individual purchase requires.
+     *
+     * @param producerId the producer
+     * @return true if Profiles has their profile; false for a null producer or no profile
+     */
+    public boolean hasProfile(ProducerId producerId) {
+        if (producerId == null) {
+            return false;
+        }
+        return profileContextFacade.existsProfileByUserId(producerId.producerId());
+    }
 }

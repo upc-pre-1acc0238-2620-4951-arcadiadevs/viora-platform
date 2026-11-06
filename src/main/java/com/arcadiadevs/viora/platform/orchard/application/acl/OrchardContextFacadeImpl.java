@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.orchard.domain.model.valueobjects.Producer
 import com.arcadiadevs.viora.platform.orchard.domain.repositories.PlotRepository;
 import com.arcadiadevs.viora.platform.orchard.domain.services.CadastralGeometryService;
 import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +41,7 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
      * @param plotRepository           domain repository port
      * @param cadastralGeometryService cadastral geometry domain service
      */
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public OrchardContextFacadeImpl(PlotRepository plotRepository, CadastralGeometryService cadastralGeometryService) {
         this.plotRepository = plotRepository;
         this.cadastralGeometryService = cadastralGeometryService != null ? cadastralGeometryService : new CadastralGeometryService();
@@ -171,6 +172,20 @@ public class OrchardContextFacadeImpl implements OrchardContextFacade {
             return plotRepository.findById(domainPlotId)
                     .filter(plot -> plot.snapshot().status() == PlotStatus.ACTIVE)
                     .map(plot -> plot.snapshot().geometry().areaHa());
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<String> findPlotGeoJson(String plotId) {
+        if (plotId == null || plotId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return plotRepository.findById(new PlotId(plotId))
+                    .filter(plot -> plot.snapshot().status() == PlotStatus.ACTIVE)
+                    .map(plot -> plot.snapshot().geometry().geoJson());
         } catch (IllegalArgumentException ex) {
             return Optional.empty();
         }

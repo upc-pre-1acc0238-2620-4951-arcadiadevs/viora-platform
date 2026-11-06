@@ -7,7 +7,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.iam.domain.repositories.UserAccountRepository;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
 import com.arcadiadevs.viora.platform.subscription.application.ports.PaymentGateway;
-import com.arcadiadevs.viora.platform.subscription.application.ports.ProducerProfilePort;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -60,7 +61,7 @@ class QuotaExtensionHttpTest {
     @Autowired private TokenService tokens;
     @Autowired private CheckoutService payments;
     @MockitoBean private PaymentGateway gateway;
-    @MockitoBean private ProducerProfilePort profiles;
+    @MockitoSpyBean private ExternalProfileService externalProfileService;
     private ProducerId owner;
     private String token;
 
@@ -84,7 +85,7 @@ class QuotaExtensionHttpTest {
         when(gateway.create(any(), any())).thenAnswer(invocation -> new PaymentGateway.Checkout(
                 "fixture-" + UUID.randomUUID(), "https://sandbox.mercadopago.com.pe/checkout/test"));
         when(gateway.recover(any())).thenReturn(Optional.empty());
-        when(profiles.isReady(anyString())).thenReturn(true);
+        doReturn(true).when(externalProfileService).hasProfile(any());
         owner = new ProducerId(userId.userId());
         token = tokens.generateAccessToken(userId.userId(), email.value(), "ROLE_PRODUCER", 3L);
     }

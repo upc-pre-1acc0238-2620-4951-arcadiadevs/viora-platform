@@ -3,8 +3,10 @@ package com.arcadiadevs.viora.platform.territory.application.internal.outboundse
 import com.arcadiadevs.viora.platform.orchard.interfaces.acl.OrchardContextFacade;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.GeoPoint;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -42,5 +44,35 @@ public class ExternalOrchardService {
      */
     public Optional<String> findPlotName(PlotId plotId) {
         return orchardContextFacade.findPlotName(plotId.plotId());
+    }
+
+    /**
+     * Lists the active plots of a producer.
+     *
+     * @param producerId the producer
+     * @return the plots
+     */
+    public List<PlotId> findActivePlots(ProducerId producerId) {
+        return orchardContextFacade.findActivePlotIdsByProducerId(producerId.producerId()).stream()
+                .map(PlotId::new)
+                .toList();
+    }
+
+    /**
+     * Finds what Orchard knows of an active plot.
+     *
+     * @param plotId the plot
+     * @return the facts, or empty if the plot does not exist or is archived
+     */
+    public Optional<PlotFacts> findPlotFacts(PlotId plotId) {
+        var id = plotId.plotId();
+        return orchardContextFacade.findPlotGeoJson(id).map(geoJson -> new PlotFacts(plotId,
+                orchardContextFacade.findPlotName(id).orElse(null),
+                orchardContextFacade.findPlotVariety(id).orElse(null),
+                orchardContextFacade.findPlotAreaHectares(id).orElse(null),
+                orchardContextFacade.findPlotCentroid(id)
+                        .map(center -> new GeoPoint(center[0], center[1]))
+                        .orElse(null),
+                geoJson));
     }
 }

@@ -32,4 +32,14 @@ public class ExternalProfileService {
     public Optional<String> findFullName(ProducerId producerId) {
         return profileContextFacade.findFullNameByUserId(producerId.producerId());
     }
+
+    /**
+     * Finds the phone of a member, to call them or write them on WhatsApp.
+     *
+     * @param producerId the member
+     * @return the phone in E.164, or empty
+     */
+    public Optional<String> findPhone(ProducerId producerId) {
+        return profileContextFacade.findPhoneNumberByUserId(producerId.producerId());
+    }
 }
