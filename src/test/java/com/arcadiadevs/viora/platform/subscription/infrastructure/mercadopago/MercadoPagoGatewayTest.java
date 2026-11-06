@@ -11,6 +11,8 @@ import org.springframework.http.HttpMethod;
 import com.arcadiadevs.viora.platform.subscription.application.ports.PaymentGateway;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
@@ -25,8 +27,8 @@ class MercadoPagoGatewayTest {
         gateway = new MercadoPagoGateway(true, true, "fixture-token", "https://example.test/notify", "https://example.test/payments/return", "fixture-plan", builder.build());
     }
     @AfterEach void verify() { server.verify(); }
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void preferenceContainsExactTotalAndConfiguredLifetime(boolean legacy) {
         var now = Instant.parse("2026-10-21T12:00:00Z");
         var attempt = new PaymentAttempt(intent, UUID.randomUUID(), "owner", "CREATING", null, null, now, now.plusSeconds(86400));

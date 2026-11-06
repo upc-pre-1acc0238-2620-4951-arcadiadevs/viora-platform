@@ -16,6 +16,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subsc
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -30,8 +32,8 @@ class IndividualCheckoutTest {
     @AfterEach
     void clearActor() { SecurityContextHolder.clearContext(); }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void recoversOneHostedPreferenceAndNeverGrantsAccessFromTheLink(boolean legacy) throws Exception {
         var owner = new ProducerId(UUID.randomUUID().toString());
         var quota = new IndividualHectaresQuota(new BigDecimal("0.5"));

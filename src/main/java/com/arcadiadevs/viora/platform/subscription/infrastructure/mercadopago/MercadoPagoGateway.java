@@ -11,6 +11,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import com.arcadiadevs.viora.platform.subscription.application.ports.PaymentGateway;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
+import org.springframework.beans.factory.annotation.Autowired;
 /** Checkout Pro Preferences adapter. Disabled until explicitly configured; test mode is the default. */
 @Component
 public class MercadoPagoGateway implements PaymentGateway {
@@ -25,7 +26,7 @@ public class MercadoPagoGateway implements PaymentGateway {
     private volatile Merchant merchantIdentity;
     /** Appended to the return URL for extension payments; the app declares the same path. */
     public static final String EXTENSION_RETURN_SUFFIX = "/extension";
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public MercadoPagoGateway(@Value("${viora.payments.enabled}") boolean enabled,
             @Value("${viora.payments.sandbox}") boolean sandbox,
             @Value("${viora.payments.access-token}") String token,

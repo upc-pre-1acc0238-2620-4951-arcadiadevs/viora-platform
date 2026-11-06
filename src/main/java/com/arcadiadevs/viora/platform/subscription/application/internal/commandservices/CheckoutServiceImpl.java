@@ -13,6 +13,7 @@ import com.arcadiadevs.viora.platform.subscription.application.ports.*;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
+import org.springframework.beans.factory.annotation.Value;
 /**
  * Coordinates durable attempts without holding a database transaction during provider requests. An attempt pays a
  * pending individual plan or a pending paid extension of a plan in force; both share the same provider flow.
@@ -42,7 +43,7 @@ public class CheckoutServiceImpl implements CheckoutService {
      */
     public CheckoutServiceImpl(SubscriptionRepository subscriptions, PaymentAttemptRepository attempts,
             SubscriptionUnitOfWork work, PaymentGateway gateway, ApplicationEventPublisher events, Clock clock,
-            @org.springframework.beans.factory.annotation.Value("${viora.payments.checkout-ttl}") Duration ttl,
+            @Value("${viora.payments.checkout-ttl}") Duration ttl,
             QuotaExtensionRepository extensions) {
         this.subscriptions = subscriptions; this.attempts = attempts; this.work = work;
         this.gateway = gateway; this.events = events; this.clock = clock; this.ttl = ttl; this.extensions = extensions;

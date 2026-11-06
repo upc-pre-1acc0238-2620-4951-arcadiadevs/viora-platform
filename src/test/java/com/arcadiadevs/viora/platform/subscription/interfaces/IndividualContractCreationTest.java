@@ -21,6 +21,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -116,8 +118,8 @@ class IndividualContractCreationTest {
         }
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"0.5,279.66,50.34,330.00", "1,559.32,100.68,660.00",
+    @ParameterizedTest
+    @CsvSource({"0.5,279.66,50.34,330.00", "1,559.32,100.68,660.00",
             "10,5593.22,1006.78,6600.00", "12,6711.86,1208.14,7920.00"})
     void persistsAndReadsTheSameInclusiveAnnualPrice(String quota, String base, String tax, String total) throws Exception {
         var response = mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "inclusive")
