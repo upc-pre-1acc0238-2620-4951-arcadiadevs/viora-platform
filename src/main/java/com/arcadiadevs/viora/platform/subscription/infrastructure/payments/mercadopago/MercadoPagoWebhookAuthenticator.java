@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.mercadopago;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.payments.mercadopago;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.*;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import com.arcadiadevs.viora.platform.subscription.application.ports.PaymentNotificationAuthenticator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
  * timestamp is recent, so a captured notification cannot be replayed forever.
  */
 @Component
-public class MercadoPagoWebhookAuthenticator implements com.arcadiadevs.viora.platform.subscription.application.ports.PaymentNotificationAuthenticator {
+public class MercadoPagoWebhookAuthenticator implements PaymentNotificationAuthenticator {
     /** How far the signed timestamp may be from now; the provider signs each delivery, retries included. */
     static final Duration TOLERANCE = Duration.ofMinutes(15);
     private final String secret;

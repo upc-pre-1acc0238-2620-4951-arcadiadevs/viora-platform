@@ -1,4 +1,4 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure.mercadopago;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.payments.mercadopago;
 
 import java.util.UUID;
 import java.math.BigDecimal;

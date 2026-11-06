@@ -1,11 +1,10 @@
-package com.arcadiadevs.viora.platform.subscription.infrastructure;
+package com.arcadiadevs.viora.platform.subscription.infrastructure.payments.mercadopago;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
-import com.arcadiadevs.viora.platform.subscription.infrastructure.mercadopago.MercadoPagoWebhookAuthenticator;
 import static org.junit.jupiter.api.Assertions.*;
 class MercadoPagoWebhookAuthenticatorTest {
     @Test void verifiesSignatureAndRejectsTampering() throws Exception {
