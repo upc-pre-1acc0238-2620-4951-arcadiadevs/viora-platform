@@ -1,7 +1,9 @@
 package com.arcadiadevs.viora.platform.subscription.application.queryservices;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.LicenseCapacity;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetAllCooperativeLicensesByManagerIdQuery;
+import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseCapacityQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdQuery;
 
@@ -36,4 +38,13 @@ public interface CooperativeLicenseQueryService {
      * @return the license, or empty if it does not exist
      */
     Optional<CooperativeLicense> handle(GetCooperativeLicenseByIdQuery query);
+
+    /**
+     * Retrieves what a license still has to give, counting as free the seats and hectares of codes whose time is
+     * over.
+     *
+     * @param query the query containing the license identifier
+     * @return the capacity, or empty if the license does not exist
+     */
+    Optional<LicenseCapacity> handle(GetCooperativeLicenseCapacityQuery query);
 }
