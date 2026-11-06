@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.subscription.application.internal.outbound
 import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.ratelimit.RedemptionAttemptLimiter;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.RedeemCooperativeCodeCommand;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
+import com.arcadiadevs.viora.platform.subscription.domain.repositories.DataSharingConsentRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.InvitationCodeRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +48,7 @@ class CooperativeCodeRedemptionCommandServiceImplTest {
                 public void recordOperation(String producerId, String key, String kind, String fingerprint,
                         java.util.UUID resourceId) {
                 }
-            });
+            }, mock(DataSharingConsentRepository.class), "2026-11-v1");
 
     @Test
     @DisplayName("A user IAM knows with another role than producer gets 403 and no code is looked up")
@@ -58,6 +59,21 @@ class CooperativeCodeRedemptionCommandServiceImplTest {
 
         assertThat(result.failure()).hasValueSatisfying(error ->
                 assertThat(error.code()).isEqualTo("COOPERATIVE_CODE_REDEMPTION_FORBIDDEN"));
+        verifyNoInteractions(codes, licenses, subscriptions, limiter);
+    }
+
+    @Test
+    @DisplayName("A consent accepted on an older text gets 409 with the version in force, before any attempt is used")
+    void outdatedConsentText() {
+        when(iam.mayRedeemCooperativeCodes(any())).thenReturn(true);
+
+        var result = service.handle(
+                new RedeemCooperativeCodeCommand(UUID.randomUUID().toString(), "COOP-7K2Q", "2026-01-v1"));
+
+        assertThat(result.failure()).hasValueSatisfying(error -> {
+            assertThat(error.properties()).containsEntry("reason", "subscription.consent.text_outdated")
+                    .containsEntry("consentTextVersion", "2026-11-v1");
+        });
         verifyNoInteractions(codes, licenses, subscriptions, limiter);
     }
 
