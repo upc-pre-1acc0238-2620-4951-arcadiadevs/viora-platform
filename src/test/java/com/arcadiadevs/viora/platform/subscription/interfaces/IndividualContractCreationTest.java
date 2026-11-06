@@ -5,14 +5,15 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import com.arcadiadevs.viora.platform.subscription.application.ports.SubscriptionUnitOfWork;
-import com.arcadiadevs.viora.platform.subscription.application.ports.ProducerProfilePort;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
 
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.*;
@@ -34,7 +35,8 @@ class IndividualContractCreationTest {
     @Autowired private SubscriptionCommandService commands;
     @Autowired private SubscriptionRepository subscriptions;
     @Autowired private SubscriptionUnitOfWork work;
-    @MockitoBean private ProducerProfilePort profiles;
+    @MockitoSpyBean private ExternalIamService externalIamService;
+    @MockitoSpyBean private ExternalProfileService externalProfileService;
     private MockMvc mvc;
     private String owner;
 
@@ -43,7 +45,8 @@ class IndividualContractCreationTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         owner = UUID.randomUUID().toString();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(owner, null, List.of()));
-        when(profiles.isReady(anyString())).thenReturn(true);
+        doReturn(true).when(externalIamService).isProducer(any());
+        doReturn(true).when(externalProfileService).hasProfile(any());
     }
 
     @AfterEach
@@ -96,7 +99,7 @@ class IndividualContractCreationTest {
 
     @Test
     void rejectsMissingProfileAndInvalidQuota() throws Exception {
-        when(profiles.isReady(owner)).thenReturn(false);
+        doReturn(false).when(externalProfileService).hasProfile(any());
         mvc.perform(post("/api/v1/subscriptions").header("Idempotency-Key", "no-profile")
                 .contentType("application/json").content("{\"planCode\":\"PRODUCER_ANNUAL\",\"requestedQuotaHa\":0.5}"))
                 .andExpect(status().isForbidden());

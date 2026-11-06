@@ -9,6 +9,8 @@ import com.arcadiadevs.viora.platform.shared.application.result.*;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.SubscriptionCommandServiceImpl;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
 import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
 import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.CheckoutServiceImpl;
@@ -19,6 +21,9 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
 import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 class CheckoutServiceTest {
     static class Store implements SubscriptionRepository, PaymentAttemptRepository, SubscriptionUnitOfWork, QuotaExtensionRepository {
         final Map<String, QuotaExtension> extensions = new HashMap<>();
@@ -177,7 +182,7 @@ class CheckoutServiceTest {
                 public SubscriptionPrice quote(String plan, IndividualHectaresQuota q) { return pricing.quote(q); }
                 public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int days, int periodDays) { throw new UnsupportedOperationException(); }
                 public java.math.BigDecimal extensionRatePerHa(String plan, int days, int periodDays) { throw new UnsupportedOperationException(); }
-            }, owner -> true, Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
+            }, producerIam(), producerProfiles(), Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
     private Result<SubscriptionCommandService.CreatedSubscription, ApplicationError> buy(String hectares, String key) {
         return purchases.handle(new CreateSubscriptionCommand(producer, "PRODUCER_ANNUAL", new BigDecimal(hectares), key));
     }
@@ -282,5 +287,17 @@ class CheckoutServiceTest {
         assertEquals(SubscriptionStatus.ACTIVE, approved.status());
         assertTrue(service.confirm("123").isSuccess());
         assertEquals(approved, legacy.snapshot());
+    }
+
+    private static ExternalIamService producerIam() {
+        var iam = mock(ExternalIamService.class);
+        when(iam.isProducer(any())).thenReturn(true);
+        return iam;
+    }
+
+    private static ExternalProfileService producerProfiles() {
+        var profiles = mock(ExternalProfileService.class);
+        when(profiles.hasProfile(any())).thenReturn(true);
+        return profiles;
     }
 }
