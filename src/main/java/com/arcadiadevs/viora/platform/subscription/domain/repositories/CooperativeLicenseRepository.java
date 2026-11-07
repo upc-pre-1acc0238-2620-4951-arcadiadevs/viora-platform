@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Coope
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ManagerId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -58,4 +60,12 @@ public interface CooperativeLicenseRepository {
      * @return the stored license
      */
     CooperativeLicense save(CooperativeLicense license);
+
+    /**
+     * Lists the licenses in force at an instant that have a technical manager in charge.
+     *
+     * @param at the instant
+     * @return the licenses
+     */
+    List<CooperativeLicenseId> findManagedIdsInForce(Instant at);
 }

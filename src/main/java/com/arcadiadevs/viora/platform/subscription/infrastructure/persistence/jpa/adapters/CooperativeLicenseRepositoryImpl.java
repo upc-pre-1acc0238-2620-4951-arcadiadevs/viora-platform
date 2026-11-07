@@ -8,6 +8,8 @@ import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jp
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.CooperativeLicensePersistenceRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,5 +66,12 @@ public class CooperativeLicenseRepositoryImpl implements CooperativeLicenseRepos
                 .map(existing -> CooperativeLicensePersistenceAssembler.updateEntityFromDomain(existing, license))
                 .orElseGet(() -> CooperativeLicensePersistenceAssembler.toPersistenceFromDomain(license));
         return CooperativeLicensePersistenceAssembler.toDomainFromPersistence(persistenceRepository.saveAndFlush(entity));
+    }
+
+    @Override
+    public List<CooperativeLicenseId> findManagedIdsInForce(Instant at) {
+        return persistenceRepository.findManagedIdsInForce(at).stream()
+                .map(id -> new CooperativeLicenseId(id.toString()))
+                .toList();
     }
 }

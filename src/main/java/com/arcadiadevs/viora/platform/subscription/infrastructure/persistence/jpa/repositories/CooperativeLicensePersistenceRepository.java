@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,4 +46,14 @@ public interface CooperativeLicensePersistenceRepository extends JpaRepository<C
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select license from CooperativeLicensePersistenceEntity license where license.managerUserId = :managerUserId")
     Optional<CooperativeLicensePersistenceEntity> findLockedByManagerUserId(@Param("managerUserId") UUID managerUserId);
+
+    /**
+     * Lists the licenses in force at an instant that have a manager in charge.
+     *
+     * @param at the instant
+     * @return the license identifiers
+     */
+    @Query("select license.id from CooperativeLicensePersistenceEntity license "
+            + "where license.managerUserId is not null and license.startsAt <= :at and license.endsAt > :at")
+    List<UUID> findManagedIdsInForce(@Param("at") Instant at);
 }
