@@ -40,6 +40,7 @@ public final class InvitationCodePersistenceAssembler {
         entity.setExpiresAt(snapshot.expiresAt());
         entity.setCodeHint(snapshot.hint());
         entity.setIssuedAt(snapshot.issuedAt());
+        entity.setSeatHeldUntil(snapshot.seatHeldUntil());
         return updateEntityFromDomain(entity, domain);
     }
 
@@ -61,6 +62,7 @@ public final class InvitationCodePersistenceAssembler {
         target.setRedeemedBy(snapshot.redeemedBy() == null ? null : UUID.fromString(snapshot.redeemedBy().producerId()));
         target.setRedeemedAt(snapshot.redeemedAt());
         target.setSealedCode(snapshot.sealedCode());
+        target.setSeatHeldUntil(snapshot.seatHeldUntil());
         return target;
     }
 
@@ -89,6 +91,7 @@ public final class InvitationCodePersistenceAssembler {
                 entity.getCodeHint(),
                 entity.getSealedCode(),
                 // Codes issued before the instant was kept tell when their row was created.
-                entity.getIssuedAt() != null ? entity.getIssuedAt() : entity.getCreatedAt()));
+                entity.getIssuedAt() != null ? entity.getIssuedAt() : entity.getCreatedAt(),
+                entity.getSeatHeldUntil()));
     }
 }

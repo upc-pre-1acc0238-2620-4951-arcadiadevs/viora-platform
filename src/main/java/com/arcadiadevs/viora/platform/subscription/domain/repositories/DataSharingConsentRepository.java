@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.domain.repositories;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.DataSharingConsent;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.DataSharingConsentId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 
@@ -35,4 +36,12 @@ public interface DataSharingConsentRepository {
      * @return the stored consent
      */
     DataSharingConsent save(DataSharingConsent consent);
+
+    /**
+     * Lists the consents given to a license.
+     *
+     * @param licenseId the license
+     * @return the consents
+     */
+    List<DataSharingConsent> findAllByLicenseId(CooperativeLicenseId licenseId);
 }

@@ -3,11 +3,17 @@ package com.arcadiadevs.viora.platform.subscription.interfaces.rest.controllers;
 import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError;
 import com.arcadiadevs.viora.platform.shared.application.security.CurrentUserProvider;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
+import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
+import com.arcadiadevs.viora.platform.subscription.application.commandservices.CooperativeLicenseCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.CooperativeLicenseQueryService;
+import com.arcadiadevs.viora.platform.subscription.domain.model.commands.ReleaseCooperativeMemberCommand;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetAllCooperativeLicensesByManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.CooperativeLicenseResource;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.MemberReleaseResource;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.resources.ReleaseCooperativeMemberResource;
 import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.CooperativeLicenseResourceFromEntityAssembler;
+import com.arcadiadevs.viora.platform.subscription.interfaces.rest.transform.MemberReleaseResourceAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,10 +22,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,6 +47,7 @@ import java.util.UUID;
 public class CooperativeLicenseController {
 
     private final CooperativeLicenseQueryService cooperativeLicenseQueryService;
+    private final CooperativeLicenseCommandService cooperativeLicenseCommandService;
     private final CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler;
     private final CurrentUserProvider users;
 
@@ -44,18 +55,22 @@ public class CooperativeLicenseController {
      * Creates the controller.
      *
      * @param cooperativeLicenseQueryService      the license reads
+     * @param cooperativeLicenseCommandService    the member release
      * @param cooperativeLicenseResourceAssembler the assembler adding what each license has left
      * @param users                               the authenticated user
      * @throws IllegalArgumentException if any dependency is null
      */
     public CooperativeLicenseController(
             CooperativeLicenseQueryService cooperativeLicenseQueryService,
+            CooperativeLicenseCommandService cooperativeLicenseCommandService,
             CooperativeLicenseResourceFromEntityAssembler cooperativeLicenseResourceAssembler,
             CurrentUserProvider users) {
-        if (cooperativeLicenseQueryService == null || cooperativeLicenseResourceAssembler == null || users == null) {
+        if (cooperativeLicenseQueryService == null || cooperativeLicenseCommandService == null
+                || cooperativeLicenseResourceAssembler == null || users == null) {
             throw new IllegalArgumentException("subscription.license_controller.dependency.null");
         }
         this.cooperativeLicenseQueryService = cooperativeLicenseQueryService;
+        this.cooperativeLicenseCommandService = cooperativeLicenseCommandService;
         this.cooperativeLicenseResourceAssembler = cooperativeLicenseResourceAssembler;
         this.users = users;
     }
@@ -108,5 +123,38 @@ public class CooperativeLicenseController {
                 .<ResponseEntity<?>>map(license -> ResponseEntity.ok(cooperativeLicenseResourceAssembler.toResource(license)))
                 .orElseGet(() -> ErrorResponseAssembler.toErrorResponseFromApplicationError(
                         ApplicationError.notFound("license", id.toString())));
+    }
+
+    /**
+     * Releases a member from the signed-in manager's license. The app shows no button for it: support uses it with
+     * the manager's session when a member leaves or redeemed a code by mistake.
+     *
+     * @param id       the license
+     * @param resource the member
+     * @return 200 with what the release did, or a problem detail explaining why it was not done
+     */
+    @PostMapping(value = "/{id}/member-releases", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Release a member from the license",
+            description = "The manager stops reading the member's data at once. The member keeps the sponsored plan "
+                    + "for the grace period (30 days by default) or until the license ends, whichever comes first, "
+                    + "and then the seat and hectares go back to the license. The Gestor app shows no button for it.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Member released",
+                    content = @Content(schema = @Schema(implementation = MemberReleaseResource.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid member"),
+            @ApiResponse(responseCode = "401", description = "No authenticated user"),
+            @ApiResponse(responseCode = "403", description = "The user is not a technical manager"),
+            @ApiResponse(responseCode = "404", description = "No such license of the manager, or not a member of it"),
+            @ApiResponse(responseCode = "409", description = "Already released (reason "
+                    + "subscription.member.already_released)")
+    })
+    public ResponseEntity<?> releaseMember(@PathVariable UUID id,
+                                           @Valid @RequestBody ReleaseCooperativeMemberResource resource) {
+        var result = cooperativeLicenseCommandService.handle(new ReleaseCooperativeMemberCommand(
+                users.requireCurrentUserId(), id.toString(), resource.memberId()));
+        return ResponseEntityAssembler.toResponseEntityFromResult(result, MemberReleaseResourceAssembler::toResource,
+                HttpStatus.OK);
     }
 }

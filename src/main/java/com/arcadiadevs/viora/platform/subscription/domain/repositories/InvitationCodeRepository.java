@@ -4,6 +4,7 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Invit
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 
 import java.time.Instant;
 import java.util.List;
@@ -88,4 +89,21 @@ public interface InvitationCodeRepository {
      * @return the stored code
      */
     InvitationCode save(InvitationCode code);
+
+    /**
+     * Lists the codes a producer redeemed that still give them a seat.
+     *
+     * @param producerId the producer
+     * @return the redeemed codes
+     */
+    List<InvitationCode> findRedeemedByProducerId(ProducerId producerId);
+
+    /**
+     * Lists the redeemed codes of a license whose released member's grace is over, so their seat can be freed.
+     *
+     * @param licenseId the license
+     * @param at        the instant to check
+     * @return the codes
+     */
+    List<InvitationCode> findSeatOverdueByLicenseId(CooperativeLicenseId licenseId, Instant at);
 }

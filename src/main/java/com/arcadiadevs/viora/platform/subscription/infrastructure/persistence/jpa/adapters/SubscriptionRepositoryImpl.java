@@ -3,18 +3,18 @@ package com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.j
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionStatus;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.SubscriptionRepository;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.assemblers.SubscriptionPersistenceAssembler;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.SubscriptionPersistenceRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.Optional;
-import org.springframework.data.domain.PageRequest;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
+import java.util.UUID;
 
 /**
  * Repository adapter bridging {@link SubscriptionRepository} with Spring Data JPA.
@@ -105,6 +105,14 @@ public class SubscriptionRepositoryImpl implements SubscriptionRepository {
                         UUID.fromString(licenseId.cooperativeLicenseId()), SubscriptionStatus.ACTIVE, at)
                 .stream()
                 .map(producerId -> new ProducerId(producerId.toString()))
+                .toList();
+    }
+
+    @Override
+    public List<Subscription> findSponsoredInForceByLicenseId(CooperativeLicenseId licenseId, Instant at) {
+        return persistenceRepository.findInForceByLicenseId(UUID.fromString(licenseId.cooperativeLicenseId()),
+                        SubscriptionStatus.ACTIVE, at).stream()
+                .map(SubscriptionPersistenceAssembler::toDomainFromPersistence)
                 .toList();
     }
 }

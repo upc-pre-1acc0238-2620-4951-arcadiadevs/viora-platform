@@ -3,11 +3,11 @@ package com.arcadiadevs.viora.platform.subscription.domain.repositories;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 
 /**
  * Repository port of the subscriptions.
@@ -69,4 +69,13 @@ public interface SubscriptionRepository {
      * @return the producers, without repetitions
      */
     List<ProducerId> findSponsoredProducerIds(CooperativeLicenseId licenseId, Instant at);
+
+    /**
+     * Lists the active sponsored plans of a license in force at an instant.
+     *
+     * @param licenseId the license
+     * @param at        the instant
+     * @return the plans
+     */
+    List<Subscription> findSponsoredInForceByLicenseId(CooperativeLicenseId licenseId, Instant at);
 }

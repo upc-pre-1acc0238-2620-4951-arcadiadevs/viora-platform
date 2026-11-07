@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Invit
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeStatus;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.InvitationCodeRepository;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.assemblers.InvitationCodePersistenceAssembler;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories.InvitationCodePersistenceRepository;
@@ -87,5 +89,21 @@ public class InvitationCodeRepositoryImpl implements InvitationCodeRepository {
     public Optional<InvitationCode> findById(InvitationCodeId id) {
         return persistenceRepository.findById(UUID.fromString(id.invitationCodeId()))
                 .map(InvitationCodePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<InvitationCode> findRedeemedByProducerId(ProducerId producerId) {
+        return persistenceRepository.findAllByRedeemedByAndStatus(UUID.fromString(producerId.producerId()),
+                        InvitationCodeStatus.REDEEMED).stream()
+                .map(InvitationCodePersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
+    public List<InvitationCode> findSeatOverdueByLicenseId(CooperativeLicenseId licenseId, Instant at) {
+        return persistenceRepository.findSeatOverdue(UUID.fromString(licenseId.cooperativeLicenseId()),
+                        InvitationCodeStatus.REDEEMED, at).stream()
+                .map(InvitationCodePersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 }
