@@ -2,22 +2,22 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 import com.arcadiadevs.viora.platform.subscription.domain.model.events.CooperativeCodeRedeemedEvent;
+import com.arcadiadevs.viora.platform.subscription.domain.model.events.SubscriptionActivated;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.HectaresQuota;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.IndividualHectaresQuota;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeId;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Money;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.PlanMode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.RedeemedCode;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPeriod;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPrice;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionStatus;
 
 import java.time.Instant;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.IndividualHectaresQuota;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.SubscriptionPrice;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.Money;
-import com.arcadiadevs.viora.platform.subscription.domain.model.events.SubscriptionActivated;
 
 /**
  * Aggregate root of a producer's right to use Viora, for a surface in hectares and a window of time.
@@ -276,6 +276,37 @@ public class Subscription extends AbstractDomainAggregateRoot<Subscription> {
      * @param at the instant to check
      * @return true if the subscription is active and {@code at} falls inside its window
      */
+    /**
+     * Ends a sponsored plan earlier, such as when its member is released from the license. A plan already ending
+     * sooner keeps its end.
+     *
+     * @param endsAt the new end, exclusive
+     * @throws IllegalArgumentException if the end is null, the plan is not sponsored, or the end is not after its start
+     */
+    public void endEarly(Instant endsAt) {
+        if (endsAt == null || mode != PlanMode.PLAN_COOPERATIVO_PATROCINADO) {
+            throw new IllegalArgumentException("subscription.sponsored_plan.end.invalid");
+        }
+        if (endsAt.isBefore(period.endsAt())) {
+            this.period = new SubscriptionPeriod(period.startsAt(), endsAt);
+        }
+    }
+
+    /**
+     * Extends a sponsored plan to a later end, as its license is renewed. A plan already ending later keeps its end.
+     *
+     * @param endsAt the new end, exclusive
+     * @throws IllegalArgumentException if the end is null or the plan is not sponsored
+     */
+    public void extendTo(Instant endsAt) {
+        if (endsAt == null || mode != PlanMode.PLAN_COOPERATIVO_PATROCINADO) {
+            throw new IllegalArgumentException("subscription.sponsored_plan.end.invalid");
+        }
+        if (endsAt.isAfter(period.endsAt())) {
+            this.period = new SubscriptionPeriod(period.startsAt(), endsAt);
+        }
+    }
+
     public boolean hasActiveEntitlement(Instant at) {
         return status == SubscriptionStatus.ACTIVE && period != null && period.contains(at);
     }

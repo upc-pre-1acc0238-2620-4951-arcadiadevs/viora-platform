@@ -19,7 +19,8 @@ public enum InvitationCodeFilter {
         return switch (this) {
             case AVAILABLE -> status == InvitationCodeStatus.AVAILABLE;
             case REDEEMED -> status == InvitationCodeStatus.REDEEMED;
-            case CLOSED -> status == InvitationCodeStatus.EXPIRED || status == InvitationCodeStatus.REVOKED;
+            case CLOSED -> status == InvitationCodeStatus.EXPIRED || status == InvitationCodeStatus.REVOKED
+                    || status == InvitationCodeStatus.RELEASED;
         };
     }
 }

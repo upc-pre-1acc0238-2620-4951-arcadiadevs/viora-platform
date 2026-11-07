@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.repositories;
 
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.InvitationCodeStatus;
 import com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.entities.InvitationCodePersistenceEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -70,15 +71,17 @@ public interface InvitationCodePersistenceRepository extends JpaRepository<Invit
     List<InvitationCodePersistenceEntity> findOverdue(@Param("licenseId") UUID licenseId, @Param("at") Instant at);
 
     /**
-     * Counts the codes of a license that hold a seat: the redeemed ones and the available ones still in time.
+     * Counts the codes of a license that hold a seat: the redeemed ones, unless their member was released and the
+     * grace is over, and the available ones still in time.
      *
      * @param licenseId the license
      * @param at        the instant to check
      * @return the number of codes
      */
     @Query("select count(code) from InvitationCodePersistenceEntity code where code.licenseId = :licenseId and "
-            + "(code.status = com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects"
-            + ".InvitationCodeStatus.REDEEMED or (code.status = com.arcadiadevs.viora.platform.subscription.domain"
+            + "((code.status = com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects"
+            + ".InvitationCodeStatus.REDEEMED and (code.seatHeldUntil is null or code.seatHeldUntil > :at)) "
+            + "or (code.status = com.arcadiadevs.viora.platform.subscription.domain"
             + ".model.valueobjects.InvitationCodeStatus.AVAILABLE and code.expiresAt > :at))")
     long countSeatsInUse(@Param("licenseId") UUID licenseId, @Param("at") Instant at);
 
@@ -89,4 +92,27 @@ public interface InvitationCodePersistenceRepository extends JpaRepository<Invit
      * @return true if a code has it
      */
     boolean existsByCodeHash(String codeHash);
+
+    /**
+     * Lists the codes a producer redeemed with a status.
+     *
+     * @param redeemedBy the producer
+     * @param status     the status
+     * @return the code entities
+     */
+    List<InvitationCodePersistenceEntity> findAllByRedeemedByAndStatus(UUID redeemedBy, InvitationCodeStatus status);
+
+    /**
+     * Lists the redeemed codes of a license whose released member's grace is over.
+     *
+     * @param licenseId the license
+     * @param status    the redeemed status
+     * @param at        the instant to check
+     * @return the code entities
+     */
+    @Query("select code from InvitationCodePersistenceEntity code where code.licenseId = :licenseId "
+            + "and code.status = :status and code.seatHeldUntil is not null and code.seatHeldUntil <= :at")
+    List<InvitationCodePersistenceEntity> findSeatOverdue(@Param("licenseId") UUID licenseId,
+                                                          @Param("status") InvitationCodeStatus status,
+                                                          @Param("at") Instant at);
 }

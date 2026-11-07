@@ -3,9 +3,9 @@ package com.arcadiadevs.viora.platform.subscription.application.internal.queryse
 import com.arcadiadevs.viora.platform.subscription.application.queryservices.CooperativeLicenseQueryService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetAllCooperativeLicensesByManagerIdQuery;
-import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseCapacityQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseByIdQuery;
+import com.arcadiadevs.viora.platform.subscription.domain.model.queries.GetCooperativeLicenseCapacityQuery;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.LicenseCapacity;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.CooperativeLicenseRepository;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.InvitationCodeRepository;
@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Implementation of {@link CooperativeLicenseQueryService}: the license a technical manager is in charge of, or the
@@ -67,7 +68,9 @@ public class CooperativeLicenseQueryServiceImpl implements CooperativeLicenseQue
     public Optional<LicenseCapacity> handle(GetCooperativeLicenseCapacityQuery query) {
         var now = clock.instant();
         return licenses.findById(query.licenseId()).map(license -> {
-            var overdueAreaHa = codes.findOverdueByLicenseId(query.licenseId(), now).stream()
+            // Expired codes and released members past their grace still count in the license until marked.
+            var overdueAreaHa = Stream.concat(codes.findOverdueByLicenseId(query.licenseId(), now).stream(),
+                            codes.findSeatOverdueByLicenseId(query.licenseId(), now).stream())
                     .map(code -> code.snapshot().quota().hectares())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             return license.capacity(codes.countSeatsInUse(query.licenseId(), now), overdueAreaHa);

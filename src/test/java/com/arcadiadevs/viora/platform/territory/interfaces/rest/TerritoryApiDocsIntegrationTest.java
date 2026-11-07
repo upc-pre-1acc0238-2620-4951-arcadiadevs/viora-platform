@@ -64,5 +64,13 @@ class TerritoryApiDocsIntegrationTest {
         }
         Map<String, Object> alerts = docs.read("$.paths['/api/v1/sector-alerts'].get");
         assertThat(alerts.get("tags")).isEqualTo(List.of("Sector Alerts"));
+        for (var route : List.of(
+                "$.paths['/api/v1/intake-forecasts'].get",
+                "$.paths['/api/v1/intake-forecasts/{campaignYear}'].get")) {
+            Map<String, Object> operation = docs.read(route);
+            assertThat(operation.get("tags")).as(route).isEqualTo(List.of("Intake Forecasts"));
+        }
+        Map<String, Object> release = docs.read("$.paths['/api/v1/cooperative-licenses/{id}/member-releases'].post");
+        assertThat(release.get("tags")).isEqualTo(List.of("Cooperative Licenses"));
     }
 }

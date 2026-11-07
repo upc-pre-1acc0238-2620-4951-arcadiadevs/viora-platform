@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.subscription.infrastructure.persistence.jpa.adapters;
 
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.DataSharingConsent;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.DataSharingConsentId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.subscription.domain.repositories.DataSharingConsentRepository;
@@ -51,5 +52,12 @@ public class DataSharingConsentRepositoryImpl implements DataSharingConsentRepos
         var saved = persistenceRepository.saveAndFlush(
                 DataSharingConsentPersistenceAssembler.toPersistenceFromDomain(entity, consent));
         return DataSharingConsentPersistenceAssembler.toDomainFromPersistence(saved);
+    }
+
+    @Override
+    public List<DataSharingConsent> findAllByLicenseId(CooperativeLicenseId licenseId) {
+        return persistenceRepository.findAllByLicenseId(UUID.fromString(licenseId.cooperativeLicenseId())).stream()
+                .map(DataSharingConsentPersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 }
