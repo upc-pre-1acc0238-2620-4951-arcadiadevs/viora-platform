@@ -4,6 +4,8 @@ import com.arcadiadevs.viora.platform.shared.application.result.ApplicationError
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
 import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetMemberPlotByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetMemberPlotsByManagerIdQuery;
+import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetProvisionalDossierByPlotIdAndManagerIdQuery;
+import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetProvisionalDossierPdfByPlotIdAndManagerIdQuery;
 
 import java.util.List;
 
@@ -27,4 +29,20 @@ public interface MemberPlotQueryService {
      * @return the plot, a 404 when it is not one of them, or a 403
      */
     Result<MemberPlotDetailView, ApplicationError> handle(GetMemberPlotByIdAndManagerIdQuery query);
+
+    /**
+     * Reads the provisional dossier of a plot of a member who shares, as it stands now.
+     *
+     * @param query the plot and the manager
+     * @return the dossier, a 404 when it is not a plot of a member who shares, or a 403
+     */
+    Result<ProvisionalDossierView, ApplicationError> handle(GetProvisionalDossierByPlotIdAndManagerIdQuery query);
+
+    /**
+     * Renders the provisional dossier of a plot of a member who shares as a PDF, as it stands now.
+     *
+     * @param query the plot and the manager
+     * @return the PDF, a 404 when it is not a plot of a member who shares, or a 403
+     */
+    Result<ProvisionalDossierFile, ApplicationError> handle(GetProvisionalDossierPdfByPlotIdAndManagerIdQuery query);
 }
