@@ -146,4 +146,21 @@ public class SubscriptionContextFacadeImpl implements SubscriptionContextFacade 
                 "WITHDRAWN".equals(sharing) ? consent.map(DataSharingConsent::snapshot).orElseThrow().withdrawnAt()
                         : null);
     }
+
+    @Override
+    public Optional<String> findLicenseOrganizationName(String licenseId) {
+        try {
+            return cooperativeLicenseRepository.findById(new CooperativeLicenseId(licenseId))
+                    .map(license -> license.snapshot().cooperativeName());
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<String> findManagedLicenseIdsInForce() {
+        return cooperativeLicenseRepository.findManagedIdsInForce(clock.instant()).stream()
+                .map(CooperativeLicenseId::cooperativeLicenseId)
+                .toList();
+    }
 }

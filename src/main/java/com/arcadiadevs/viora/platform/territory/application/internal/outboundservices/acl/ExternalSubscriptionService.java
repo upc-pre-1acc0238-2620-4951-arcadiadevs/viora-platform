@@ -75,4 +75,23 @@ public class ExternalSubscriptionService {
                         member.withdrawnAt()))
                 .toList();
     }
+
+    /**
+     * Finds the name of the organization that holds a license.
+     *
+     * @param licenseId the license
+     * @return the name, or empty
+     */
+    public Optional<String> findOrganizationName(LicenseId licenseId) {
+        return subscriptionContextFacade.findLicenseOrganizationName(licenseId.licenseId());
+    }
+
+    /**
+     * Lists the licenses in force that have a manager in charge, whose sectors deserve alerts.
+     *
+     * @return the licenses
+     */
+    public List<LicenseId> findManagedLicensesInForce() {
+        return subscriptionContextFacade.findManagedLicenseIdsInForce().stream().map(LicenseId::new).toList();
+    }
 }

@@ -16,6 +16,7 @@ import com.arcadiadevs.viora.platform.territory.domain.model.aggregates.SectorZo
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.GeoPoint;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.LicenseId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotId;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotRisk;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotRiskAssessment;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotRiskSignals;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ProducerId;
@@ -126,6 +127,24 @@ public class MemberPlotReader {
     }
 
     /**
+     * Reads the color of each active plot of a member who shares that has a sector of the list, as the domain sees
+     * it. Plots «Por confirmar» or without a sector belong to no sector yet and are left out.
+     *
+     * @param read       the read context
+     * @param producerId the member
+     * @return the plots with their sector and color
+     */
+    public List<PlotRisk> risksOf(LicenseRead read, ProducerId producerId) {
+        return externalOrchardService.findActivePlots(producerId).stream()
+                .flatMap(plotId -> sectorZoneOf(read, producerId, plotId)
+                        .map(zone -> new PlotRisk(plotId, producerId, zone,
+                                assess(read, plotId, externalThinningService.findCampaign(plotId,
+                                        today(read).getYear()))))
+                        .stream())
+                .toList();
+    }
+
+    /**
      * Reads one plot of a member who shares, with what the manager needs to coordinate a visit.
      *
      * @param read       the read context
@@ -204,6 +223,13 @@ public class MemberPlotReader {
         }
         return new Sector(snapshot.sectorZoneId().sectorZoneId(), read.zones().get(snapshot.sectorZoneId()),
                 snapshot.status().name(), null);
+    }
+
+    private static Optional<SectorZoneId> sectorZoneOf(LicenseRead read, ProducerId producerId, PlotId plotId) {
+        return Optional.ofNullable(read.sectors().get(plotId))
+                .map(PlotSectorAssignment::snapshot)
+                .filter(snapshot -> snapshot.producerId().equals(producerId))
+                .map(snapshot -> snapshot.sectorZoneId());
     }
 
     private static List<RiskReasonView> reasonsOf(PlotRiskAssessment assessment) {

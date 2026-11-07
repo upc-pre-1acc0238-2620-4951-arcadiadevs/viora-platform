@@ -1,6 +1,9 @@
 package com.arcadiadevs.viora.platform.settlement.application.acl;
 
+import com.arcadiadevs.viora.platform.settlement.application.queryservices.ProvisionalDossierQueryService;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetProvisionalDossierByPlotIdQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetProvisionalDossierPdfByPlotIdQuery;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.settlement.domain.repositories.AgronomicReportRepository;
 import com.arcadiadevs.viora.platform.settlement.interfaces.acl.SettlementContextFacade;
@@ -8,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,17 +26,21 @@ public class SettlementContextFacadeImpl implements SettlementContextFacade {
 
     private final AgronomicReportRepository reportRepository;
     private final CommercialSizeGradeQueryService commercialSizeGradeQueryService;
+    private final ProvisionalDossierQueryService provisionalDossierQueryService;
 
     /**
      * Constructs the facade.
      *
      * @param reportRepository                the agronomic reports, which hold the settlements of a plot
      * @param commercialSizeGradeQueryService names the commercial size grade of a caliber
+     * @param provisionalDossierQueryService  reads and renders provisional dossiers
      */
     public SettlementContextFacadeImpl(AgronomicReportRepository reportRepository,
-                                       CommercialSizeGradeQueryService commercialSizeGradeQueryService) {
+                                       CommercialSizeGradeQueryService commercialSizeGradeQueryService,
+                                       ProvisionalDossierQueryService provisionalDossierQueryService) {
         this.reportRepository = reportRepository;
         this.commercialSizeGradeQueryService = commercialSizeGradeQueryService;
+        this.provisionalDossierQueryService = provisionalDossierQueryService;
     }
 
     @Override
@@ -75,6 +83,37 @@ public class SettlementContextFacadeImpl implements SettlementContextFacade {
             return true;
         } catch (IllegalArgumentException e) {
             return false;
+        }
+    }
+
+    @Override
+    public Optional<ProvisionalDossier> findProvisionalDossier(String plotId, String holderName,
+                                                               String organizationName) {
+        return plotIdOf(plotId)
+                .flatMap(id -> provisionalDossierQueryService.handle(
+                        new GetProvisionalDossierByPlotIdQuery(id, holderName, organizationName)))
+                .map(content -> new ProvisionalDossier(content.plotName(), content.variety(), content.areaHectares(),
+                        content.campaignYear().value(), content.cutOffAt(), content.preThinningFruitsPerShoot(),
+                        content.targetFruitsPerShoot(), content.overTargetPercentage(),
+                        content.prescribedRemovalPercentage(), content.windowOpensOn(), content.windowClosesOn(),
+                        content.sampledTrees(), content.lastSampledOn(), content.thinnedOn(), content.linkedNodes(),
+                        content.daysWithReadings()));
+    }
+
+    @Override
+    public Optional<ProvisionalDossierDocument> renderProvisionalDossier(String plotId, String holderName,
+                                                                         String organizationName) {
+        return plotIdOf(plotId)
+                .flatMap(id -> provisionalDossierQueryService.handle(
+                        new GetProvisionalDossierPdfByPlotIdQuery(id, holderName, organizationName)))
+                .map(pdf -> new ProvisionalDossierDocument(pdf.content(), pdf.cutOffAt()));
+    }
+
+    private static Optional<PlotId> plotIdOf(String plotId) {
+        try {
+            return Optional.of(new PlotId(plotId));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
         }
     }
 }

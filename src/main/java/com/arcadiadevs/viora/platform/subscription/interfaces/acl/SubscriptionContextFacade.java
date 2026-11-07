@@ -53,6 +53,21 @@ public interface SubscriptionContextFacade {
     List<LicenseMember> findLicenseMembers(String licenseId);
 
     /**
+     * Finds the name of the organization that holds a cooperative license.
+     *
+     * @param licenseId the license identifier
+     * @return the organization's name, or empty for an unknown license
+     */
+    Optional<String> findLicenseOrganizationName(String licenseId);
+
+    /**
+     * Lists the cooperative licenses in force now that have a technical manager in charge.
+     *
+     * @return the license identifiers
+     */
+    List<String> findManagedLicenseIdsInForce();
+
+    /**
      * A member of a cooperative license as other contexts may know it.
      *
      * @param producerId    the producer's user identifier

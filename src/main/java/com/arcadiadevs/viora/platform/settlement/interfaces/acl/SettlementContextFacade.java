@@ -1,6 +1,9 @@
 package com.arcadiadevs.viora.platform.settlement.interfaces.acl;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ACL facade exposing read-only Settlement data to other bounded contexts, without leaking its aggregates.
@@ -25,5 +28,63 @@ public interface SettlementContextFacade {
      *                            scale has no grade for it
      */
     record SettledCaliber(int campaignYear, double fruitsPerKg, String commercialSizeGrade) {
+    }
+
+    /**
+     * Reads the provisional dossier of a plot's campaign in progress, as it stands now. The caller decides who may
+     * read it; nothing is stored and nothing is hashed.
+     *
+     * @param plotId           the plot identifier (UUID)
+     * @param holderName       the producer's name to print; null if unknown
+     * @param organizationName the organization to print; null if unknown
+     * @return the dossier, or empty if the plot does not exist or is archived
+     */
+    Optional<ProvisionalDossier> findProvisionalDossier(String plotId, String holderName, String organizationName);
+
+    /**
+     * Renders the provisional dossier of a plot as a PDF, as it stands now.
+     *
+     * @param plotId           the plot identifier (UUID)
+     * @param holderName       the producer's name to print; null if unknown
+     * @param organizationName the organization to print; null if unknown
+     * @return the PDF, or empty if the plot does not exist or is archived
+     */
+    Optional<ProvisionalDossierDocument> renderProvisionalDossier(String plotId, String holderName,
+                                                                  String organizationName);
+
+    /**
+     * What a provisional dossier shows.
+     *
+     * @param plotName                    the plot's name
+     * @param variety                     its variety
+     * @param areaHectares                its area
+     * @param campaignYear                the campaign in progress
+     * @param cutOffAt                    when the data was read
+     * @param preThinningFruitsPerShoot   the estimated load
+     * @param targetFruitsPerShoot        the sustainable load
+     * @param overTargetPercentage        the excess over the target
+     * @param prescribedRemovalPercentage the prescribed thinning
+     * @param windowOpensOn               when the thinning window opens
+     * @param windowClosesOn              when it closes
+     * @param sampledTrees                trees sampled
+     * @param lastSampledOn               the last sampling round
+     * @param thinnedOn                   when the thinning was registered
+     * @param linkedNodes                 sensor nodes linked
+     * @param daysWithReadings            days with readings this campaign
+     */
+    record ProvisionalDossier(String plotName, String variety, Double areaHectares, int campaignYear,
+                              Instant cutOffAt, Double preThinningFruitsPerShoot, Double targetFruitsPerShoot,
+                              Double overTargetPercentage, Double prescribedRemovalPercentage,
+                              LocalDate windowOpensOn, LocalDate windowClosesOn, int sampledTrees,
+                              LocalDate lastSampledOn, LocalDate thinnedOn, int linkedNodes, int daysWithReadings) {
+    }
+
+    /**
+     * A provisional dossier rendered as a PDF.
+     *
+     * @param content  the PDF bytes
+     * @param cutOffAt when its data was read
+     */
+    record ProvisionalDossierDocument(byte[] content, Instant cutOffAt) {
     }
 }
