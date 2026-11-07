@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -62,6 +61,9 @@ public class InvitationCodePersistenceEntity extends AuditableAbstractPersistenc
 
     @Column(name = "issued_at")
     private Instant issuedAt;
+
+    @Column(name = "seat_held_until")
+    private Instant seatHeldUntil;
 
     @Version
     @Column(name = "revision", nullable = false)

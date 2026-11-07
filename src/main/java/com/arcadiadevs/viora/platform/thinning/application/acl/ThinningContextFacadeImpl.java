@@ -187,4 +187,28 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
         return estimate == null || estimate.status() != YieldEstimateStatus.AVAILABLE
                 || estimate.estimatedKgPerHa() == null ? null : estimate;
     }
+
+    @Override
+    public Optional<YieldOutlook> findYieldOutlook(String plotId, int campaignYear) {
+        final PlotId id;
+        final CampaignYear year;
+        try {
+            id = new PlotId(plotId);
+            year = new CampaignYear(campaignYear);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        return prescriptionRepository.findByPlotIdAndCampaignYear(id, year).map(prescription -> {
+            var snapshot = prescription.snapshot();
+            var outlook = outlookService.outlookOf(snapshot);
+            var estimate = outlook.yieldEstimate();
+            var withLoad = available(estimate);
+            var thinned = snapshot.executionConfirmation() != null;
+            var after = thinned ? available(outlookService.yieldAfterThinning(snapshot)) : null;
+            return new YieldOutlook(outlook.sampledTrees() > 0,
+                    estimate == null ? null : estimate.status().name(),
+                    withLoad == null ? null : withLoad.estimatedKgPerHa(), thinned,
+                    after == null ? null : after.estimatedKgPerHa());
+        });
+    }
 }

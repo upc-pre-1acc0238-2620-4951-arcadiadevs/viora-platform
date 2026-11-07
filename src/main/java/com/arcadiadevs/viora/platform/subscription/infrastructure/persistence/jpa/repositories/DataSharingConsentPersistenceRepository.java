@@ -36,4 +36,12 @@ public interface DataSharingConsentPersistenceRepository
      * @return the consent entities
      */
     List<DataSharingConsentPersistenceEntity> findAllByProducerIdOrderByAcceptedAtDesc(UUID producerId);
+
+    /**
+     * Lists the consents given to a license.
+     *
+     * @param licenseId the license
+     * @return the consent entities
+     */
+    List<DataSharingConsentPersistenceEntity> findAllByLicenseId(UUID licenseId);
 }

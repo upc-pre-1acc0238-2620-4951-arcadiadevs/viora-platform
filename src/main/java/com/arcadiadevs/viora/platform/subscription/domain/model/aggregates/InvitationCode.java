@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.subscription.domain.model.aggregates;
 
 import com.arcadiadevs.viora.platform.shared.domain.model.aggregates.AbstractDomainAggregateRoot;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotReleasableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRevocableException;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
@@ -36,6 +37,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
     private final String hint;
     private String sealedCode;
     private final Instant issuedAt;
+    private Instant seatHeldUntil;
 
     private InvitationCode(InvitationCodeSnapshot snapshot) {
         this.id = snapshot.id();
@@ -51,6 +53,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
         this.hint = snapshot.hint();
         this.sealedCode = snapshot.sealedCode();
         this.issuedAt = snapshot.issuedAt();
+        this.seatHeldUntil = snapshot.seatHeldUntil();
     }
 
     /**
@@ -147,7 +150,56 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
      * @return the status at {@code at}
      */
     public InvitationCodeStatus statusAt(Instant at) {
-        return isOverdue(at) ? InvitationCodeStatus.EXPIRED : status;
+        if (isOverdue(at)) {
+            return InvitationCodeStatus.EXPIRED;
+        }
+        return isSeatOverdue(at) ? InvitationCodeStatus.RELEASED : status;
+    }
+
+    /**
+     * Checks whether the member of a redeemed code was released and their grace is over, so its seat and hectares
+     * are still held only until the code is marked as released.
+     *
+     * @param at the instant to check
+     * @return true if the code is redeemed and its seat hold ended at {@code at}
+     */
+    public boolean isSeatOverdue(Instant at) {
+        return status == InvitationCodeStatus.REDEEMED && seatHeldUntil != null && at != null
+                && !at.isBefore(seatHeldUntil);
+    }
+
+    /**
+     * Keeps the seat of a released member until their plan ends. Meant to be called through
+     * {@code CooperativeLicense.holdMemberSeat}.
+     *
+     * @param until when the seat is freed
+     * @throws IllegalArgumentException          if {@code until} is null
+     * @throws InvitationCodeNotReleasableException if the code is not redeemed or its seat is already on hold
+     */
+    void holdSeatUntil(Instant until) {
+        if (until == null) {
+            throw new IllegalArgumentException("subscription.invitation_code.seat_hold.null");
+        }
+        if (status != InvitationCodeStatus.REDEEMED || seatHeldUntil != null) {
+            throw new InvitationCodeNotReleasableException();
+        }
+        this.seatHeldUntil = until;
+    }
+
+    /**
+     * Frees the seat of a redeemed code whose member left. Meant to be called through
+     * {@code CooperativeLicense.releaseMemberCode}, which gives its hectares back.
+     *
+     * @param at the instant of the release
+     * @return true if the code was redeemed and is now released; false if nothing changed
+     */
+    boolean release(Instant at) {
+        if (status != InvitationCodeStatus.REDEEMED || at == null) {
+            return false;
+        }
+        this.status = InvitationCodeStatus.RELEASED;
+        this.seatHeldUntil = null;
+        return true;
     }
 
     /**
@@ -213,7 +265,7 @@ public class InvitationCode extends AbstractDomainAggregateRoot<InvitationCode> 
      */
     public InvitationCodeSnapshot snapshot() {
         return new InvitationCodeSnapshot(id, licenseId, batchId, fingerprint, quota, status, expiresAt, redeemedBy,
-                redeemedAt, revision, hint, sealedCode, issuedAt);
+                redeemedAt, revision, hint, sealedCode, issuedAt, seatHeldUntil);
     }
 
     /**

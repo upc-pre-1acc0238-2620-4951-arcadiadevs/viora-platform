@@ -250,6 +250,12 @@ public class InvitationCodeCommandServiceImpl implements InvitationCodeCommandSe
                 codes.save(code);
             }
         }
+        // A released member's seat goes back once their grace is over.
+        for (var code : codes.findSeatOverdueByLicenseId(license.snapshot().id(), now)) {
+            if (license.releaseOverdueSeat(code, now)) {
+                codes.save(code);
+            }
+        }
     }
 
     /**

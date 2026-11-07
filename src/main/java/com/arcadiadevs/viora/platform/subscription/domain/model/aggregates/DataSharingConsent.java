@@ -29,7 +29,7 @@ public class DataSharingConsent extends AbstractDomainAggregateRoot<DataSharingC
     private final ManagerId managerId;
     private final ConsentTextVersion textVersion;
     private final Instant acceptedAt;
-    private final Instant endsAt;
+    private Instant endsAt;
     private Instant withdrawnAt;
     private final Long revision;
 
@@ -122,6 +122,37 @@ public class DataSharingConsent extends AbstractDomainAggregateRoot<DataSharingC
             throw new DataSharingConsentNotActiveException();
         }
         this.withdrawnAt = at;
+    }
+
+    /**
+     * Ends the manager's reading at once because the member was released from the license. Unlike a withdrawal, it is
+     * not the member's choice, so the consent ends instead of being withdrawn.
+     *
+     * @param at the instant of the release
+     * @return true if the consent was active and ended now
+     */
+    public boolean endWithRelease(Instant at) {
+        if (at == null || statusAt(at) != DataSharingConsentStatus.ACTIVE) {
+            return false;
+        }
+        this.endsAt = at;
+        return true;
+    }
+
+    /**
+     * Extends an active consent with its renewed plan. A withdrawn or ended consent does not come back.
+     *
+     * @param newEndsAt the plan's new end
+     * @param at        the instant of the renewal
+     * @return true if the consent now lasts longer
+     */
+    public boolean extendTo(Instant newEndsAt, Instant at) {
+        if (newEndsAt == null || at == null || statusAt(at) != DataSharingConsentStatus.ACTIVE
+                || !newEndsAt.isAfter(endsAt)) {
+            return false;
+        }
+        this.endsAt = newEndsAt;
+        return true;
     }
 
     /**

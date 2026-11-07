@@ -1,25 +1,27 @@
 package com.arcadiadevs.viora.platform.subscription.application;
 
+import com.arcadiadevs.viora.platform.shared.application.result.*;
+import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
+import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.CheckoutServiceImpl;
+import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.SubscriptionCommandServiceImpl;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
+import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
+import com.arcadiadevs.viora.platform.subscription.application.ports.*;
+import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
+import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
+import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
+import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
+import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
+import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
+import org.junit.jupiter.api.*;
+
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import java.util.function.Supplier;
-import org.junit.jupiter.api.*;
-import com.arcadiadevs.viora.platform.shared.application.result.*;
-import com.arcadiadevs.viora.platform.subscription.application.commandservices.CheckoutService;
-import com.arcadiadevs.viora.platform.subscription.application.commandservices.SubscriptionCommandService;
-import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.SubscriptionCommandServiceImpl;
-import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalIamService;
-import com.arcadiadevs.viora.platform.subscription.application.internal.outboundservices.acl.ExternalProfileService;
-import com.arcadiadevs.viora.platform.subscription.application.queryservices.SubscriptionCatalog;
-import com.arcadiadevs.viora.platform.subscription.domain.model.commands.CreateSubscriptionCommand;
-import com.arcadiadevs.viora.platform.subscription.application.internal.commandservices.CheckoutServiceImpl;
-import com.arcadiadevs.viora.platform.subscription.application.ports.*;
-import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.QuotaExtension;
-import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.Subscription;
-import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.*;
-import com.arcadiadevs.viora.platform.subscription.domain.repositories.*;
-import com.arcadiadevs.viora.platform.subscription.domain.services.SubscriptionPricingPolicy;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -41,6 +43,7 @@ class CheckoutServiceTest {
         }
         public Optional<Subscription> findCurrent(ProducerId p, Instant at) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p)).findFirst(); }
         public List<ProducerId> findSponsoredProducerIds(CooperativeLicenseId licenseId, Instant at) { return List.of(); }
+        public List<Subscription> findSponsoredInForceByLicenseId(CooperativeLicenseId licenseId, Instant at) { return List.of(); }
         public boolean existsActiveByProducerId(ProducerId p, Instant at) { return contracts.values().stream().anyMatch(s -> s.snapshot().producerId().equals(p) && s.hasActiveEntitlement(at)); }
         public Optional<Subscription> findPendingByProducerId(ProducerId p) { return contracts.values().stream().filter(s -> s.snapshot().producerId().equals(p) && s.snapshot().status() == SubscriptionStatus.PENDING_PAYMENT).findFirst(); }
         public PaymentAttempt save(PaymentAttempt a) { attempts.put(a.id(), a); return a; }
@@ -181,7 +184,7 @@ class CheckoutServiceTest {
                 public List<PlanOffer> plans() { return List.of(); }
                 public SubscriptionPrice quote(String plan, IndividualHectaresQuota q) { return pricing.quote(q); }
                 public SubscriptionPrice quoteExtension(String plan, IndividualHectaresQuota q, int days, int periodDays) { throw new UnsupportedOperationException(); }
-                public java.math.BigDecimal extensionRatePerHa(String plan, int days, int periodDays) { throw new UnsupportedOperationException(); }
+                public BigDecimal extensionRatePerHa(String plan, int days, int periodDays) { throw new UnsupportedOperationException(); }
             }, producerIam(), producerProfiles(), Clock.fixed(now.plusSeconds(30), ZoneOffset.UTC), service);
     private Result<SubscriptionCommandService.CreatedSubscription, ApplicationError> buy(String hectares, String key) {
         return purchases.handle(new CreateSubscriptionCommand(producer, "PRODUCER_ANNUAL", new BigDecimal(hectares), key));

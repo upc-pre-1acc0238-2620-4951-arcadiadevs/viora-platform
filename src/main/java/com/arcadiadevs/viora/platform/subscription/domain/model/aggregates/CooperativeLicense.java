@@ -5,8 +5,10 @@ import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ExtensionCo
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseAreaException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InsufficientLicenseSeatsException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotReleasableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.InvitationCodeNotRevocableException;
 import com.arcadiadevs.viora.platform.subscription.domain.exceptions.ManagerCodeNotRedeemableException;
+import com.arcadiadevs.viora.platform.subscription.domain.model.events.CooperativeLicenseRenewedEvent;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CodeFingerprint;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeId;
 import com.arcadiadevs.viora.platform.subscription.domain.model.valueobjects.CooperativeLicenseId;
@@ -40,7 +42,7 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
     private final int seats;
     private HectaresQuota contractedArea;
     private BigDecimal committedAreaHa;
-    private final SubscriptionPeriod period;
+    private SubscriptionPeriod period;
     private ManagerId managerId;
     private final Long revision;
 
@@ -216,6 +218,72 @@ public class CooperativeLicense extends AbstractDomainAggregateRoot<CooperativeL
                 : free.multiply(BigDecimal.TWO).divide(BigDecimal.valueOf(seatsFree), 0, RoundingMode.FLOOR)
                         .divide(BigDecimal.TWO, 1, RoundingMode.UNNECESSARY);
         return new LicenseCapacity(Math.min(seatsUsed, seats), seatsFree, reserved, free, suggested);
+    }
+
+    /**
+     * Keeps the seat and hectares of a released member until their plan ends, so the license does not reuse them
+     * while the member still has a plan.
+     *
+     * @param code  the member's redeemed code; it must belong to this license
+     * @param until when the seat is freed
+     * @param at    the instant of the release
+     * @throws IllegalArgumentException             if an argument is null or the code belongs to another license
+     * @throws InvitationCodeNotReleasableException if the code is not redeemed or was already released
+     */
+    public void holdMemberSeat(InvitationCode code, Instant until, Instant at) {
+        requireOwnCode(code, at);
+        code.holdSeatUntil(until);
+    }
+
+    /**
+     * Gives back the seat and hectares of a member who left, such as when they delete their account.
+     *
+     * @param code the member's redeemed code; it must belong to this license
+     * @param at   the instant of the release
+     * @return true if the code was redeemed and is now released
+     * @throws IllegalArgumentException if an argument is null or the code belongs to another license
+     */
+    public boolean releaseMemberCode(InvitationCode code, Instant at) {
+        requireOwnCode(code, at);
+        if (!code.release(at)) {
+            return false;
+        }
+        release(code);
+        return true;
+    }
+
+    /**
+     * Gives back the seat and hectares of a released member whose grace is over. A seat still on hold is left as it
+     * is.
+     *
+     * @param code the member's code; it must belong to this license
+     * @param at   the instant to check
+     * @return true if the seat was freed now
+     */
+    public boolean releaseOverdueSeat(InvitationCode code, Instant at) {
+        requireOwnCode(code, at);
+        return code.isSeatOverdue(at) && releaseMemberCode(code, at);
+    }
+
+    /**
+     * Extends the license to a later end, as the organization renews its contract. The plans of its members follow
+     * through {@link CooperativeLicenseRenewedEvent}, without new codes.
+     *
+     * @param newEndsAt the new end, exclusive
+     * @param at        the instant of the renewal
+     * @throws IllegalArgumentException if an argument is null or the new end is not after the current one
+     */
+    public void renew(Instant newEndsAt, Instant at) {
+        if (newEndsAt == null || at == null) {
+            throw new IllegalArgumentException("subscription.license.renewal.incomplete");
+        }
+        var previousEnd = period.endsAt();
+        if (!newEndsAt.isAfter(previousEnd)) {
+            throw new IllegalArgumentException("subscription.license.renewal.not_later");
+        }
+        this.period = new SubscriptionPeriod(period.startsAt(), newEndsAt);
+        registerDomainEvent(new CooperativeLicenseRenewedEvent(id.cooperativeLicenseId(), previousEnd, newEndsAt,
+                at));
     }
 
     private void requireOwnCode(InvitationCode code, Instant at) {

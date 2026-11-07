@@ -31,6 +31,27 @@ public interface SettlementContextFacade {
     }
 
     /**
+     * The harvest settled for each campaign of a plot, oldest first: one per campaign, the latest settlement of a year
+     * wins. The caller decides who may read it.
+     *
+     * @param plotId the plot identifier (UUID)
+     * @return the settled harvests; empty when the plot has none
+     */
+    List<SettledHarvest> findSettledHarvests(String plotId);
+
+    /**
+     * The harvest settled for one campaign of a plot.
+     *
+     * @param campaignYear the campaign
+     * @param greenKg      green olives, in kilograms
+     * @param blackKg      black olives, in kilograms
+     * @param totalKg      the whole harvest, in kilograms
+     * @param settledAt    when it was settled
+     */
+    record SettledHarvest(int campaignYear, double greenKg, double blackKg, double totalKg, Instant settledAt) {
+    }
+
+    /**
      * Reads the provisional dossier of a plot's campaign in progress, as it stands now. The caller decides who may
      * read it; nothing is stored and nothing is hashed.
      *

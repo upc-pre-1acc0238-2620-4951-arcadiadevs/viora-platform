@@ -116,4 +116,24 @@ public class SettlementContextFacadeImpl implements SettlementContextFacade {
             return Optional.empty();
         }
     }
+
+    @Override
+    public List<SettledHarvest> findSettledHarvests(String plotId) {
+        if (!isUuid(plotId)) {
+            return List.of();
+        }
+        return reportRepository.findByPlotId(new PlotId(plotId))
+                .map(report -> report.snapshot().settlements().stream()
+                        // One harvest per campaign: the latest settlement of the year wins
+                        .collect(Collectors.toMap(settlement -> settlement.campaignYear().value(),
+                                settlement -> settlement,
+                                (first, second) -> isLater(second, first) ? second : first,
+                                TreeMap::new))
+                        .values().stream()
+                        .map(settlement -> new SettledHarvest(settlement.campaignYear().value(),
+                                settlement.greenOlivesWeight().kilograms(), settlement.blackOlivesWeight().kilograms(),
+                                settlement.totalHarvestWeight().kilograms(), settlement.settledAt()))
+                        .toList())
+                .orElse(List.of());
+    }
 }

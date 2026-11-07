@@ -24,7 +24,8 @@ import java.time.Instant;
  * @param revision    the optimistic locking revision
  * @param hint        the last two characters of the code, kept to show it masked; null for codes issued before
  * @param sealedCode  the code encrypted, kept only while it can be redeemed so the manager can share it again
- * @param issuedAt    when the code was issued; null for codes issued before it was kept
+ * @param issuedAt      when the code was issued; null for codes issued before it was kept
+ * @param seatHeldUntil until when a released member still holds the seat; null unless their release is in grace
  */
 public record InvitationCodeSnapshot(
         InvitationCodeId id,
@@ -39,8 +40,34 @@ public record InvitationCodeSnapshot(
         Long revision,
         String hint,
         String sealedCode,
-        Instant issuedAt
+        Instant issuedAt,
+        Instant seatHeldUntil
 ) {
+
+    /**
+     * Creates a snapshot of a code whose seat is not on hold.
+     *
+     * @param id          the code
+     * @param licenseId   the license
+     * @param batchId     the batch
+     * @param fingerprint the fingerprint
+     * @param quota       the hectares
+     * @param status      the status
+     * @param expiresAt   the last instant it can be redeemed
+     * @param redeemedBy  who redeemed it
+     * @param redeemedAt  when
+     * @param revision    the revision
+     * @param hint        its last two characters
+     * @param sealedCode  the code encrypted
+     * @param issuedAt    when it was issued
+     */
+    public InvitationCodeSnapshot(InvitationCodeId id, CooperativeLicenseId licenseId, String batchId,
+                                  CodeFingerprint fingerprint, HectaresQuota quota, InvitationCodeStatus status,
+                                  Instant expiresAt, ProducerId redeemedBy, Instant redeemedAt, Long revision,
+                                  String hint, String sealedCode, Instant issuedAt) {
+        this(id, licenseId, batchId, fingerprint, quota, status, expiresAt, redeemedBy, redeemedAt, revision, hint,
+                sealedCode, issuedAt, null);
+    }
 
     /**
      * Snapshot of a code issued before codes kept their hint, sealed value and issue instant, such as a seeded one.
