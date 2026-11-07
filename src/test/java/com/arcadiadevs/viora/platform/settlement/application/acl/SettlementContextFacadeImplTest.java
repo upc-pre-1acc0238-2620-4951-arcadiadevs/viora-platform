@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.settlement.application.acl;
 
+import com.arcadiadevs.viora.platform.settlement.application.queryservices.ProvisionalDossierQueryService;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.AgronomicReport;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.AgronomicReportSnapshot;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.HarvestSettlementSnapshot;
@@ -30,7 +31,8 @@ class SettlementContextFacadeImplTest {
 
     private final AgronomicReportRepository reports = mock(AgronomicReportRepository.class);
     private final CommercialSizeGradeQueryService grades = mock(CommercialSizeGradeQueryService.class);
-    private final SettlementContextFacadeImpl facade = new SettlementContextFacadeImpl(reports, grades);
+    private final SettlementContextFacadeImpl facade = new SettlementContextFacadeImpl(reports, grades,
+            mock(ProvisionalDossierQueryService.class));
 
     @Test
     @DisplayName("one caliber per campaign, oldest first, named with its grade; the latest settlement of a year wins")

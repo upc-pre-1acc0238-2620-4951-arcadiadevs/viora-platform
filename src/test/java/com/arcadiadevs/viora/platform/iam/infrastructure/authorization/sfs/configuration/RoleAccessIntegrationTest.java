@@ -127,12 +127,12 @@ class RoleAccessIntegrationTest {
     }
 
     @Test
-    @DisplayName("Only a technical manager reads members and member plots")
+    @DisplayName("Only a technical manager reads members, member plots and sector alerts")
     void memberViewIsTheManagers() throws Exception {
         var manager = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
         var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
 
-        for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots"}) {
+        for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots", "/api/v1/sector-alerts"}) {
             mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, producer))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));

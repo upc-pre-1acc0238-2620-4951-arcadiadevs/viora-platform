@@ -64,4 +64,38 @@ public class ExternalThinningService {
     public record CampaignThinningPlan(Double preThinningFruitsPerShoot, Double targetFruitsPerShoot,
             Double percentageToRemove, LocalDate windowOpensOn, LocalDate windowClosesOn) {
     }
+
+    /**
+     * Finds how a plot's campaign stands in Thinning: sampling, load, prescription and thinning.
+     *
+     * @param plotId       the plot
+     * @param campaignYear the campaign
+     * @return the progress, or empty if the plot has no prescription this campaign
+     */
+    public Optional<CampaignProgress> findCampaignProgress(PlotId plotId, CampaignYear campaignYear) {
+        if (plotId == null || campaignYear == null) {
+            return Optional.empty();
+        }
+        return thinningContextFacade.findThinningPlanDetail(plotId.plotId(), campaignYear.value())
+                .map(detail -> new CampaignProgress(detail.preThinningFruitsPerShoot(), detail.targetFruitsPerShoot(),
+                        detail.percentageToRemove(), detail.windowOpensOn(), detail.windowClosesOn(),
+                        detail.sampledTrees(), detail.lastSampledOn(), detail.executedOn()));
+    }
+
+    /**
+     * How a campaign stands in Thinning before it is settled.
+     *
+     * @param preThinningFruitsPerShoot the estimated load
+     * @param targetFruitsPerShoot      the sustainable load
+     * @param percentageToRemove        the prescribed thinning
+     * @param windowOpensOn             when the window opens
+     * @param windowClosesOn            when it closes
+     * @param sampledTrees              trees sampled
+     * @param lastSampledOn             the last sampling round
+     * @param executedOn                when the thinning was registered
+     */
+    public record CampaignProgress(Double preThinningFruitsPerShoot, Double targetFruitsPerShoot,
+            Double percentageToRemove, LocalDate windowOpensOn, LocalDate windowClosesOn, int sampledTrees,
+            LocalDate lastSampledOn, LocalDate executedOn) {
+    }
 }

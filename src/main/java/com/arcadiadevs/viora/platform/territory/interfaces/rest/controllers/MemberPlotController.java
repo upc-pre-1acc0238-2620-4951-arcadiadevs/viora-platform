@@ -7,8 +7,11 @@ import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseE
 import com.arcadiadevs.viora.platform.territory.application.queryservices.MemberPlotQueryService;
 import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetMemberPlotByIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetMemberPlotsByManagerIdQuery;
+import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetProvisionalDossierByPlotIdAndManagerIdQuery;
+import com.arcadiadevs.viora.platform.territory.domain.model.queries.GetProvisionalDossierPdfByPlotIdAndManagerIdQuery;
 import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.MemberPlotDetailResource;
 import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.MemberPlotResource;
+import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.ProvisionalDossierResource;
 import com.arcadiadevs.viora.platform.territory.interfaces.rest.transform.MemberPlotResourceAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +22,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -120,5 +125,60 @@ public class MemberPlotController {
                 currentUserProvider.requireCurrentUserId()));
         return ResponseEntityAssembler.toResponseEntityFromResult(result, MemberPlotResourceAssembler::toResource,
                 HttpStatus.OK);
+    }
+
+    /**
+     * Reads the provisional dossier of a plot of a member who shares, as it stands now.
+     *
+     * @param id the plot
+     * @return 200 with the dossier, or 404 if it is not a plot of a member who shares
+     */
+    @GetMapping(value = "/{id}/provisional-dossier", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Get the provisional dossier of a member plot",
+            description = "Generated when asked, with the instant its data was read: provisional, not certified, "
+                    + "without a verification code and not stored. Asking another day may give other values. The "
+                    + "sealed dossier stays the producer's. Ask with Accept: application/pdf to download it.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "The dossier",
+                    content = {
+                            @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    schema = @Schema(implementation = ProvisionalDossierResource.class)),
+                            @Content(mediaType = MediaType.APPLICATION_PDF_VALUE,
+                                    schema = @Schema(type = "string", format = "binary"))}),
+            @ApiResponse(responseCode = "401", description = "No authenticated user"),
+            @ApiResponse(responseCode = "403", description = "Not a manager with a license in force"),
+            @ApiResponse(responseCode = "404", description = "Not a plot of a member who shares")
+    })
+    public ResponseEntity<?> getProvisionalDossier(@PathVariable UUID id) {
+        var result = memberPlotQueryService.handle(new GetProvisionalDossierByPlotIdAndManagerIdQuery(id.toString(),
+                currentUserProvider.requireCurrentUserId()));
+        return ResponseEntityAssembler.toResponseEntityFromResult(result, MemberPlotResourceAssembler::toResource,
+                HttpStatus.OK);
+    }
+
+    /**
+     * Downloads the provisional dossier of a plot of a member who shares as a PDF.
+     *
+     * @param id the plot
+     * @return 200 with the PDF as an attachment; on error only the status, since a PDF client reads no JSON
+     */
+    @GetMapping(value = "/{id}/provisional-dossier", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(hidden = true)
+    public ResponseEntity<byte[]> downloadProvisionalDossier(@PathVariable UUID id) {
+        var result = memberPlotQueryService.handle(new GetProvisionalDossierPdfByPlotIdAndManagerIdQuery(
+                id.toString(), currentUserProvider.requireCurrentUserId()));
+        if (result.isFailure()) {
+            // A PDF client cannot read a JSON problem: the status says what happened
+            return ResponseEntity.status(ErrorResponseAssembler.toErrorResponseFromApplicationError(
+                    result.failure().orElseThrow()).getStatusCode()).build();
+        }
+        var file = result.success().orElseThrow();
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(file.fileName()).build().toString())
+                .body(file.content());
     }
 }
