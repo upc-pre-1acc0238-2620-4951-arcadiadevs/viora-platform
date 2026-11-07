@@ -175,4 +175,28 @@ public interface ThinningContextFacade {
             Double estimatedKgPerHaAfterThinning
     ) {
     }
+
+    /**
+     * Tells how much a plot is expected to yield this campaign, with the same estimates the thinning plan shows:
+     * with the sampled load and, once the thinning is registered, with the load it left.
+     *
+     * @param plotId       the plot identifier (UUID)
+     * @param campaignYear the campaign
+     * @return the outlook, or empty if the plot has no prescription that campaign
+     */
+    Optional<YieldOutlook> findYieldOutlook(String plotId, int campaignYear);
+
+    /**
+     * The yield outlook of a plot's campaign.
+     *
+     * @param sampled            whether any tree was sampled
+     * @param estimateStatus     {@code AVAILABLE}, or why the yield cannot be estimated
+     * @param kgPerHaWithLoad    the yield estimated with the sampled load; null unless available
+     * @param thinned            whether the producer registered the thinning
+     * @param kgPerHaAfterThinning the yield estimated with the load the thinning left; null unless thinned and
+     *                           available
+     */
+    record YieldOutlook(boolean sampled, String estimateStatus, Double kgPerHaWithLoad, boolean thinned,
+                        Double kgPerHaAfterThinning) {
+    }
 }
