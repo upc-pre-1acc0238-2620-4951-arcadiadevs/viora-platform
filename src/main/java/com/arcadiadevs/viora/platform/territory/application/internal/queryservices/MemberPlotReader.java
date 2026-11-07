@@ -21,6 +21,7 @@ import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotRi
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotRiskSignals;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ProducerId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.RiskLevel;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.SectorPlacement;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.SectorZoneId;
 import com.arcadiadevs.viora.platform.territory.domain.repositories.PlotSectorAssignmentRepository;
 import com.arcadiadevs.viora.platform.territory.domain.repositories.SectorZoneRepository;
@@ -145,6 +146,22 @@ public class MemberPlotReader {
     }
 
     /**
+     * Lists the active plots of a member who shares with their area and where they are counted by sector, for the
+     * intake.
+     *
+     * @param read       the read context
+     * @param producerId the member
+     * @return the plots
+     */
+    public List<PlotPlacement> placementsOf(LicenseRead read, ProducerId producerId) {
+        return externalOrchardService.findActivePlots(producerId).stream()
+                .flatMap(plotId -> externalOrchardService.findPlotFacts(plotId).stream())
+                .map(facts -> new PlotPlacement(facts.plotId(), facts.areaHa(),
+                        placementOf(sectorOf(read, producerId, facts.plotId()))))
+                .toList();
+    }
+
+    /**
      * Reads one plot of a member who shares, with what the manager needs to coordinate a visit.
      *
      * @param read       the read context
@@ -225,6 +242,13 @@ public class MemberPlotReader {
                 snapshot.status().name(), null);
     }
 
+    private static SectorPlacement placementOf(Sector sector) {
+        if (sector.zoneId() != null) {
+            return SectorPlacement.assigned(new SectorZoneId(sector.zoneId()));
+        }
+        return "PENDING".equals(sector.status()) ? SectorPlacement.PENDING : SectorPlacement.NONE;
+    }
+
     private static Optional<SectorZoneId> sectorZoneOf(LicenseRead read, ProducerId producerId, PlotId plotId) {
         return Optional.ofNullable(read.sectors().get(plotId))
                 .map(PlotSectorAssignment::snapshot)
@@ -256,6 +280,16 @@ public class MemberPlotReader {
      */
     public record LicenseRead(Map<PlotId, PlotSectorAssignment> sectors, Map<SectorZoneId, String> zones,
                            Instant evaluatedAt) {
+    }
+
+    /**
+     * An active member plot with its area and where it is counted by sector.
+     *
+     * @param plotId    the plot
+     * @param areaHa    its area; null if unknown
+     * @param placement its sector, «Por confirmar» or none
+     */
+    public record PlotPlacement(PlotId plotId, Double areaHa, SectorPlacement placement) {
     }
 
     private record Sector(String zoneId, String zoneName, String status, String proposedName) {

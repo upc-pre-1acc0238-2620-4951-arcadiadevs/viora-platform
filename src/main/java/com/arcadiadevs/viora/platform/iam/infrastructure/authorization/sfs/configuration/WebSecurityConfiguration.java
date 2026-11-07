@@ -20,8 +20,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -140,7 +140,8 @@ public class WebSecurityConfiguration {
                                 "/api/v1/invitation-codes/**",
                                 "/api/v1/cooperative-members/**",
                                 "/api/v1/member-plots/**",
-                                "/api/v1/sector-alerts/**").hasRole("TECHNICAL_MANAGER")
+                                "/api/v1/sector-alerts/**",
+                                "/api/v1/intake-forecasts/**").hasRole("TECHNICAL_MANAGER")
                         // A manager keeps the sector list of the license; its members read it and sector their plots
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/sector-zones/**",

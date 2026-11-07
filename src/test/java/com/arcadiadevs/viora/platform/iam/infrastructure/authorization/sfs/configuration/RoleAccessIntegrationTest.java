@@ -21,8 +21,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -127,12 +127,13 @@ class RoleAccessIntegrationTest {
     }
 
     @Test
-    @DisplayName("Only a technical manager reads members, member plots and sector alerts")
+    @DisplayName("Only a technical manager reads members, member plots, sector alerts and intake")
     void memberViewIsTheManagers() throws Exception {
         var manager = "Bearer " + tokenOf(accountOf(UserRole.ROLE_TECHNICAL_MANAGER));
         var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
 
-        for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots", "/api/v1/sector-alerts"}) {
+        for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots", "/api/v1/sector-alerts",
+                "/api/v1/intake-forecasts"}) {
             mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, producer))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));

@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotId
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -65,5 +66,29 @@ public class ExternalSettlementService {
      * @param cutOffAt when its data was read
      */
     public record RenderedDossier(byte[] content, Instant cutOffAt) {
+    }
+
+    /**
+     * Lists the harvest settled for each campaign of a plot.
+     *
+     * @param plotId the plot
+     * @return the settled harvests, oldest first
+     */
+    public List<SettledHarvestFacts> findSettledHarvests(PlotId plotId) {
+        return settlementContextFacade.findSettledHarvests(plotId.plotId()).stream()
+                .map(harvest -> new SettledHarvestFacts(harvest.campaignYear(), harvest.greenKg(), harvest.blackKg(),
+                        harvest.settledAt()))
+                .toList();
+    }
+
+    /**
+     * The harvest settled for one campaign of a plot.
+     *
+     * @param campaignYear the campaign
+     * @param greenKg      green olives, in kilograms
+     * @param blackKg      black olives, in kilograms
+     * @param settledAt    when it was settled
+     */
+    public record SettledHarvestFacts(int campaignYear, double greenKg, double blackKg, Instant settledAt) {
     }
 }
