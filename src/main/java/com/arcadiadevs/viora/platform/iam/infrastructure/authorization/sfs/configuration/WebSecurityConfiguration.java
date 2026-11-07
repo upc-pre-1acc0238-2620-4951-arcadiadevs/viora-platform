@@ -139,7 +139,8 @@ public class WebSecurityConfiguration {
                                 "/api/v1/cooperative-licenses/**",
                                 "/api/v1/invitation-codes/**",
                                 "/api/v1/cooperative-members/**",
-                                "/api/v1/member-plots/**").hasRole("TECHNICAL_MANAGER")
+                                "/api/v1/member-plots/**",
+                                "/api/v1/sector-alerts/**").hasRole("TECHNICAL_MANAGER")
                         // A manager keeps the sector list of the license; its members read it and sector their plots
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/sector-zones/**",
