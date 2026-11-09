@@ -237,9 +237,12 @@ class MemberViewIntegrationTest {
                 Instant.now().plus(Duration.ofDays(7)));
         licenseRepository.save(stored);
         invitationCodeRepository.save(issued);
-        var command = shares ? new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1")
-                : new RedeemCooperativeCodeCommand(producer, code);
+        var command = new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1");
         assertThat(redemptionCommandService.handle(command).isSuccess()).isTrue();
+        if (!shares) {
+            // A plan redeemed before the consent became mandatory has none.
+            consentRows.deleteAll(consentRows.findAllByProducerIdOrderByAcceptedAtDesc(UUID.fromString(producer)));
+        }
         return producer;
     }
 

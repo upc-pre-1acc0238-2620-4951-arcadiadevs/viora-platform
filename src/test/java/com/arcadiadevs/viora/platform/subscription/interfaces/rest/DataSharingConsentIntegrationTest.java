@@ -126,7 +126,7 @@ class DataSharingConsentIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.reason").value("subscription.invitation_code.not_redeemable"));
 
-        redeem(newCode("5"), null).andExpect(status().isCreated());
+        redeem(newCode("5"), VERSION).andExpect(status().isCreated());
 
         preview(newCode("5"))
                 .andExpect(status().isConflict())
@@ -156,12 +156,15 @@ class DataSharingConsentIntegrationTest {
     }
 
     @Test
-    @DisplayName("Redeeming without the text version activates the plan and shares nothing")
+    @DisplayName("Redeeming without the text version is refused and leaves the code ready to be redeemed")
     void redeemingWithoutConsent() throws Exception {
-        redeem(newCode("12"), null).andExpect(status().isCreated());
+        var code = newCode("12");
+
+        redeem(code, null).andExpect(status().isBadRequest());
+        redeem(code, " ").andExpect(status().isBadRequest());
 
         assertThat(consentsOf(producer)).isEmpty();
-        mvc.perform(get(CONSENTS)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        redeem(code, VERSION).andExpect(status().isCreated());
     }
 
     @Test

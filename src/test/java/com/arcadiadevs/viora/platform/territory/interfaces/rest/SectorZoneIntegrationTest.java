@@ -305,8 +305,8 @@ class SectorZoneIntegrationTest {
                 Instant.now().plus(Duration.ofDays(7)));
         licenseRepository.save(stored);
         invitationCodeRepository.save(issued);
-        assertThat(redemptionCommandService.handle(new RedeemCooperativeCodeCommand(producer, code)).isSuccess())
-                .isTrue();
+        assertThat(redemptionCommandService.handle(
+                new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1")).isSuccess()).isTrue();
         return producer;
     }
 

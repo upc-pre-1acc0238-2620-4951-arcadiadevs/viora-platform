@@ -103,10 +103,10 @@ class DossierAndAlertsIntegrationTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         manager = signUp("ROLE_TECHNICAL_MANAGER", "Rubén Ticona");
         license = licenseOf(manager);
-        sharing = member(license, "Teodoro Mamani", true);
+        sharing = member(license, "Teodoro Mamani");
         hotPlot = newPlot(sharing, "La Yarada 02", -70.25);
         coldPlot = newPlot(sharing, "Lote Norte", -70.30);
-        withdrawn = member(license, "Hilda Poma", true);
+        withdrawn = member(license, "Hilda Poma");
         withdrawnPlot = newPlot(withdrawn, "Lote Sur", -70.27);
         withdraw(withdrawn);
         var zone = sectorZoneCommandService.handle(new CreateSectorZoneCommand(manager, "La Yarada Baja"))
@@ -249,7 +249,7 @@ class DossierAndAlertsIntegrationTest {
                 new ManagerId(managerId), 0L)));
     }
 
-    private String member(CooperativeLicense owner, String fullName, boolean shares) {
+    private String member(CooperativeLicense owner, String fullName) {
         var producer = signUp("ROLE_PRODUCER", fullName);
         var code = randomCode();
         var stored = licenseRepository.findById(owner.snapshot().id()).orElseThrow();
@@ -257,8 +257,7 @@ class DossierAndAlertsIntegrationTest {
                 Instant.now().plus(Duration.ofDays(7)));
         licenseRepository.save(stored);
         invitationCodeRepository.save(issued);
-        var command = shares ? new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1")
-                : new RedeemCooperativeCodeCommand(producer, code);
+        var command = new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1");
         assertThat(redemptionCommandService.handle(command).isSuccess()).isTrue();
         return producer;
     }
