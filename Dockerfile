@@ -33,6 +33,7 @@ COPY --from=build /app/target/*.jar app.jar
 ENV PORT=8080
 EXPOSE 8080
 
-# Ejecutar la aplicación mapeando el puerto asignado por Render. El heap queda acotado al 75 % de la memoria del
-# contenedor, para que un pico de memoria falle con OutOfMemoryError en vez de matar el contenedor entero.
-ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=75 -jar app.jar --server.port=${PORT}"]
+# Ejecutar la aplicación mapeando el puerto asignado por Render. El heap queda acotado al 45 % de la memoria del
+# contenedor, y la metaspace, la caché de código y las pilas también, porque fuera del heap la JVM usa cerca de la
+# mitad de los 512 MB: así un pico de memoria falla con OutOfMemoryError en vez de matar el contenedor entero.
+ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=45 -XX:MaxMetaspaceSize=170m -XX:ReservedCodeCacheSize=64m -Xss512k -jar app.jar --server.port=${PORT}"]
