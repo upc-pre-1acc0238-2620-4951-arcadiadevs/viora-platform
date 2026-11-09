@@ -55,7 +55,8 @@ class CooperativeCodeRedemptionCommandServiceImplTest {
     void onlyProducersRedeem() {
         when(iam.mayRedeemCooperativeCodes(any())).thenReturn(false);
 
-        var result = service.handle(new RedeemCooperativeCodeCommand(UUID.randomUUID().toString(), "COOP-7K2Q"));
+        var result = service.handle(new RedeemCooperativeCodeCommand(UUID.randomUUID().toString(), "COOP-7K2Q",
+                "2026-11-v1"));
 
         assertThat(result.failure()).hasValueSatisfying(error ->
                 assertThat(error.code()).isEqualTo("COOPERATIVE_CODE_REDEMPTION_FORBIDDEN"));

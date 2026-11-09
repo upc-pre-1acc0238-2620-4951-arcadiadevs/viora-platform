@@ -257,7 +257,7 @@ class CooperativeCodeRedemptionIntegrationTest {
         var code = newCode(license, Instant.now().plus(Duration.ofDays(7)), new BigDecimal("8"));
 
         mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\": \"" + code + "\", \"quotaHa\": 150}"))
+                        .content("{\"code\": \"" + code + "\", \"consentTextVersion\": \"2026-11-v1\", \"quotaHa\": 150}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.quotaHa").value(8.0));
 
@@ -316,7 +316,7 @@ class CooperativeCodeRedemptionIntegrationTest {
                 Callable<Result<Subscription, ApplicationError>> task = () -> {
                     start.await();
                     return redemptionCommandService.handle(
-                            new RedeemCooperativeCodeCommand(producer, guess));
+                            new RedeemCooperativeCodeCommand(producer, guess, "2026-11-v1"));
                 };
                 futures.add(executor.submit(task));
             }
@@ -358,7 +358,7 @@ class CooperativeCodeRedemptionIntegrationTest {
                 Callable<Result<Subscription, ApplicationError>> task = () -> {
                     start.await();
                     return redemptionCommandService.handle(
-                            new RedeemCooperativeCodeCommand(each, code));
+                            new RedeemCooperativeCodeCommand(each, code, "2026-11-v1"));
                 };
                 futures.add(executor.submit(task));
             }
@@ -389,7 +389,7 @@ class CooperativeCodeRedemptionIntegrationTest {
     }
 
     private static String body(String code) {
-        return "{\"code\": \"" + code + "\"}";
+        return "{\"code\": \"" + code + "\", \"consentTextVersion\": \"2026-11-v1\"}";
     }
 
     private CooperativeLicense newLicense(BigDecimal areaHa) {

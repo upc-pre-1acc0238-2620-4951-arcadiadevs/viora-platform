@@ -84,7 +84,8 @@ class AccountDeletionIntegrationTest {
                         """.formatted(UUID.randomUUID(), LocalDate.now(ProducerTimeZone.ZONE))))
                 .andExpect(status().isCreated());
         mvc.perform(post("/api/v1/cooperative-code-redemptions").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"code\":\"" + SubscriptionTestCodesSeeder.CODES.firstEntry().getKey() + "\"}"))
+                .content("{\"code\":\"" + SubscriptionTestCodesSeeder.CODES.firstEntry().getKey()
+                        + "\",\"consentTextVersion\":\"2026-11-v1\"}"))
                 .andExpect(status().isCreated());
 
         delete("Wrong-password-1")
