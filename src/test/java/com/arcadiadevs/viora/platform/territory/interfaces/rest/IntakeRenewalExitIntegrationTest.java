@@ -101,7 +101,7 @@ class IntakeRenewalExitIntegrationTest {
         manager = signUp("ROLE_TECHNICAL_MANAGER", "Rubén Ticona");
         license = licenseOf(manager);
         licenseId = license.snapshot().id().cooperativeLicenseId();
-        member = member(license, "Teodoro Mamani", true);
+        member = member(license, "Teodoro Mamani");
         var plot = newPlot(member, "La Yarada 02", -70.25);
         newPlot(member, "Lote Norte", -70.30);
         var zone = sectorZoneCommandService.handle(new CreateSectorZoneCommand(manager, "La Yarada Baja"))
@@ -226,7 +226,7 @@ class IntakeRenewalExitIntegrationTest {
                 new ManagerId(managerId), 0L)));
     }
 
-    private String member(CooperativeLicense owner, String fullName, boolean shares) {
+    private String member(CooperativeLicense owner, String fullName) {
         var producer = signUp("ROLE_PRODUCER", fullName);
         var code = randomCode();
         var stored = licenseRepository.findById(owner.snapshot().id()).orElseThrow();
@@ -234,8 +234,7 @@ class IntakeRenewalExitIntegrationTest {
                 Instant.now().plus(Duration.ofDays(7)));
         licenseRepository.save(stored);
         invitationCodeRepository.save(issued);
-        var command = shares ? new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1")
-                : new RedeemCooperativeCodeCommand(producer, code);
+        var command = new RedeemCooperativeCodeCommand(producer, code, "2026-11-v1");
         assertThat(redemptionCommandService.handle(command).isSuccess()).isTrue();
         return producer;
     }

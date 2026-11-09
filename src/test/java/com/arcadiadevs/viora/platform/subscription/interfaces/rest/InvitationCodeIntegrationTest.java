@@ -194,7 +194,7 @@ class InvitationCodeIntegrationTest {
         String code = JsonPath.read(body, "$.codes[0].code");
         authenticateAs(signUp("ROLE_PRODUCER", "Teodoro Mamani"));
         mvc.perform(post("/api/v1/cooperative-code-redemptions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\": \"" + code + "\"}"))
+                        .content("{\"code\": \"" + code + "\", \"consentTextVersion\": \"2026-11-v1\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.cooperativeName").value("Cooperativa Olivar del Sur"));
         authenticateAs(manager);

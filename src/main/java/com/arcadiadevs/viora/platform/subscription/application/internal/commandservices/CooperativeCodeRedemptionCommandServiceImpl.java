@@ -31,8 +31,8 @@ import java.util.Map;
  * code's hectares, is created, and all of them are stored in one transaction. A code that does not exist, expired, was
  * already redeemed or was revoked answers the same validation error, and counts as a failed attempt. The attempt is
  * reserved before the code is looked up and given back for any other outcome.</p>
- * <p>When the producer accepted to share their data, the consent is recorded in the same transaction, for the version
- * of the text in force; a redemption without it activates the plan without sharing anything.</p>
+ * <p>A code is only redeemed by accepting to share data, so the consent is recorded in the same transaction, for the
+ * version of the text in force.</p>
  */
 @Service
 public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeCodeRedemptionCommandService {
@@ -128,10 +128,9 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             if (!externalIamService.mayRedeemCooperativeCodes(producerId)) {
                 return Result.failure(ApplicationError.forbidden(RESOURCE, "subscription.redemption.producer_only"));
             }
-            var accepted = command.consentTextVersion() == null ? null
-                    : new ConsentTextVersion(command.consentTextVersion());
+            var accepted = new ConsentTextVersion(command.consentTextVersion());
             // A producer who read another wording accepts it again, so the record tells what they agreed to.
-            if (accepted != null && !accepted.value().equals(consentTextVersion)) {
+            if (!accepted.value().equals(consentTextVersion)) {
                 return Result.failure(ApplicationError.conflict("consent", TEXT_OUTDATED,
                         Map.of("reason", TEXT_OUTDATED, "consentTextVersion", consentTextVersion)));
             }
@@ -184,10 +183,8 @@ public class CooperativeCodeRedemptionCommandServiceImpl implements CooperativeC
             invitationCodeRepository.save(invitationCode.get());
             cooperativeLicenseRepository.save(license.get());
             var savedSubscription = subscriptionRepository.save(subscription);
-            if (accepted != null) {
-                dataSharingConsentRepository.save(DataSharingConsent.accept(redeemedCode, subscription,
-                        license.get().snapshot().managerId(), accepted, now));
-            }
+            dataSharingConsentRepository.save(DataSharingConsent.accept(redeemedCode, subscription,
+                    license.get().snapshot().managerId(), accepted, now));
 
             for (var event : subscription.domainEvents()) {
                 eventPublisher.publishEvent(event);
