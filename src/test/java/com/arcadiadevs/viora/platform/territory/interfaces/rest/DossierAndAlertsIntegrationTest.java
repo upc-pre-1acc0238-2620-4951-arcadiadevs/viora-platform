@@ -128,6 +128,7 @@ class DossierAndAlertsIntegrationTest {
     void provisionalDossier() throws Exception {
         mvc.perform(get(PLOTS + "/" + hotPlot + "/provisional-dossier").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentType").value("PROVISIONAL"))
                 .andExpect(jsonPath("$.plotName").value("La Yarada 02"))
                 .andExpect(jsonPath("$.producerName").value("Teodoro Mamani"))
                 .andExpect(jsonPath("$.organizationName").value("Cooperativa Olivar del Sur"))
