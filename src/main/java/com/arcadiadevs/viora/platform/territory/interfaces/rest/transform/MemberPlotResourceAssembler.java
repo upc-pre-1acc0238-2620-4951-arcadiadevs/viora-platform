@@ -16,6 +16,9 @@ import java.util.List;
  */
 public final class MemberPlotResourceAssembler {
 
+    // The only kind of dossier a manager reads: the sealed one stays the producer's
+    private static final String PROVISIONAL_DOCUMENT = "PROVISIONAL";
+
     private MemberPlotResourceAssembler() {
     }
 
@@ -67,7 +70,7 @@ public final class MemberPlotResourceAssembler {
      * @return the resource
      */
     public static ProvisionalDossierResource toResource(ProvisionalDossierView view) {
-        return new ProvisionalDossierResource(view.plotId(), view.plotName(), view.producerName(),
+        return new ProvisionalDossierResource(PROVISIONAL_DOCUMENT, view.plotId(), view.plotName(), view.producerName(),
                 view.organizationName(), view.variety(), view.areaHa(), view.campaignYear(), view.cutOffAt(),
                 view.preThinningFruitsPerShoot(), view.targetFruitsPerShoot(), view.overTargetPercentage(),
                 view.prescribedRemovalPercentage(), view.windowOpensOn(), view.windowClosesOn(), view.sampledTrees(),

@@ -8,6 +8,7 @@ import java.time.LocalDate;
 /**
  * The provisional dossier of a member plot: provisional, not certified, with the instant its data was read.
  *
+ * @param documentType                always {@code PROVISIONAL}: the sealed dossier is another document
  * @param plotId                      the plot
  * @param plotName                    its name
  * @param producerName                its owner
@@ -30,6 +31,7 @@ import java.time.LocalDate;
  */
 @Schema(name = "ProvisionalDossierResource", description = "Provisional, not certified dossier of a member plot")
 public record ProvisionalDossierResource(
+        @Schema(example = "PROVISIONAL", allowableValues = "PROVISIONAL") String documentType,
         String plotId,
         @Schema(example = "La Yarada 02") String plotName,
         @Schema(example = "Teodoro Mamani") String producerName,
