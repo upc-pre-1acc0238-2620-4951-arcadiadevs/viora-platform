@@ -3,6 +3,10 @@ package com.arcadiadevs.viora.platform.settlement.application.internal.queryserv
 import com.arcadiadevs.viora.platform.settlement.application.internal.outboundservices.acl.ExternalOrchardService;
 import com.arcadiadevs.viora.platform.settlement.application.queryservices.SealedDossierQueryService;
 import com.arcadiadevs.viora.platform.settlement.domain.model.aggregates.SealedDossierSnapshot;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierByPlotIdAndCampaignYearQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierByVerificationHashQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierPdfByPlotIdAndCampaignYearQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossiersByPlotIdQuery;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.CampaignYear;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.settlement.domain.model.valueobjects.UserId;
@@ -15,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Locale;
 
 /** Read side of the dossiers sealed by producers. */
 @Service
@@ -23,6 +26,7 @@ import java.util.Locale;
 public class SealedDossierQueryServiceImpl implements SealedDossierQueryService {
 
     private static final String RESOURCE = "AgronomicDossier";
+    private static final String QUERY_NULL = "settlement.query.null";
 
     private final SealedDossierRepository dossierRepository;
     private final AgronomicReportRepository reportRepository;
@@ -36,9 +40,12 @@ public class SealedDossierQueryServiceImpl implements SealedDossierQueryService 
     }
 
     @Override
-    public Result<DossierView, ApplicationError> findByPlotAndCampaign(String plotId, Integer campaignYear,
-            String actorId) {
-        var dossier = ownedDossier(plotId, campaignYear, actorId);
+    public Result<DossierView, ApplicationError> handle(GetSealedDossierByPlotIdAndCampaignYearQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", QUERY_NULL));
+        }
+        var dossier = ownedDossier(new PlotId(query.plotId()), new CampaignYear(query.campaignYear()),
+                query.actorId());
         if (dossier instanceof Result.Failure<SealedDossierSnapshot, ApplicationError> failure) {
             return Result.failure(failure.error());
         }
@@ -50,15 +57,12 @@ public class SealedDossierQueryServiceImpl implements SealedDossierQueryService 
     }
 
     @Override
-    public Result<List<SealedDossierSnapshot>, ApplicationError> findByPlot(String plotId, String actorId) {
-        final PlotId plot;
-        try {
-            plot = new PlotId(plotId);
-            new UserId(actorId);
-        } catch (IllegalArgumentException exception) {
-            return Result.failure(ApplicationError.validationError("request", exception.getMessage()));
+    public Result<List<SealedDossierSnapshot>, ApplicationError> handle(GetSealedDossiersByPlotIdQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", QUERY_NULL));
         }
-        var ownership = checkOwner(plot, actorId);
+        var plot = new PlotId(query.plotId());
+        var ownership = checkOwner(plot, query.actorId());
         if (ownership != null) {
             return Result.failure(ownership);
         }
@@ -66,8 +70,12 @@ public class SealedDossierQueryServiceImpl implements SealedDossierQueryService 
     }
 
     @Override
-    public Result<DossierFile, ApplicationError> findDocument(String plotId, Integer campaignYear, String actorId) {
-        var dossier = ownedDossier(plotId, campaignYear, actorId);
+    public Result<DossierFile, ApplicationError> handle(GetSealedDossierPdfByPlotIdAndCampaignYearQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", QUERY_NULL));
+        }
+        var dossier = ownedDossier(new PlotId(query.plotId()), new CampaignYear(query.campaignYear()),
+                query.actorId());
         if (dossier instanceof Result.Failure<SealedDossierSnapshot, ApplicationError> failure) {
             return Result.failure(failure.error());
         }
@@ -78,29 +86,18 @@ public class SealedDossierQueryServiceImpl implements SealedDossierQueryService 
     }
 
     @Override
-    public Result<SealedDossierSnapshot, ApplicationError> verify(String verificationHash) {
-        final VerificationHash hash;
-        try {
-            hash = new VerificationHash(verificationHash == null ? null : verificationHash.trim().toLowerCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            return Result.failure(ApplicationError.validationError("verificationHash", exception.getMessage()));
+    public Result<SealedDossierSnapshot, ApplicationError> handle(GetSealedDossierByVerificationHashQuery query) {
+        if (query == null) {
+            return Result.failure(ApplicationError.validationError("query", QUERY_NULL));
         }
+        var hash = new VerificationHash(query.verificationHash());
         return dossierRepository.findByVerificationHash(hash)
                 .<Result<SealedDossierSnapshot, ApplicationError>>map(Result::success)
                 .orElseGet(() -> Result.failure(ApplicationError.notFound(RESOURCE, hash.value())));
     }
 
-    private Result<SealedDossierSnapshot, ApplicationError> ownedDossier(String plotId, Integer campaignYear,
+    private Result<SealedDossierSnapshot, ApplicationError> ownedDossier(PlotId plot, CampaignYear year,
             String actorId) {
-        final PlotId plot;
-        final CampaignYear year;
-        try {
-            plot = new PlotId(plotId);
-            year = new CampaignYear(campaignYear);
-            new UserId(actorId);
-        } catch (IllegalArgumentException exception) {
-            return Result.failure(ApplicationError.validationError("request", exception.getMessage()));
-        }
         var ownership = checkOwner(plot, actorId);
         if (ownership != null) {
             return Result.failure(ownership);
