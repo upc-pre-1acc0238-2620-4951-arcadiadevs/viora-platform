@@ -33,7 +33,8 @@ COPY --from=build /app/target/*.jar app.jar
 ENV PORT=8080
 EXPOSE 8080
 
-# Ejecutar la aplicación mapeando el puerto asignado por Render. El heap queda acotado al 45 % de la memoria del
-# contenedor, y la metaspace, la caché de código y las pilas también, porque fuera del heap la JVM usa cerca de la
-# mitad de los 512 MB: así un pico de memoria falla con OutOfMemoryError en vez de matar el contenedor entero.
-ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=45 -XX:MaxMetaspaceSize=170m -XX:ReservedCodeCacheSize=64m -Xss512k -jar app.jar --server.port=${PORT}"]
+# Ejecutar la aplicación mapeando el puerto asignado por Render. Fuera del heap la JVM ocupa unos 250 MB fijos
+# (metaspace, símbolos, código compilado), así que el heap queda en 192 MB y devuelve al sistema lo que no usa, y solo
+# compila con C1, que ocupa mucha menos caché de código y memoria del compilador. Medido en 512 MB y 0,5 CPU: en reposo
+# usa unos 350 MB y aguanta diez peticiones pesadas a la vez, donde la configuración anterior mataba el contenedor.
+ENTRYPOINT ["sh", "-c", "java -Xmx192m -XX:MaxHeapFreeRatio=40 -XX:MinHeapFreeRatio=15 -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=170m -Xss512k -jar app.jar --server.port=${PORT}"]
