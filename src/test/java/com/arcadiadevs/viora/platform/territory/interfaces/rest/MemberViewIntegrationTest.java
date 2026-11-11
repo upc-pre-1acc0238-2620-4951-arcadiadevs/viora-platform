@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.iam.domain.model.commands.RegisterUserAcco
 import com.arcadiadevs.viora.platform.orchard.application.commandservices.PlotCommandService;
 import com.arcadiadevs.viora.platform.orchard.domain.model.commands.DelimitPlotCommand;
 import com.arcadiadevs.viora.platform.shared.application.result.Result;
+import com.arcadiadevs.viora.platform.shared.domain.model.valueobjects.ProducerTimeZone;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.CooperativeCodeRedemptionCommandService;
 import com.arcadiadevs.viora.platform.subscription.application.commandservices.DataSharingConsentCommandService;
 import com.arcadiadevs.viora.platform.subscription.domain.model.aggregates.CooperativeLicense;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +42,7 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -116,6 +120,8 @@ class MemberViewIntegrationTest {
     @Test
     @DisplayName("The roll lists every member with whether they share; only who shares shows plots and hectares")
     void rollShowsEachMemberState() throws Exception {
+        sampleOneTree(sharing, sharingPlot);
+
         mvc.perform(get(MEMBERS))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
@@ -123,15 +129,18 @@ class MemberViewIntegrationTest {
                 .andExpect(jsonPath("$[0].sharing").value("WITHDRAWN"))
                 .andExpect(jsonPath("$[0].withdrawnAt").isNotEmpty())
                 .andExpect(jsonPath("$[0].plotCount").doesNotExist())
+                .andExpect(jsonPath("$[0].unsampledPlots").doesNotExist())
                 .andExpect(jsonPath("$[1].fullName").value("Teodoro Mamani"))
                 .andExpect(jsonPath("$[1].sharing").value("SHARING"))
                 .andExpect(jsonPath("$[1].plotCount").value(2))
+                .andExpect(jsonPath("$[1].unsampledPlots").value(1))
                 .andExpect(jsonPath("$[1].registeredAreaHa").isNumber())
                 .andExpect(jsonPath("$[1].sectorNames[0]").value("La Yarada Baja"))
                 .andExpect(jsonPath("$[1].worstRiskLevel").value("NO_DATA"))
                 .andExpect(jsonPath("$[2].fullName").value("Ángel Choque"))
                 .andExpect(jsonPath("$[2].sharing").value("NOT_SHARING"))
-                .andExpect(jsonPath("$[2].plotCount").doesNotExist());
+                .andExpect(jsonPath("$[2].plotCount").doesNotExist())
+                .andExpect(jsonPath("$[2].unsampledPlots").doesNotExist());
     }
 
     @Test
@@ -244,6 +253,19 @@ class MemberViewIntegrationTest {
             consentRows.deleteAll(consentRows.findAllByProducerIdOrderByAcceptedAtDesc(UUID.fromString(producer)));
         }
         return producer;
+    }
+
+    // One tree is enough for the intake to count the plot as sampled, even if the prescription is not issued yet.
+    private void sampleOneTree(String producerId, String plotId) throws Exception {
+        var today = LocalDate.now(ProducerTimeZone.ZONE);
+        authenticateAs(producerId);
+        mvc.perform(post("/api/v1/plots/{plotId}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clientBatchId": "%s", "campaignYear": %d, "samples": [{"treeTag": "T-01",
+                                "shootCount": 12, "fruitSetCount": 144, "samplingDate": "%s"}]}
+                                """.formatted(UUID.randomUUID(), today.getYear(), today)))
+                .andExpect(status().isCreated());
+        authenticateAs(manager);
     }
 
     private String newPlot(String producerId, String name, double lng) {
