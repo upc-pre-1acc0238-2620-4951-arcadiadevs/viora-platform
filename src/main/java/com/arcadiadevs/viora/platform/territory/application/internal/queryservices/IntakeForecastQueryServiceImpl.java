@@ -176,7 +176,8 @@ public class IntakeForecastQueryServiceImpl implements IntakeForecastQueryServic
                             : sector.sector().sectorZoneId().sectorZoneId();
                     return new SectorIntakeView(zoneId, zoneId == null ? null : zoneNames.get(zoneId),
                             sector.sector().status(), sector.plots(), sector.sampledPlots(),
-                            tons.apply(sector.kilograms()));
+                            tons.apply(sector.kilograms()), tons.apply(sector.greenKg()),
+                            tons.apply(sector.blackKg()), tons.apply(sector.unclassifiedKg()));
                 })
                 .sorted(Comparator.comparing((SectorIntakeView view) -> view.sectorZoneId() == null)
                         .thenComparing(view -> view.tons() == null ? 0.0 : -view.tons()))

@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.settlement.interfaces.rest.controllers;
 
 import com.arcadiadevs.viora.platform.settlement.application.queryservices.SealedDossierQueryService;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierByVerificationHashQuery;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.DossierVerificationResource;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform.AgronomicDossierResourceAssembler;
 import com.arcadiadevs.viora.platform.shared.interfaces.rest.transform.ResponseEntityAssembler;
@@ -48,7 +49,8 @@ public class DossierVerificationController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<?> verify(@PathVariable @Parameter(description = "SHA-256 of the PDF") String verificationHash) {
-        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.verify(verificationHash),
+        return ResponseEntityAssembler.toResponseEntityFromResult(
+                queryService.handle(new GetSealedDossierByVerificationHashQuery(verificationHash)),
                 AgronomicDossierResourceAssembler::toVerification, HttpStatus.OK);
     }
 }

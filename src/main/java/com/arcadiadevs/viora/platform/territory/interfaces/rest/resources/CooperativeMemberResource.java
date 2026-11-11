@@ -14,6 +14,8 @@ import java.util.List;
  * @param sharing          {@code SHARING}, {@code WITHDRAWN} or {@code NOT_SHARING}
  * @param withdrawnAt      when they stopped sharing; null unless withdrawn
  * @param plotCount        their active plots; null unless sharing
+ * @param unsampledPlots   those without any tree sampled this campaign, as the intake counts them; null unless
+ *                         sharing
  * @param registeredAreaHa the hectares of those plots; null unless sharing
  * @param sectorNames      the sectors of those plots
  * @param worstRiskLevel   the color of their most urgent plot
@@ -26,6 +28,7 @@ public record CooperativeMemberResource(
         @Schema(example = "SHARING") String sharing,
         Instant withdrawnAt,
         @Schema(example = "2") Integer plotCount,
+        @Schema(example = "1") Integer unsampledPlots,
         @Schema(example = "4.00") BigDecimal registeredAreaHa,
         List<String> sectorNames,
         @Schema(example = "CRITICAL") String worstRiskLevel,

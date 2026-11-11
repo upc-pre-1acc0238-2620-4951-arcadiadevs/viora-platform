@@ -42,7 +42,13 @@ class YieldAggregationDomainServiceTest {
         assertThat(intake.coveragePercent()).isEqualTo(75.0);
         assertThat(intake.sectors()).hasSize(2);
         assertThat(intake.sectors().getFirst().kilograms()).isEqualTo(15_000.0);
+        assertThat(intake.sectors().getFirst().greenKg()).isCloseTo(6_000.0, within(0.001));
+        assertThat(intake.sectors().getFirst().blackKg()).isCloseTo(4_000.0, within(0.001));
+        assertThat(intake.sectors().getFirst().unclassifiedKg()).isEqualTo(5_000.0);
         assertThat(intake.sectors().get(1).kilograms()).isNull();
+        assertThat(intake.sectors().get(1).greenKg()).isNull();
+        assertThat(intake.sectors().get(1).blackKg()).isNull();
+        assertThat(intake.sectors().get(1).unclassifiedKg()).isNull();
         assertThat(intake.sectors().get(1).sampledPlots()).isEqualTo(1);
     }
 
@@ -73,11 +79,15 @@ class YieldAggregationDomainServiceTest {
         assertThat(closed.totalKg()).isEqualTo(8_000.0);
         assertThat(closed.greenKg()).isEqualTo(5_000.0);
         assertThat(closed.unclassifiedKg()).isZero();
+        assertThat(closed.sectors().getFirst().greenKg()).isEqualTo(3_000.0);
+        assertThat(closed.sectors().getFirst().blackKg()).isEqualTo(1_000.0);
+        assertThat(closed.sectors().getFirst().unclassifiedKg()).isZero();
 
         var partial = YieldAggregationDomainService.settled(List.of(settled(lowerYarada, 3_000, 1_000),
                 new PlotSettlement(plot(), magollo, false, 0, 0)));
         assertThat(partial.status()).isEqualTo(IntakeStatus.PARTIAL);
         assertThat(partial.coveragePercent()).isEqualTo(50.0);
+        assertThat(partial.sectors().get(1).greenKg()).isNull();
 
         var none = YieldAggregationDomainService.settled(List.of(new PlotSettlement(plot(), magollo, false, 0, 0)));
         assertThat(none.status()).isEqualTo(IntakeStatus.NO_DATA);

@@ -21,7 +21,8 @@ public final class CooperativeMemberResourceAssembler {
      */
     public static CooperativeMemberResource toResource(CooperativeMemberView view) {
         return new CooperativeMemberResource(view.id(), view.fullName(), view.sharing(), view.withdrawnAt(),
-                view.plotCount(), view.registeredAreaHa(), view.sectorNames(), view.worstRiskLevel(),
+                view.plotCount(), view.unsampledPlots(), view.registeredAreaHa(), view.sectorNames(),
+                view.worstRiskLevel(),
                 MemberPlotResourceAssembler.toResource(view.worstReason()));
     }
 

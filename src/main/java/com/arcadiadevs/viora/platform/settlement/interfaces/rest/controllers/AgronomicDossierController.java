@@ -3,6 +3,9 @@ package com.arcadiadevs.viora.platform.settlement.interfaces.rest.controllers;
 import com.arcadiadevs.viora.platform.settlement.application.commandservices.SealAgronomicDossierCommandService;
 import com.arcadiadevs.viora.platform.settlement.application.queryservices.SealedDossierQueryService;
 import com.arcadiadevs.viora.platform.settlement.domain.model.commands.SealAgronomicDossierCommand;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierByPlotIdAndCampaignYearQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossierPdfByPlotIdAndCampaignYearQuery;
+import com.arcadiadevs.viora.platform.settlement.domain.model.queries.GetSealedDossiersByPlotIdQuery;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.AgronomicDossierResource;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.resources.SealDossierResource;
 import com.arcadiadevs.viora.platform.settlement.interfaces.rest.transform.AgronomicDossierResourceAssembler;
@@ -103,7 +106,8 @@ public class AgronomicDossierController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<?> list(@PathVariable String plotId) {
-        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.findByPlot(plotId, currentUserProvider.requireCurrentUserId()),
+        var query = new GetSealedDossiersByPlotIdQuery(plotId, currentUserProvider.requireCurrentUserId());
+        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.handle(query),
                 dossiers -> dossiers.stream().map(AgronomicDossierResourceAssembler::toResource).toList(),
                 HttpStatus.OK);
     }
@@ -124,7 +128,15 @@ public class AgronomicDossierController {
             @PathVariable @Parameter(description = "Campaign year", example = "2026") Integer campaignYear,
             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
         if (accept != null && accept.contains(MediaType.APPLICATION_PDF_VALUE)) {
-            var file = queryService.findDocument(plotId, campaignYear, currentUserProvider.requireCurrentUserId());
+            final GetSealedDossierPdfByPlotIdAndCampaignYearQuery query;
+            try {
+                query = new GetSealedDossierPdfByPlotIdAndCampaignYearQuery(plotId, campaignYear,
+                        currentUserProvider.requireCurrentUserId());
+            } catch (IllegalArgumentException exception) {
+                // A PDF client cannot read a JSON problem: the status says what happened
+                return ResponseEntity.badRequest().build();
+            }
+            var file = queryService.handle(query);
             if (file instanceof Result.Success<SealedDossierQueryService.DossierFile, ApplicationError> success) {
                 var dossier = success.value().dossier();
                 byte[] bytes = success.value().document().content();
@@ -142,8 +154,9 @@ public class AgronomicDossierController {
             return ResponseEntity.status(ErrorResponseAssembler.toErrorResponseFromApplicationError(failure.error())
                     .getStatusCode()).build();
         }
-        return ResponseEntityAssembler.toResponseEntityFromResult(
-                queryService.findByPlotAndCampaign(plotId, campaignYear, currentUserProvider.requireCurrentUserId()),
+        var query = new GetSealedDossierByPlotIdAndCampaignYearQuery(plotId, campaignYear,
+                currentUserProvider.requireCurrentUserId());
+        return ResponseEntityAssembler.toResponseEntityFromResult(queryService.handle(query),
                 view -> AgronomicDossierResourceAssembler.toResource(view.dossier(), view.certification()),
                 HttpStatus.OK);
     }

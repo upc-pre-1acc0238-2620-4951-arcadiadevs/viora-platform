@@ -111,11 +111,11 @@ public class CooperativeMemberQueryServiceImpl implements CooperativeMemberQuery
         var name = externalProfileService.findFullName(member.producerId()).orElse(null);
         if (member.sharing() != DataSharingState.SHARING) {
             return new CooperativeMemberView(member.producerId().producerId(), name, member.sharing().name(),
-                    member.withdrawnAt(), null, null, List.of(), null, null);
+                    member.withdrawnAt(), null, null, null, List.of(), null, null);
         }
         var worst = sortedForVisit(plots).stream().findFirst();
         return new CooperativeMemberView(member.producerId().producerId(), name, member.sharing().name(), null,
-                plots.size(), registeredArea(plots),
+                plots.size(), (int) plots.stream().filter(plot -> !plot.sampled()).count(), registeredArea(plots),
                 plots.stream().map(MemberPlotView::sectorZoneName).filter(Objects::nonNull).distinct().sorted()
                         .toList(),
                 worst.map(MemberPlotView::riskLevel).orElse(null),

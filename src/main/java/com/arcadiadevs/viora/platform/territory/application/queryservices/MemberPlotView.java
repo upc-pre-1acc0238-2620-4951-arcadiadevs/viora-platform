@@ -23,12 +23,13 @@ import java.util.List;
  * @param riskLevel          {@code CRITICAL}, {@code MODERATE}, {@code NO_DATA} or {@code OPTIMAL}
  * @param reasons            why, the most serious first
  * @param overloadPercent    overload in percent; null without a valid sampling
+ * @param sampled            whether any of its trees was sampled this campaign, as the intake counts it
  * @param distanceKm         distance to the manager; null without their location
  * @param evaluatedAt        when the color was computed
  */
 public record MemberPlotView(String plotId, String plotName, String producerId, String producerName, String variety,
                              Double areaHa, Double latitude, Double longitude, String geoJson, String sectorZoneId,
                              String sectorZoneName, String sectorStatus, String proposedSectorName, String riskLevel,
-                             List<RiskReasonView> reasons, Double overloadPercent, Double distanceKm,
-                             Instant evaluatedAt) {
+                             List<RiskReasonView> reasons, Double overloadPercent, boolean sampled,
+                             Double distanceKm, Instant evaluatedAt) {
 }
