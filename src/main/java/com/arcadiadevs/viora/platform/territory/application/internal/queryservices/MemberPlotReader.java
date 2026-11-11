@@ -211,7 +211,8 @@ public class MemberPlotReader {
                 facts.variety(), facts.areaHa(), center == null ? null : center.latitude(),
                 center == null ? null : center.longitude(), facts.geoJson(), sector.zoneId(), sector.zoneName(),
                 sector.status(), sector.proposedName(), assessment.level().name(), reasonsOf(assessment),
-                assessment.overloadPercent(), distance, read.evaluatedAt());
+                assessment.overloadPercent(), thinning.map(each -> each.sampledTrees() > 0).orElse(false), distance,
+                read.evaluatedAt());
     }
 
     private PlotRiskAssessment assess(LicenseRead read, PlotId plotId, Optional<ThinningFacts> thinning) {

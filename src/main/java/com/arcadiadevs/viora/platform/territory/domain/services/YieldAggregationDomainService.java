@@ -60,21 +60,22 @@ public final class YieldAggregationDomainService {
                 continue;
             }
             estimable++;
-            totals.add(plot.projectedKg());
-            if (plot.greenShare() == null) {
-                unclassified += plot.projectedKg();
-            } else {
-                green += plot.projectedKg() * plot.greenShare();
-                black += plot.projectedKg() * (1 - plot.greenShare());
-            }
+            var kilograms = plot.projectedKg();
+            var share = plot.greenShare();
+            var plotGreen = share == null ? 0.0 : kilograms * share;
+            var plotBlack = share == null ? 0.0 : kilograms * (1 - share);
+            var plotUnclassified = share == null ? kilograms : 0.0;
+            totals.add(kilograms, plotGreen, plotBlack, plotUnclassified);
+            green += plotGreen;
+            black += plotBlack;
+            unclassified += plotUnclassified;
         }
         var status = sampled == 0 ? IntakeStatus.NO_DATA
                 : sampled * 100.0 / plots.size() < PRELIMINARY_THRESHOLD_PERCENT ? IntakeStatus.PRELIMINARY
                 : IntakeStatus.SUFFICIENT;
         Double total = status == IntakeStatus.NO_DATA || estimable == 0 ? null : green + black + unclassified;
         var sectors = new ArrayList<SectorIntake>();
-        bySector.forEach((sector, totals) ->
-                sectors.add(new SectorIntake(sector, totals.plots, totals.sampled, totals.kilograms)));
+        bySector.forEach((sector, totals) -> sectors.add(totals.of(sector)));
         return new IntakeProjection(status, total, green, black, unclassified, plots.size(), sampled, estimable,
                 sectors);
     }
@@ -103,15 +104,14 @@ public final class YieldAggregationDomainService {
             }
             settled++;
             totals.sampled++;
-            totals.add(plot.greenKg() + plot.blackKg());
+            totals.add(plot.greenKg() + plot.blackKg(), plot.greenKg(), plot.blackKg(), 0.0);
             green += plot.greenKg();
             black += plot.blackKg();
         }
         var status = settled == 0 ? IntakeStatus.NO_DATA
                 : settled == plots.size() ? IntakeStatus.CLOSED : IntakeStatus.PARTIAL;
         var sectors = new ArrayList<SectorIntake>();
-        bySector.forEach((sector, totals) ->
-                sectors.add(new SectorIntake(sector, totals.plots, totals.sampled, totals.kilograms)));
+        bySector.forEach((sector, totals) -> sectors.add(totals.of(sector)));
         return new IntakeProjection(status, settled == 0 ? null : green + black, green, black, 0.0, plots.size(),
                 settled, settled, sectors);
     }
@@ -120,9 +120,24 @@ public final class YieldAggregationDomainService {
         private int plots;
         private int sampled;
         private Double kilograms;
+        private Double green;
+        private Double black;
+        private Double unclassified;
 
-        private void add(double value) {
-            kilograms = kilograms == null ? value : kilograms + value;
+        // The parts start together with the total, so a sector none of whose plots can tell has none of them.
+        private void add(double value, double greenPart, double blackPart, double unclassifiedPart) {
+            kilograms = plus(kilograms, value);
+            green = plus(green, greenPart);
+            black = plus(black, blackPart);
+            unclassified = plus(unclassified, unclassifiedPart);
+        }
+
+        private SectorIntake of(SectorPlacement sector) {
+            return new SectorIntake(sector, plots, sampled, kilograms, green, black, unclassified);
+        }
+
+        private static Double plus(Double total, double value) {
+            return total == null ? value : total + value;
         }
     }
 }

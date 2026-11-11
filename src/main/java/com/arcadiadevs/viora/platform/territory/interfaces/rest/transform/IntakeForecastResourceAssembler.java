@@ -24,7 +24,8 @@ public final class IntakeForecastResourceAssembler {
                 view.estimablePlots(), view.coveragePercent(), view.preliminaryThresholdPercent(),
                 view.sectors().stream()
                         .map(sector -> new SectorIntakeResource(sector.sectorZoneId(), sector.sectorZoneName(),
-                                sector.sectorStatus(), sector.plots(), sector.sampledPlots(), sector.tons()))
+                                sector.sectorStatus(), sector.plots(), sector.sampledPlots(), sector.tons(),
+                                sector.greenTons(), sector.blackTons(), sector.unclassifiedTons()))
                         .toList(),
                 view.evaluatedAt());
     }
