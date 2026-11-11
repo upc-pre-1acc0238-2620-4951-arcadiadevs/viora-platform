@@ -136,6 +136,8 @@ class IntakeRenewalExitIntegrationTest {
                 .andExpect(jsonPath("$.sectors.length()").value(2))
                 .andExpect(jsonPath("$.sectors[0].sectorZoneName").value("La Yarada Baja"))
                 .andExpect(jsonPath("$.sectors[0].plots").value(1))
+                .andExpect(jsonPath("$.sectors[0].greenTons").doesNotExist())
+                .andExpect(jsonPath("$.sectors[0].blackTons").doesNotExist())
                 .andExpect(jsonPath("$.sectors[1].sectorStatus").value("NONE"));
         mvc.perform(get(INTAKES + "/" + (current + 1))).andExpect(status().isNotFound());
         mvc.perform(get(INTAKES + "/1999")).andExpect(status().isBadRequest());
