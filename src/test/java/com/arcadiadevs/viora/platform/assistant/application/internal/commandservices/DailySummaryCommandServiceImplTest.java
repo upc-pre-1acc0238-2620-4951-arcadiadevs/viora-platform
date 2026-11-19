@@ -323,7 +323,7 @@ class DailySummaryCommandServiceImplTest {
     private static HomeFacts.PlotHome openPlot() {
         var plan = new ThinningPlanData(true, 30.0, 0.5714, 0.4, LocalDate.of(2026, 10, 20),
                 LocalDate.of(2026, 11, 10), 5, LocalDate.of(2026, 10, 29), null, null, null, null, null);
-        return new HomeFacts.PlotHome(plan, 0, List.of(), null, null, null, null);
+        return new HomeFacts.PlotHome(plan, 0, List.of(), null, null, null, null, null);
     }
 
     private static HomeFacts onePlot(HomeFacts.PlotHome plot) {

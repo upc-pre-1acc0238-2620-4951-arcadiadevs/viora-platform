@@ -28,29 +28,35 @@ final class HomeSamples {
 
     /** A plot with nothing read: no plan, alerts, harvests or forecast. */
     static PlotHome bare() {
-        return new PlotHome(null, 0, List.of(), null, null, null, null);
+        return new PlotHome(null, 0, List.of(), null, null, null, null, null);
+    }
+
+    /** The same plot with its name, as the Orchard context returns it. */
+    static PlotHome named(String name, PlotHome plot) {
+        return new PlotHome(plot.plan(), plot.treesNeeded(), plot.openAlerts(), plot.yields(), plot.bearingIndex(),
+                plot.bearingCategory(), plot.forecast(), name);
     }
 
     static PlotHome withPlan(ThinningPlanData plan, int treesNeeded) {
-        return new PlotHome(plan, treesNeeded, List.of(), null, null, null, null);
+        return new PlotHome(plan, treesNeeded, List.of(), null, null, null, null, null);
     }
 
     static PlotHome withAlerts(Incident... alerts) {
-        return new PlotHome(null, 0, List.of(alerts), null, null, null, null);
+        return new PlotHome(null, 0, List.of(alerts), null, null, null, null, null);
     }
 
     static PlotHome withForecast(Forecast forecast) {
-        return new PlotHome(null, 0, List.of(), null, null, null, forecast);
+        return new PlotHome(null, 0, List.of(), null, null, null, forecast, null);
     }
 
     static PlotHome withYields(SortedMap<Integer, Double> yields, Double bearingIndex, String category) {
-        return new PlotHome(null, 0, List.of(), yields, bearingIndex, category, null);
+        return new PlotHome(null, 0, List.of(), yields, bearingIndex, category, null, null);
     }
 
     /** Every figure, with the moderate index 0.5123. */
     static PlotHome full(ThinningPlanData plan, int treesNeeded, List<Incident> alerts,
                          SortedMap<Integer, Double> yields, Forecast forecast) {
-        return new PlotHome(plan, treesNeeded, alerts, yields, INDEX, MODERATE, forecast);
+        return new PlotHome(plan, treesNeeded, alerts, yields, INDEX, MODERATE, forecast, null);
     }
 
     /** Prescription issued: remove 30 %, window 20 Oct - 10 Nov (open today), 5 trees. */
