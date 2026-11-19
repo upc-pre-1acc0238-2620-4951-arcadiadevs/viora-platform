@@ -36,7 +36,9 @@ import java.util.TreeMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @DisplayName("HomeFactsReader: the figures of the home screen, through the Orchard, Thinning, Phenology and Telemetry "
@@ -120,7 +122,10 @@ class HomeFactsReaderTest {
 
         assertThat(facts.fieldScope()).isFalse();
         assertThat(facts.plots()).hasSize(1);
-        verifyNoInteractions(orchard);
+        assertThat(facts.plots().getFirst().name()).isEqualTo("La Yarada");
+        // Only the name of the plot asked is read; the producer's plots are not listed
+        verify(orchard).findPlotName(PLOT);
+        verifyNoMoreInteractions(orchard);
         assertThatThrownBy(() -> reader.read(null, 2026))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("assistant.plot.required");
     }
@@ -175,6 +180,7 @@ class HomeFactsReaderTest {
     }
 
     private void stubPlot(String plotId) {
+        when(orchard.findPlotName(plotId)).thenReturn(Optional.of("La Yarada"));
         when(thinning.findThinningPlanDetail(plotId, 2026)).thenReturn(Optional.of(new ThinningPlanDetail(true, 30.0,
                 0.5714, 0.4, LocalDate.of(2026, 10, 20), LocalDate.of(2026, 11, 10), 5, LocalDate.of(2026, 10, 29),
                 null, null, null, null, null)));

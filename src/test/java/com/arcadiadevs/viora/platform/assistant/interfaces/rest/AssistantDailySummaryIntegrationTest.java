@@ -123,7 +123,8 @@ class AssistantDailySummaryIntegrationTest {
                         + "cierra el ")))
                 .andExpect(jsonPath("$.facts", hasSize(3)))
                 .andExpect(jsonPath("$.facts[0].value").value("12"))
-                .andExpect(jsonPath("$.facts[0].label").value("días de ventana"))
+                // A field of two plots names the plot whose window the card counts
+                .andExpect(jsonPath("$.facts[0].label", startsWith("días de ventana en Cuartel ")))
                 .andExpect(jsonPath("$.facts[0].pill", startsWith("cierra el ")))
                 .andExpect(jsonPath("$.facts[0].tone").value("PRIMARY"))
                 .andExpect(jsonPath("$.facts[1].value").value("35,1 °C"))
@@ -148,7 +149,7 @@ class AssistantDailySummaryIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summaryId").value(not(id)))
                 .andExpect(jsonPath("$.text", startsWith("On 1 of your 2 plots the thinning window is open")))
-                .andExpect(jsonPath("$.facts[0].label").value("days of window left"))
+                .andExpect(jsonPath("$.facts[0].label", startsWith("days of window left in Cuartel ")))
                 .andExpect(jsonPath("$.facts[0].pill", startsWith("closes ")))
                 .andExpect(jsonPath("$.facts[1].label").value("week maximum"));
         assertThat(rows()).isEqualTo(2);

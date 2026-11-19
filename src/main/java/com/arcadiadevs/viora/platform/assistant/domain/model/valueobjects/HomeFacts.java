@@ -163,6 +163,7 @@ public record HomeFacts(
      * @param bearingIndex    latest Biennial Bearing Index; null while it cannot be calculated yet
      * @param bearingCategory alternation band of that index
      * @param forecast        the seven-day forecast; null when unavailable
+     * @param name            the plot's name, to tell the plots of a field apart; null when unknown
      */
     public record PlotHome(
             ThinningPlanData plan,
@@ -171,7 +172,8 @@ public record HomeFacts(
             SortedMap<Integer, Double> yields,
             Double bearingIndex,
             String bearingCategory,
-            ClimateData.Forecast forecast
+            ClimateData.Forecast forecast,
+            String name
     ) {
 
         public PlotHome {
@@ -189,7 +191,7 @@ public record HomeFacts(
                     + ";" + yields.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue())
                     .collect(Collectors.joining(","))
                     + ";" + bearingIndex + ";" + bearingCategory + ";"
-                    + (forecast == null ? null : forecast.canonical());
+                    + (forecast == null ? null : forecast.canonical()) + ";" + name;
         }
     }
 }

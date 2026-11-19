@@ -24,6 +24,7 @@ import static com.arcadiadevs.viora.platform.assistant.domain.services.ClimateSa
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.bare;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.field;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.full;
+import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.named;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.onePlot;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.openPlan;
 import static com.arcadiadevs.viora.platform.assistant.domain.services.HomeSamples.plan;
@@ -77,6 +78,30 @@ class DailySummaryTextsTest {
         assertThat(summary.facts().get(0)).isEqualTo(
                 new AnswerFact("12", "days of window left", "closes Nov 10", FactTone.PRIMARY));
         assertThat(summary.text()).isEqualTo(weekPlan(facts, EN).text());
+    }
+
+    @Test
+    @DisplayName("field of several plots: the window card names the plot whose window it counts (es and en)")
+    void fieldWindowNamesItsPlot() {
+        var open = field(named("La Yarada", withPlan(plan(TODAY.minusDays(5), TODAY.plusDays(21)), 0)),
+                named("Cuartel San Jerónimo", bare()));
+
+        assertThat(summary(open, ES).facts().get(0)).isEqualTo(
+                new AnswerFact("22", "días de ventana en La Yarada", "cierra el 20 nov", FactTone.PRIMARY));
+        assertThat(summary(open, EN).facts().get(0)).isEqualTo(
+                new AnswerFact("22", "days of window left in La Yarada", "closes Nov 20", FactTone.PRIMARY));
+
+        var opening = field(named("Magollo", withPlan(plan(TODAY.plusDays(3), TODAY.plusDays(20)), 0)), bare());
+        assertThat(summary(opening, ES).facts().get(0)).isEqualTo(
+                new AnswerFact("3", "días para abrir en Magollo", "abre el 2 nov", FactTone.PRIMARY));
+    }
+
+    @Test
+    @DisplayName("a single plot does not repeat its own name on the window card")
+    void singlePlotWindowKeepsTheShortLabel() {
+        var facts = onePlot(named("La Yarada", withPlan(openPlan(), 0)));
+
+        assertThat(summary(facts, ES).facts().get(0).label()).isEqualTo("días de ventana");
     }
 
     @Test
