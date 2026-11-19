@@ -96,6 +96,7 @@ public class HomeFactsReader implements ScreenFactsReader {
                 externalPhenologyService.findHistoricalYields(plotId),
                 bearing.map(PlotBearingIndex::value).orElse(null),
                 bearing.map(PlotBearingIndex::category).orElse(null),
-                externalTelemetryService.findForecast(plotId).orElse(null));
+                externalTelemetryService.findForecast(plotId).orElse(null),
+                externalOrchardService.findPlotName(plotId).orElse(null));
     }
 }

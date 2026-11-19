@@ -1,11 +1,13 @@
 package com.arcadiadevs.viora.platform.assistant.domain.services;
 
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.CatalogText;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.DailySummaryDraft;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactDraft;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.FactTone;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.HomeFacts;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.QuestionId;
 import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.TextDate;
+import com.arcadiadevs.viora.platform.assistant.domain.model.valueobjects.ThinningPlanData;
 
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -43,17 +45,33 @@ public final class DailySummaryTexts {
             var closesOn = open.getFirst().windowClosesOn();
             // Today included, as the other window answers count it
             long daysLeft = ChronoUnit.DAYS.between(today, closesOn) + 1;
-            return new FactDraft(shared("value.integer", daysLeft), shared("card.days_left.label", daysLeft),
-                    shared("card.closes.pill", TextDate.shortOf(closesOn)), FactTone.PRIMARY);
+            return new FactDraft(shared("value.integer", daysLeft), label(facts, open.getFirst(), "card.days_left",
+                    daysLeft), shared("card.closes.pill", TextDate.shortOf(closesOn)), FactTone.PRIMARY);
         }
         var opening = HomeQuestions.windowsOpeningThisWeek(facts);
         if (!opening.isEmpty()) {
             var opensOn = opening.getFirst().windowOpensOn();
             long daysUntilOpen = ChronoUnit.DAYS.between(today, opensOn);
-            return new FactDraft(shared("value.integer", daysUntilOpen), shared("card.days_to_open.label",
-                    daysUntilOpen), shared("card.opens.pill", TextDate.shortOf(opensOn)), FactTone.PRIMARY);
+            return new FactDraft(shared("value.integer", daysUntilOpen), label(facts, opening.getFirst(),
+                    "card.days_to_open", daysUntilOpen), shared("card.opens.pill", TextDate.shortOf(opensOn)),
+                    FactTone.PRIMARY);
         }
         return new FactDraft(shared("card.no_window.value"), shared("card.window.label"),
                 shared("card.next_days.pill"), FactTone.PRIMARY);
+    }
+
+    /**
+     * The label of the window card. In a field of several plots it names the plot whose window it counts, so the
+     * figure is not read as the window of the plot the home screen is showing ("22 días de ventana en La Yarada").
+     */
+    private static CatalogText label(HomeFacts facts, ThinningPlanData plan, String key, long days) {
+        if (facts.singlePlot()) {
+            return shared(key + ".label", days);
+        }
+        return facts.plots().stream()
+                .filter(plot -> plot.plan() == plan && plot.name() != null && !plot.name().isBlank())
+                .findFirst()
+                .map(plot -> shared(key + ".plot.label", days, plot.name()))
+                .orElseGet(() -> shared(key + ".label", days));
     }
 }

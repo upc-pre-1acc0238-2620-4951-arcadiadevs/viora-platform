@@ -65,6 +65,19 @@ public class ExternalOrchardService {
     }
 
     /**
+     * Resolves the name of an active plot, for the texts that tell the plots of a field apart.
+     *
+     * @param plotId the plot
+     * @return its name, or empty when the plot is unknown or not active
+     */
+    public Optional<String> findPlotName(PlotId plotId) {
+        if (plotId == null) {
+            return Optional.empty();
+        }
+        return orchardContextFacade.findPlotName(plotId.plotId());
+    }
+
+    /**
      * Lists the producers that own at least one active plot, for the daily summary job. It reads every active plot
      * and its owner, one lookup per plot; a plot without a producer is skipped.
      *
