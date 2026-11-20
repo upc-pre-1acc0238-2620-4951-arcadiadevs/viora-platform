@@ -129,10 +129,11 @@ public class HarvestSettlementCommandServiceImpl implements HarvestSettlementCom
             var weighedOn = WeighingDate.of(command.weighedOn(), clock);
             var green = new OliveWeight(command.greenOlivesKg());
             var black = new OliveWeight(command.blackOlivesKg());
+            var discard = new OliveWeight(command.discardOlivesKg() == null ? 0.0 : command.discardOlivesKg());
             var millTicketNumber = MillTicketNumber.of(command.millTicketNumber());
-            HarvestSettlement.validateFigures(green, black, command.commercialFruitsPerKg(), command.notes());
+            HarvestSettlement.validateFigures(green, black, discard, command.commercialFruitsPerKg(), command.notes());
             var receiptNumber = nextReceiptNumber(owner.get(), campaignYear);
-            settlement = report.settleCampaign(campaignYear, green, black, command.commercialFruitsPerKg(),
+            settlement = report.settleCampaign(campaignYear, green, black, discard, command.commercialFruitsPerKg(),
                     command.notes(), balance, history, receiptNumber, weighedOn, millTicketNumber, idempotencyKey,
                     clock);
         } catch (IllegalArgumentException exception) {

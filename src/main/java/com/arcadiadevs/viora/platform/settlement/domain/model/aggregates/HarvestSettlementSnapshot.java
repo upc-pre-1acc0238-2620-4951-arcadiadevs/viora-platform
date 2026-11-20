@@ -17,7 +17,8 @@ import java.time.Instant;
  * @param campaignYear          settled campaign
  * @param greenOlivesWeight     green olives delivered
  * @param blackOlivesWeight     black olives delivered
- * @param totalHarvestWeight    green plus black
+ * @param discardOlivesWeight   discarded olives (aceituna de descarte); zero when there were none
+ * @param totalHarvestWeight    green plus black plus discard
  * @param commercialFruitsPerKg optional caliber of the delivered table olives (fruits per kilogram)
  * @param notes                 optional settlement notes
  * @param status                settlement status
@@ -36,6 +37,7 @@ public record HarvestSettlementSnapshot(
         CampaignYear campaignYear,
         OliveWeight greenOlivesWeight,
         OliveWeight blackOlivesWeight,
+        OliveWeight discardOlivesWeight,
         OliveWeight totalHarvestWeight,
         Double commercialFruitsPerKg,
         String notes,

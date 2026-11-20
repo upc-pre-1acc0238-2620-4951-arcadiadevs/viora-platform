@@ -16,6 +16,7 @@ public record CampaignHarvestSettledEvent(
         Integer campaignYear,
         Double greenOlivesKg,
         Double blackOlivesKg,
+        Double discardOlivesKg,
         Double totalYieldKg,
         Double commercialFruitsPerKg,
         Instant occurredOn

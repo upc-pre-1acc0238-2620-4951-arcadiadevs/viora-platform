@@ -39,7 +39,7 @@ public class HarvestSettlementResourceFromEntityAssembler {
         return new HarvestSettlementResource(settlement.id().settlementId(), settlement.reportId().reportId(),
                 settlement.plotId().plotId(), settlement.campaignYear().value(),
                 settlement.greenOlivesWeight().kilograms(), settlement.blackOlivesWeight().kilograms(),
-                settlement.totalHarvestWeight().kilograms(), settlement.commercialFruitsPerKg(), settlement.notes(),
+                settlement.discardOlivesWeight().kilograms(), settlement.totalHarvestWeight().kilograms(), settlement.commercialFruitsPerKg(), settlement.notes(),
                 settlement.status().name(), settlement.settledAt(),
                 toResource(settlement.thinningBalance()), toResource(settlement.trendCurve()),
                 settlement.receiptNumber() == null ? null : settlement.receiptNumber().value(),
