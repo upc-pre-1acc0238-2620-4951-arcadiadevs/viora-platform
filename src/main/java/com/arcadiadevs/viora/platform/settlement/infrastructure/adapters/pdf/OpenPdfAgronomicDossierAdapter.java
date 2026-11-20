@@ -145,6 +145,9 @@ public class OpenPdfAgronomicDossierAdapter implements AgronomicDossierPdfGenera
         var table = table();
         row(table, fonts, "Green olives (kg)", number(settlement.greenOlivesWeight().kilograms(), 2));
         row(table, fonts, "Black olives (kg)", number(settlement.blackOlivesWeight().kilograms(), 2));
+        if (settlement.discardOlivesWeight().kilograms() > 0.0) {
+            row(table, fonts, "Discarded olives (kg)", number(settlement.discardOlivesWeight().kilograms(), 2));
+        }
         row(table, fonts, "Total harvest (kg)", number(settlement.totalHarvestWeight().kilograms(), 2));
         row(table, fonts, "Commercial caliber (fruits/kg)", settlement.commercialFruitsPerKg() == null
                 ? NOT_RECORDED : number(settlement.commercialFruitsPerKg(), 2));

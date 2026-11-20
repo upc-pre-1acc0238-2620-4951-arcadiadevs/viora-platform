@@ -77,6 +77,7 @@ public final class AgronomicReportPersistenceAssembler {
         entity.setCampaignYear(snapshot.campaignYear().value());
         entity.setGreenOlivesKg(snapshot.greenOlivesWeight().kilograms());
         entity.setBlackOlivesKg(snapshot.blackOlivesWeight().kilograms());
+        entity.setDiscardOlivesKg(snapshot.discardOlivesWeight().kilograms());
         entity.setTotalYieldKg(snapshot.totalHarvestWeight().kilograms());
         entity.setCommercialFruitsPerKg(snapshot.commercialFruitsPerKg());
         entity.setNotes(snapshot.notes());
@@ -131,7 +132,9 @@ public final class AgronomicReportPersistenceAssembler {
         var campaignYear = new CampaignYear(entity.getCampaignYear());
         return new HarvestSettlementSnapshot(new SettlementId(entity.getId().toString()), reportId, plotId,
                 campaignYear, new OliveWeight(entity.getGreenOlivesKg()),
-                new OliveWeight(entity.getBlackOlivesKg()), new OliveWeight(entity.getTotalYieldKg()),
+                new OliveWeight(entity.getBlackOlivesKg()),
+                new OliveWeight(entity.getDiscardOlivesKg() == null ? 0.0 : entity.getDiscardOlivesKg()),
+                new OliveWeight(entity.getTotalYieldKg()),
                 entity.getCommercialFruitsPerKg(), entity.getNotes(), SettlementStatus.valueOf(entity.getStatus()),
                 entity.getSettledAt(), balance, curve, toReceiptNumber(entity, campaignYear),
                 toWeighingDate(entity), MillTicketNumber.of(entity.getMillTicketNumber()),

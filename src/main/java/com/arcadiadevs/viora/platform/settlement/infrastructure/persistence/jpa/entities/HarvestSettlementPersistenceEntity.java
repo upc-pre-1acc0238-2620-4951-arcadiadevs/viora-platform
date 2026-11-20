@@ -61,6 +61,12 @@ public class HarvestSettlementPersistenceEntity {
     private Double greenOlivesKg;
     @Column(nullable = false, updatable = false)
     private Double blackOlivesKg;
+    /**
+     * Discarded olives (aceituna de descarte). Nullable because {@code ddl-auto=update} cannot add a NOT NULL
+     * column to a table that already holds rows; null on rows that predate it and read back as zero.
+     */
+    @Column(name = "discard_olives_kg", updatable = false)
+    private Double discardOlivesKg;
     @Column(nullable = false, updatable = false)
     private Double totalYieldKg;
     @Column(updatable = false)
