@@ -19,10 +19,20 @@ import java.time.LocalDate;
  *                              {@link WeighingDate#of(LocalDate, java.time.Clock)}, which owns that rule
  * @param millTicketNumber      optional ticket number of the receiving mill, trimmed; blank becomes absent
  * @param idempotencyKey        optional key making the settlement replayable, trimmed; blank becomes absent
+ * @param discardOlivesKg       optional discarded olives, kilograms; absent counts as 0
  */
 public record SettleCampaignHarvestCommand(String plotId, String actorId, Integer campaignYear,
         Double greenOlivesKg, Double blackOlivesKg, Double commercialFruitsPerKg, String notes,
-        LocalDate weighedOn, String millTicketNumber, String idempotencyKey) {
+        LocalDate weighedOn, String millTicketNumber, String idempotencyKey, Double discardOlivesKg) {
+
+    /** Settlement without discarded olives, as before the discard was recorded. */
+    public SettleCampaignHarvestCommand(String plotId, String actorId, Integer campaignYear, Double greenOlivesKg,
+            Double blackOlivesKg, Double commercialFruitsPerKg, String notes, LocalDate weighedOn,
+            String millTicketNumber, String idempotencyKey) {
+        this(plotId, actorId, campaignYear, greenOlivesKg, blackOlivesKg, commercialFruitsPerKg, notes, weighedOn,
+                millTicketNumber, idempotencyKey, null);
+    }
+
 
     /**
      * Validates the instruction and normalises the two optional identifiers, so a header or body value that is too
@@ -38,7 +48,7 @@ public record SettleCampaignHarvestCommand(String plotId, String actorId, Intege
         actorId = new UserId(actorId).userId();
         new CampaignYear(campaignYear);
         HarvestSettlement.validateFigures(new OliveWeight(greenOlivesKg), new OliveWeight(blackOlivesKg),
-                commercialFruitsPerKg, notes);
+                new OliveWeight(discardOlivesKg == null ? 0.0 : discardOlivesKg), commercialFruitsPerKg, notes);
         millTicketNumber = MillTicketNumber.of(millTicketNumber).value();
         idempotencyKey = IdempotencyKey.of(idempotencyKey).value();
     }

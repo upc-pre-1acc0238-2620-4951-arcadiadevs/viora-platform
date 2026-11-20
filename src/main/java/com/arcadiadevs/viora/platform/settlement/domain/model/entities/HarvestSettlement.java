@@ -27,10 +27,22 @@ public final class HarvestSettlement {
      * @return green plus black, strictly positive
      */
     public static OliveWeight calculateTotalWeight(OliveWeight green, OliveWeight black) {
-        if (green == null || black == null) {
+        return calculateTotalWeight(green, black, new OliveWeight(0.0));
+    }
+
+    /**
+     * Validates the weights of a campaign, discarded olives included, and returns their total.
+     *
+     * @param green   green olives delivered
+     * @param black   black olives delivered
+     * @param discard discarded olives (aceituna de descarte); counts toward the total
+     * @return green plus black plus discard, strictly positive
+     */
+    public static OliveWeight calculateTotalWeight(OliveWeight green, OliveWeight black, OliveWeight discard) {
+        if (green == null || black == null || discard == null) {
             throw new IllegalArgumentException("settlement.weight.invalid");
         }
-        var total = green.plus(black);
+        var total = green.plus(black).plus(discard);
         if (total.kilograms() <= 0.0) {
             throw new IllegalArgumentException("settlement.weight.total.not_positive");
         }
@@ -54,6 +66,22 @@ public final class HarvestSettlement {
      */
     public static OliveWeight validateFigures(OliveWeight green, OliveWeight black, Double commercialFruitsPerKg,
             String notes) {
+        return validateFigures(green, black, new OliveWeight(0.0), commercialFruitsPerKg, notes);
+    }
+
+    /**
+     * Same checks as {@link #validateFigures(OliveWeight, OliveWeight, Double, String)} with the discarded olives
+     * (aceituna de descarte) counted in the total.
+     *
+     * @param green                 green olives delivered
+     * @param black                 black olives delivered
+     * @param discard               discarded olives
+     * @param commercialFruitsPerKg optional caliber of the delivered olives
+     * @param notes                 optional notes
+     * @return the strictly positive total weight
+     */
+    public static OliveWeight validateFigures(OliveWeight green, OliveWeight black, OliveWeight discard,
+            Double commercialFruitsPerKg, String notes) {
         if (commercialFruitsPerKg != null
                 && (!Double.isFinite(commercialFruitsPerKg) || commercialFruitsPerKg <= 0.0
                         || commercialFruitsPerKg > MAX_COMMERCIAL_FRUITS_PER_KG)) {
@@ -62,7 +90,7 @@ public final class HarvestSettlement {
         if (notes != null && notes.length() > MAX_NOTES_LENGTH) {
             throw new IllegalArgumentException("settlement.notes.too_long");
         }
-        return calculateTotalWeight(green, black);
+        return calculateTotalWeight(green, black, discard);
     }
 
     /**
@@ -73,6 +101,7 @@ public final class HarvestSettlement {
      * @param campaignYear         settled campaign
      * @param green                green olives delivered
      * @param black                black olives delivered
+     * @param discard              discarded olives, counted in the total
      * @param commercialFruitsPerKg optional caliber of the delivered olives
      * @param notes                optional notes
      * @param receiptNumber        official receipt number allocated to this settlement
@@ -87,7 +116,7 @@ public final class HarvestSettlement {
      *                                  or if the weights do not add up to a positive total
      */
     public static HarvestSettlement create(ReportId reportId, PlotId plotId, CampaignYear campaignYear,
-            OliveWeight green, OliveWeight black, Double commercialFruitsPerKg, String notes,
+            OliveWeight green, OliveWeight black, OliveWeight discard, Double commercialFruitsPerKg, String notes,
             ReceiptNumber receiptNumber, WeighingDate weighedOn, MillTicketNumber millTicketNumber,
             IdempotencyKey idempotencyKey, ThinningBalance thinningBalance, StabilizationTrendCurve trendCurve,
             Instant settledAt) {
@@ -95,9 +124,9 @@ public final class HarvestSettlement {
                 || trendCurve == null || settledAt == null || receiptNumber == null || weighedOn == null) {
             throw new IllegalArgumentException("settlement.reference.null");
         }
-        var total = validateFigures(green, black, commercialFruitsPerKg, notes);
+        var total = validateFigures(green, black, discard, commercialFruitsPerKg, notes);
         return new HarvestSettlement(new HarvestSettlementSnapshot(new SettlementId(), reportId, plotId,
-                campaignYear, green, black, total, commercialFruitsPerKg, notes, SettlementStatus.SETTLED,
+                campaignYear, green, black, discard, total, commercialFruitsPerKg, notes, SettlementStatus.SETTLED,
                 settledAt, thinningBalance, trendCurve, receiptNumber, weighedOn, millTicketNumber,
                 idempotencyKey));
     }

@@ -102,26 +102,41 @@ public class AgronomicReport extends AbstractDomainAggregateRoot<AgronomicReport
             Double commercialFruitsPerKg, String notes, ThinningBalance thinningBalance,
             SortedMap<Integer, Double> historicalYields, ReceiptNumber receiptNumber, WeighingDate weighedOn,
             MillTicketNumber millTicketNumber, IdempotencyKey idempotencyKey, Clock clock) {
+        return settleCampaign(campaignYear, green, black, new OliveWeight(0.0), commercialFruitsPerKg, notes,
+                thinningBalance, historicalYields, receiptNumber, weighedOn, millTicketNumber, idempotencyKey, clock);
+    }
+
+    /**
+     * Settles a campaign recording the discarded olives too; the discard counts toward the total harvest.
+     *
+     * @param discard discarded olives (aceituna de descarte), zero when there were none
+     * @see #settleCampaign(CampaignYear, OliveWeight, OliveWeight, Double, String, ThinningBalance, SortedMap,
+     *      ReceiptNumber, WeighingDate, MillTicketNumber, IdempotencyKey, Clock)
+     */
+    public HarvestSettlementSnapshot settleCampaign(CampaignYear campaignYear, OliveWeight green, OliveWeight black,
+            OliveWeight discard, Double commercialFruitsPerKg, String notes, ThinningBalance thinningBalance,
+            SortedMap<Integer, Double> historicalYields, ReceiptNumber receiptNumber, WeighingDate weighedOn,
+            MillTicketNumber millTicketNumber, IdempotencyKey idempotencyKey, Clock clock) {
         if (campaignYear == null) {
             throw new IllegalArgumentException("settlement.campaign_year.null");
         }
         if (settlementOf(campaignYear).isPresent()) {
             throw new IllegalStateException(CAMPAIGN_ALREADY_SETTLED);
         }
-        var total = HarvestSettlement.calculateTotalWeight(green, black);
+        var total = HarvestSettlement.calculateTotalWeight(green, black, discard);
 
         SortedMap<Integer, Double> settledYields = new TreeMap<>();
         settlements.forEach(s -> settledYields.put(s.campaignYear().value(), s.totalHarvestWeight().kilograms()));
         settledYields.put(campaignYear.value(), total.kilograms());
         var curve = StabilizationCurveCalculatorService.computeCurve(historicalYields, settledYields);
 
-        var settlement = HarvestSettlement.create(id, plotId, campaignYear, green, black, commercialFruitsPerKg,
+        var settlement = HarvestSettlement.create(id, plotId, campaignYear, green, black, discard, commercialFruitsPerKg,
                 notes, receiptNumber, weighedOn, millTicketNumber, idempotencyKey, thinningBalance, curve,
                 clock.instant()).snapshot();
         settlements.add(settlement);
         registerDomainEvent(new CampaignHarvestSettledEvent(UUID.randomUUID().toString(), id.reportId(),
                 settlement.id().settlementId(), plotId.plotId(), campaignYear.value(),
-                green.kilograms(), black.kilograms(), total.kilograms(), commercialFruitsPerKg,
+                green.kilograms(), black.kilograms(), discard.kilograms(), total.kilograms(), commercialFruitsPerKg,
                 settlement.settledAt()));
         return settlement;
     }
