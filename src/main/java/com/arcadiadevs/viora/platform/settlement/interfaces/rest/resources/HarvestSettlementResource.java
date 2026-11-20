@@ -14,6 +14,8 @@ public record HarvestSettlementResource(
         Integer campaignYear,
         Double greenOlivesKg,
         Double blackOlivesKg,
+        @Schema(description = "Discarded olives (aceituna de descarte), kg; 0 when there were none. Counted in "
+                + "totalYieldKg.", example = "350.0") Double discardOlivesKg,
         Double totalYieldKg,
         @Schema(nullable = true) Double commercialFruitsPerKg,
         @Schema(nullable = true) String notes,

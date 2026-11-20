@@ -25,6 +25,6 @@ public final class SettleCampaignHarvestCommandFromResourceAssembler {
             SettleHarvestResource resource) {
         return new SettleCampaignHarvestCommand(plotId, actorId, resource.campaignYear(), resource.greenOlivesKg(),
                 resource.blackOlivesKg(), resource.commercialFruitsPerKg(), resource.notes(),
-                resource.weighedOn(), resource.millTicketNumber(), idempotencyKey);
+                resource.weighedOn(), resource.millTicketNumber(), idempotencyKey, resource.discardOlivesKg());
     }
 }

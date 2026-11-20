@@ -33,5 +33,9 @@ public record SettleHarvestResource(
         @Schema(description = "Optional ticket number of the mill that received the olives, up to 30 characters "
                 + "once trimmed. It is the weighbridge ticket the mill prints on delivery.", example = "MT-88213",
                 maxLength = 30, nullable = true)
-        String millTicketNumber) {
+        String millTicketNumber,
+        @PositiveOrZero(message = "{settlement.weight.invalid}")
+        @Schema(description = "Optional discarded olives (aceituna de descarte), kg. It counts toward the total "
+                + "harvest but not toward the green / black split. Absent is the same as 0.",
+                example = "350.0", nullable = true) Double discardOlivesKg) {
 }
