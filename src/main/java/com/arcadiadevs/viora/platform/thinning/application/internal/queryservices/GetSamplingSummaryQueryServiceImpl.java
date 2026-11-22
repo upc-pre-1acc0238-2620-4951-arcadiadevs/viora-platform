@@ -114,7 +114,8 @@ public class GetSamplingSummaryQueryServiceImpl implements GetSamplingSummaryQue
                 totalFruits,
                 meanFruitsPerShoot,
                 representative,
-                treesNeeded
+                treesNeeded,
+                SamplingCoverageEvaluator.latestFruitsPerKgFromSnapshots(rounds)
         );
     }
 

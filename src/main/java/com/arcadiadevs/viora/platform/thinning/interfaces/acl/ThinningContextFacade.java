@@ -195,8 +195,9 @@ public interface ThinningContextFacade {
      * @param thinned            whether the producer registered the thinning
      * @param kgPerHaAfterThinning the yield estimated with the load the thinning left; null unless thinned and
      *                           available
+     * @param fruitsPerKg          the caliber of the latest round that weighed fruits; null when none did
      */
     record YieldOutlook(boolean sampled, String estimateStatus, Double kgPerHaWithLoad, boolean thinned,
-                        Double kgPerHaAfterThinning) {
+                        Double kgPerHaAfterThinning, Double fruitsPerKg) {
     }
 }

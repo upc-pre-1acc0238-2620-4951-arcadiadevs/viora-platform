@@ -10,14 +10,24 @@ import java.util.List;
  * @param campaignYear  the agricultural campaign year
  * @param clientBatchId the client-side idempotency batch identifier
  * @param samples       the list of tree evaluations
+ * @param fruitSample   the fruits weighed in the round to know their caliber; null when none were weighed
  */
 public record IngestFieldSamplingsBatchCommand(
         String plotId,
         String actorId,
         Integer campaignYear,
         String clientBatchId,
-        List<TreeSampleItem> samples
+        List<TreeSampleItem> samples,
+        FruitSampleItem fruitSample
 ) {
+
+    /**
+     * Constructor for a round that weighed no fruits.
+     */
+    public IngestFieldSamplingsBatchCommand(String plotId, String actorId, Integer campaignYear, String clientBatchId,
+                                            List<TreeSampleItem> samples) {
+        this(plotId, actorId, campaignYear, clientBatchId, samples, null);
+    }
 
     /**
      * Compact constructor validating strictly non-null arguments.

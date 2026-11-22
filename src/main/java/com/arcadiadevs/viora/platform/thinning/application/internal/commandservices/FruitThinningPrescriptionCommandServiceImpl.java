@@ -13,6 +13,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.commands.IngestField
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.TreeSampleItem;
 import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplingRecord;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.FruitSample;
 import com.arcadiadevs.viora.platform.thinning.domain.repositories.FruitThinningPrescriptionRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -88,6 +89,13 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
         } catch (IllegalArgumentException e) {
             return Result.failure(ApplicationError.validationError("samples", e.getMessage()));
         }
+        final FruitSample fruitSample;
+        try {
+            fruitSample = command.fruitSample() == null ? null
+                    : new FruitSample(command.fruitSample().fruitCount(), command.fruitSample().weightGrams());
+        } catch (IllegalArgumentException e) {
+            return Result.failure(ApplicationError.validationError("fruitSample", e.getMessage()));
+        }
 
         // 3. Retrieve or create prescription aggregate for plot and campaign
         Optional<FruitThinningPrescription> existingPrescription =
@@ -100,7 +108,7 @@ public class FruitThinningPrescriptionCommandServiceImpl implements FruitThinnin
         // 4. Ingest sampling batch into aggregate (handles deduplication and idempotency)
         try {
             SamplingBatchId batchId = new SamplingBatchId(command.clientBatchId());
-            prescription.ingestSamplingsBatch(actorId, batchId, domainRecords);
+            prescription.ingestSamplingsBatch(actorId, batchId, domainRecords, fruitSample);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return Result.failure(ApplicationError.conflict("SamplingRound", e.getMessage()));
         }

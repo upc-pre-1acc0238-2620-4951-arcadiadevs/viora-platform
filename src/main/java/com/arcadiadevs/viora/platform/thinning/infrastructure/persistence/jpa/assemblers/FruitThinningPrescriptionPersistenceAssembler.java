@@ -5,6 +5,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.FruitThin
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.SamplingRoundSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.TreeSamplingRecordSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.FruitSample;
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.FruitThinningPrescriptionPersistenceEntity;
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.SamplingRoundPersistenceEntity;
 import com.arcadiadevs.viora.platform.thinning.infrastructure.persistence.jpa.entities.TreeSamplingRecordPersistenceEntity;
@@ -63,6 +64,10 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
             roundEntity.setClientBatchId(roundSnap.batchId().batchId());
             roundEntity.setIsRepresentative(roundSnap.isRepresentative());
             roundEntity.setCreatedAt(roundSnap.createdAt());
+            roundEntity.setFruitSampleCount(
+                    roundSnap.fruitSample() == null ? null : roundSnap.fruitSample().fruitCount());
+            roundEntity.setFruitSampleWeightGrams(
+                    roundSnap.fruitSample() == null ? null : roundSnap.fruitSample().weightGrams());
 
             var recordEntities = new ArrayList<TreeSamplingRecordPersistenceEntity>();
             for (var recordSnap : roundSnap.samplingRecords()) {
@@ -124,6 +129,10 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                 roundEntity.setClientBatchId(roundSnap.batchId().batchId());
                 roundEntity.setIsRepresentative(roundSnap.isRepresentative());
                 roundEntity.setCreatedAt(roundSnap.createdAt());
+                roundEntity.setFruitSampleCount(
+                        roundSnap.fruitSample() == null ? null : roundSnap.fruitSample().fruitCount());
+                roundEntity.setFruitSampleWeightGrams(
+                        roundSnap.fruitSample() == null ? null : roundSnap.fruitSample().weightGrams());
 
                 var recordEntities = new ArrayList<TreeSamplingRecordPersistenceEntity>();
                 for (var recordSnap : roundSnap.samplingRecords()) {
@@ -177,7 +186,10 @@ public final class FruitThinningPrescriptionPersistenceAssembler {
                         new SamplingBatchId(roundEntity.getClientBatchId()),
                         roundEntity.getIsRepresentative(),
                         recordSnapshots,
-                        roundEntity.getCreatedAt()
+                        roundEntity.getCreatedAt(),
+                        roundEntity.getFruitSampleCount() == null ? null
+                                : new FruitSample(roundEntity.getFruitSampleCount(),
+                                roundEntity.getFruitSampleWeightGrams())
                 ));
             }
         }
