@@ -208,7 +208,8 @@ public class ThinningContextFacadeImpl implements ThinningContextFacade {
             return new YieldOutlook(outlook.sampledTrees() > 0,
                     estimate == null ? null : estimate.status().name(),
                     withLoad == null ? null : withLoad.estimatedKgPerHa(), thinned,
-                    after == null ? null : after.estimatedKgPerHa());
+                    after == null ? null : after.estimatedKgPerHa(),
+                    SamplingCoverageEvaluator.latestFruitsPerKgFromSnapshots(snapshot.samplingRounds()));
         });
     }
 }

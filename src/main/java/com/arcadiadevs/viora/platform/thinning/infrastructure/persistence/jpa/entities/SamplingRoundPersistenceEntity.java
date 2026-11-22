@@ -47,6 +47,12 @@ public class SamplingRoundPersistenceEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "fruit_sample_count")
+    private Integer fruitSampleCount;
+
+    @Column(name = "fruit_sample_weight_grams")
+    private Double fruitSampleWeightGrams;
+
     public SamplingRoundPersistenceEntity() {
     }
 
@@ -119,5 +125,21 @@ public class SamplingRoundPersistenceEntity {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getFruitSampleCount() {
+        return fruitSampleCount;
+    }
+
+    public void setFruitSampleCount(Integer fruitSampleCount) {
+        this.fruitSampleCount = fruitSampleCount;
+    }
+
+    public Double getFruitSampleWeightGrams() {
+        return fruitSampleWeightGrams;
+    }
+
+    public void setFruitSampleWeightGrams(Double fruitSampleWeightGrams) {
+        this.fruitSampleWeightGrams = fruitSampleWeightGrams;
     }
 }

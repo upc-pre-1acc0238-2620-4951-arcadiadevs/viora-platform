@@ -133,7 +133,7 @@ class RoleAccessIntegrationTest {
         var producer = "Bearer " + tokenOf(accountOf(UserRole.ROLE_PRODUCER));
 
         for (var path : new String[]{"/api/v1/cooperative-members", "/api/v1/member-plots", "/api/v1/sector-alerts",
-                "/api/v1/intake-forecasts"}) {
+                "/api/v1/intake-forecasts", "/api/v1/caliber-ranges"}) {
             mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, producer))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("USER_FORBIDDEN"));

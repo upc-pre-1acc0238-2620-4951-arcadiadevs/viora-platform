@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -61,6 +62,11 @@ public record SubmitSamplingResource(
                 schema = @Schema(implementation = TreeSampleResourceItem.class),
                 arraySchema = @Schema(description = "List of evaluated tree observations (minimum 5 for statistical representativeness)", requiredMode = Schema.RequiredMode.REQUIRED)
         )
-        List<@Valid TreeSampleResourceItem> samples
+        List<@Valid TreeSampleResourceItem> samples,
+
+        @Valid
+        @Schema(description = "Fruits weighed in the round to estimate their caliber (optional)",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Nullable FruitSampleResource fruitSample
 ) {
 }

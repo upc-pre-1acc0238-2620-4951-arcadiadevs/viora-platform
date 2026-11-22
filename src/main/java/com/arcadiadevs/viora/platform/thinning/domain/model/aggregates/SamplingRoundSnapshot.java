@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.domain.model.aggregates;
 
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.FruitSample;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.RoundId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingBatchId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.UserId;
@@ -23,8 +24,23 @@ public record SamplingRoundSnapshot(
         SamplingBatchId batchId,
         Boolean isRepresentative,
         List<TreeSamplingRecordSnapshot> samplingRecords,
-        Instant createdAt
+        Instant createdAt,
+        FruitSample fruitSample
 ) {
+
+    /**
+     * Constructor for a round without a fruit sample.
+     */
+    public SamplingRoundSnapshot(
+            RoundId id,
+            UserId actorId,
+            SamplingBatchId batchId,
+            Boolean isRepresentative,
+            List<TreeSamplingRecordSnapshot> samplingRecords,
+            Instant createdAt
+    ) {
+        this(id, actorId, batchId, isRepresentative, samplingRecords, createdAt, null);
+    }
 
     /**
      * Backward-compatible constructor defaulting createdAt to current time.

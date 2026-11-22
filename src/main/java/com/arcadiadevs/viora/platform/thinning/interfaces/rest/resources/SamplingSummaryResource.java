@@ -48,6 +48,11 @@ public record SamplingSummaryResource(
         Integer treesNeeded,
 
         @Schema(description = "Unit of the mean load", example = "FRUITS_PER_SHOOT")
-        String loadUnit
+        String loadUnit,
+
+        @Schema(description = "Caliber of the latest round that weighed fruits, in fruits per kilogram; "
+                + "null when none did",
+                example = "200.0")
+        Double fruitsPerKg
 ) {
 }

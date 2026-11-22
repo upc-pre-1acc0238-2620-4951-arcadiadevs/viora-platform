@@ -13,6 +13,7 @@ import java.util.List;
  * @param plotName                      its name
  * @param producerId                    its owner
  * @param producerName                  the owner's name
+ * @param memberCode                    the code the member redeemed, masked, to tell members apart
  * @param producerPhone                 the owner's phone, for «Llamar» and «WhatsApp»
  * @param variety                       its olive variety
  * @param areaHa                        its area in hectares
@@ -40,6 +41,7 @@ public record MemberPlotDetailResource(
         @Schema(example = "La Yarada 02") String plotName,
         String producerId,
         @Schema(example = "Teodoro Mamani") String producerName,
+        @Schema(example = "COOP-••2Q") String memberCode,
         @Schema(example = "+51952184337") String producerPhone,
         @Schema(example = "SEVILLANA") String variety,
         @Schema(example = "2.5") Double areaHa,

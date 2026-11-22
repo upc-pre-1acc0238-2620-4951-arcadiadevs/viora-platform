@@ -12,6 +12,7 @@ import java.util.List;
  * @param plotName           its name; only unique per producer
  * @param producerId         its owner
  * @param producerName       the owner's name
+ * @param memberCode         the code the member redeemed, masked, to tell members apart
  * @param variety            its olive variety
  * @param areaHa             its area in hectares
  * @param latitude           its centroid latitude
@@ -33,6 +34,7 @@ public record MemberPlotResource(
         @Schema(example = "La Yarada 02") String plotName,
         String producerId,
         @Schema(example = "Teodoro Mamani") String producerName,
+        @Schema(example = "COOP-••2Q") String memberCode,
         @Schema(example = "SEVILLANA") String variety,
         @Schema(example = "2.5") Double areaHa,
         @Schema(example = "-18.05") Double latitude,

@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -220,6 +221,36 @@ class ThinningPrescriptionFlowIntegrationTest {
         mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
                         .content(correction.replaceFirst("[0-9a-f-]{36}", UUID.randomUUID().toString())))
                 .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    @DisplayName("A round may weigh fruits: it answers their caliber, and a sample no field could weigh is refused")
+    void aRoundMayWeighFruits() throws Exception {
+        var plotId = createPlot("SEVILLANA");
+        var round = """
+                {"clientBatchId":"%s","campaignYear":%d,"samples":[
+                 {"treeTag":"T-1","shootCount":20,"fruitSetCount":12,"samplingDate":"%s"}],
+                 "fruitSample":{"fruitCount":%d,"weightGrams":%s}}
+                """;
+        var today = LocalDate.now(ProducerTimeZone.ZONE);
+
+        mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content(round.formatted(UUID.randomUUID(), campaign, today, 0, "250")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content(round.formatted(UUID.randomUUID(), campaign, today, 50, "1000")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("2000")));
+        mvc.perform(get("/api/v1/plots/{id}/samplings", plotId).param("campaignYear", String.valueOf(campaign)))
+                .andExpect(jsonPath("$.sampledTreesCount").value(0));
+
+        mvc.perform(post("/api/v1/plots/{id}/samplings", plotId).contentType(MediaType.APPLICATION_JSON)
+                        .content(round.formatted(UUID.randomUUID(), campaign, today, 50, "250")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fruitsPerKg").value(200.0));
+        mvc.perform(get("/api/v1/plots/{id}/samplings", plotId).param("campaignYear", String.valueOf(campaign)))
+                .andExpect(jsonPath("$.sampledTreesCount").value(1))
+                .andExpect(jsonPath("$.fruitsPerKg").value(200.0));
     }
 
     @Test

@@ -12,6 +12,7 @@ import java.util.List;
  * @param plotName                      its name
  * @param producerId                    its owner
  * @param producerName                  the owner's name
+ * @param memberCode                    the code the member redeemed, masked, to tell members apart
  * @param producerPhone                 the owner's phone, for «Llamar» and «WhatsApp»
  * @param variety                       its olive variety
  * @param areaHa                        its area in hectares
@@ -34,11 +35,12 @@ import java.util.List;
  * @param evaluatedAt                   when this was read
  */
 public record MemberPlotDetailView(String plotId, String plotName, String producerId, String producerName,
-                                   String producerPhone, String variety, Double areaHa, String sectorZoneName,
-                                   String sectorStatus, String riskLevel, List<RiskReasonView> reasons,
-                                   Double overloadPercent, Integer sampledTrees, LocalDate lastSampledOn,
-                                   Double preThinningFruitsPerShoot, Double targetFruitsPerShoot,
-                                   Double percentageToRemove, LocalDate windowOpensOn, LocalDate windowClosesOn,
-                                   LocalDate thinningExecutedOn, Double estimatedKgPerHaAfterThinning,
-                                   Double bearingIndex, String bearingCategory, Instant evaluatedAt) {
+                                   String memberCode, String producerPhone, String variety, Double areaHa,
+                                   String sectorZoneName, String sectorStatus, String riskLevel,
+                                   List<RiskReasonView> reasons, Double overloadPercent, Integer sampledTrees,
+                                   LocalDate lastSampledOn, Double preThinningFruitsPerShoot,
+                                   Double targetFruitsPerShoot, Double percentageToRemove, LocalDate windowOpensOn,
+                                   LocalDate windowClosesOn, LocalDate thinningExecutedOn,
+                                   Double estimatedKgPerHaAfterThinning, Double bearingIndex, String bearingCategory,
+                                   Instant evaluatedAt) {
 }

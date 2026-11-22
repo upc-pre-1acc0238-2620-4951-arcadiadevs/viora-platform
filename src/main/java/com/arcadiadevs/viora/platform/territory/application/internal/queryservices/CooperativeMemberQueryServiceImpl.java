@@ -73,7 +73,7 @@ public class CooperativeMemberQueryServiceImpl implements CooperativeMemberQuery
         var read = memberPlotReader.startRead(licenseId);
         return Result.success(externalSubscriptionService.findMembers(licenseId).stream()
                 .map(member -> toView(member, member.sharing() == DataSharingState.SHARING
-                        ? memberPlotReader.plotsOf(read, member.producerId(), null) : List.of()))
+                        ? memberPlotReader.plotsOf(read, member, null) : List.of()))
                 .sorted(Comparator.comparing(view -> view.fullName() == null ? "" : view.fullName()))
                 .toList());
     }
@@ -99,7 +99,7 @@ public class CooperativeMemberQueryServiceImpl implements CooperativeMemberQuery
                     found.sharing().name(), found.withdrawnAt(), found.memberSince(), found.quotaHa(),
                     found.maskedCode(), null, null, null, List.of()));
         }
-        var plots = memberPlotReader.plotsOf(memberPlotReader.startRead(licenseId), found.producerId(), null);
+        var plots = memberPlotReader.plotsOf(memberPlotReader.startRead(licenseId), found, null);
         return Result.success(new CooperativeMemberDetailView(found.producerId().producerId(), name,
                 found.sharing().name(), null, found.memberSince(), found.quotaHa(), found.maskedCode(),
                 externalProfileService.findPhone(found.producerId()).orElse(null),

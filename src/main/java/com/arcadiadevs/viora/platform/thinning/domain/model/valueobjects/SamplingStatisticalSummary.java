@@ -20,7 +20,8 @@ public record SamplingStatisticalSummary(
         int sampledFruitSetCount,
         double meanFruitsPerShoot,
         boolean isRepresentative,
-        int treesNeeded
+        int treesNeeded,
+        Double fruitsPerKg
 ) {
 
     /**
