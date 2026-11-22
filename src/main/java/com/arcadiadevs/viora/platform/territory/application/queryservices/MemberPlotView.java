@@ -11,6 +11,7 @@ import java.util.List;
  * @param plotName           its name; only unique per producer
  * @param producerId         its owner
  * @param producerName       the owner's name
+ * @param memberCode         the code the member redeemed, masked, to tell members apart
  * @param variety            its olive variety
  * @param areaHa             its area in hectares
  * @param latitude           its centroid latitude; null if unknown
@@ -27,9 +28,9 @@ import java.util.List;
  * @param distanceKm         distance to the manager; null without their location
  * @param evaluatedAt        when the color was computed
  */
-public record MemberPlotView(String plotId, String plotName, String producerId, String producerName, String variety,
-                             Double areaHa, Double latitude, Double longitude, String geoJson, String sectorZoneId,
-                             String sectorZoneName, String sectorStatus, String proposedSectorName, String riskLevel,
-                             List<RiskReasonView> reasons, Double overloadPercent, boolean sampled,
+public record MemberPlotView(String plotId, String plotName, String producerId, String producerName, String memberCode,
+                             String variety, Double areaHa, Double latitude, Double longitude, String geoJson,
+                             String sectorZoneId, String sectorZoneName, String sectorStatus, String proposedSectorName,
+                             String riskLevel, List<RiskReasonView> reasons, Double overloadPercent, boolean sampled,
                              Double distanceKm, Instant evaluatedAt) {
 }

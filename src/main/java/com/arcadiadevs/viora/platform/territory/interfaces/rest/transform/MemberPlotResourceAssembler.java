@@ -30,7 +30,7 @@ public final class MemberPlotResourceAssembler {
      */
     public static MemberPlotResource toResource(MemberPlotView view) {
         return new MemberPlotResource(view.plotId(), view.plotName(), view.producerId(), view.producerName(),
-                view.variety(), view.areaHa(), view.latitude(), view.longitude(), view.geoJson(),
+                view.memberCode(), view.variety(), view.areaHa(), view.latitude(), view.longitude(), view.geoJson(),
                 view.sectorZoneId(), view.sectorZoneName(), view.sectorStatus(), view.proposedSectorName(),
                 view.riskLevel(), toResources(view.reasons()), view.overloadPercent(), view.distanceKm(),
                 view.evaluatedAt());
@@ -44,12 +44,12 @@ public final class MemberPlotResourceAssembler {
      */
     public static MemberPlotDetailResource toResource(MemberPlotDetailView view) {
         return new MemberPlotDetailResource(view.plotId(), view.plotName(), view.producerId(), view.producerName(),
-                view.producerPhone(), view.variety(), view.areaHa(), view.sectorZoneName(), view.sectorStatus(),
-                view.riskLevel(), toResources(view.reasons()), view.overloadPercent(), view.sampledTrees(),
-                view.lastSampledOn(), view.preThinningFruitsPerShoot(), view.targetFruitsPerShoot(),
-                view.percentageToRemove(), view.windowOpensOn(), view.windowClosesOn(), view.thinningExecutedOn(),
-                view.estimatedKgPerHaAfterThinning(), view.bearingIndex(), view.bearingCategory(),
-                view.evaluatedAt());
+                view.memberCode(), view.producerPhone(), view.variety(), view.areaHa(), view.sectorZoneName(),
+                view.sectorStatus(), view.riskLevel(), toResources(view.reasons()), view.overloadPercent(),
+                view.sampledTrees(), view.lastSampledOn(), view.preThinningFruitsPerShoot(),
+                view.targetFruitsPerShoot(), view.percentageToRemove(), view.windowOpensOn(), view.windowClosesOn(),
+                view.thinningExecutedOn(), view.estimatedKgPerHaAfterThinning(), view.bearingIndex(),
+                view.bearingCategory(), view.evaluatedAt());
     }
 
     /**
