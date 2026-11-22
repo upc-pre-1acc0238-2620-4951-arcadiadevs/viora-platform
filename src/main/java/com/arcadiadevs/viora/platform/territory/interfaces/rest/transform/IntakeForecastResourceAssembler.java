@@ -1,6 +1,7 @@
 package com.arcadiadevs.viora.platform.territory.interfaces.rest.transform;
 
 import com.arcadiadevs.viora.platform.territory.application.queryservices.IntakeForecastView;
+import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.CaliberIntakeResource;
 import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.IntakeForecastResource;
 import com.arcadiadevs.viora.platform.territory.interfaces.rest.resources.SectorIntakeResource;
 
@@ -27,6 +28,11 @@ public final class IntakeForecastResourceAssembler {
                                 sector.sectorStatus(), sector.plots(), sector.sampledPlots(), sector.tons(),
                                 sector.greenTons(), sector.blackTons(), sector.unclassifiedTons()))
                         .toList(),
-                view.evaluatedAt());
+                view.confidenceLevel(), view.pendingPlots(), view.pendingHectares(),
+                view.caliberBreakdown().stream()
+                        .map(range -> new CaliberIntakeResource(range.minFruitsPerKg(), range.maxFruitsPerKg(),
+                                range.tons(), range.greenTons(), range.blackTons(), range.unclassifiedTons()))
+                        .toList(),
+                view.unsizedTons(), view.outOfRangeTons(), view.evaluatedAt());
     }
 }

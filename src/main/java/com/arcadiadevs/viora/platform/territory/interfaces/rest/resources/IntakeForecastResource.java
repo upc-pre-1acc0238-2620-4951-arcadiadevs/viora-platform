@@ -22,6 +22,14 @@ import java.util.List;
  * @param coveragePercent             the share of plots sampled or settled
  * @param preliminaryThresholdPercent the coverage from which a projection stops being preliminary
  * @param sectors                     the intake by sector; only when reading one campaign
+ * @param confidenceLevel             {@code LOW}, {@code MEDIUM} or {@code HIGH} for a projection, by the lower of the
+ *                                    plot and hectare coverage; null once settled
+ * @param pendingPlots                plots left to sample for the next confidence level; null once settled
+ * @param pendingHectares             hectares left to sample for the next confidence level; null once settled
+ * @param caliberBreakdown            the projection by the plant's caliber ranges; empty when the plant set none or
+ *                                    once settled
+ * @param unsizedTons                 tons of plots whose producer weighed no fruits; null without ranges
+ * @param outOfRangeTons              tons of plots whose caliber falls outside every range; null without ranges
  * @param evaluatedAt                 when it was computed
  */
 @Schema(name = "IntakeForecastResource", description = "Intake of a campaign: projected or settled")
@@ -39,6 +47,12 @@ public record IntakeForecastResource(
         @Schema(example = "61.7") double coveragePercent,
         @Schema(example = "50.0") double preliminaryThresholdPercent,
         List<SectorIntakeResource> sectors,
+        @Schema(example = "MEDIUM") String confidenceLevel,
+        @Schema(example = "12") Integer pendingPlots,
+        @Schema(example = "38.5") Double pendingHectares,
+        List<CaliberIntakeResource> caliberBreakdown,
+        @Schema(example = "80.0") Double unsizedTons,
+        @Schema(example = "0.0") Double outOfRangeTons,
         Instant evaluatedAt
 ) {
 }

@@ -56,6 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -128,7 +129,9 @@ class IntakeRenewalExitIntegrationTest {
                 .andExpect(jsonPath("$[0].kind").value("PROJECTION"))
                 .andExpect(jsonPath("$[0].status").value("NO_DATA"))
                 .andExpect(jsonPath("$[0].plots").value(2))
-                .andExpect(jsonPath("$[0].totalTons").doesNotExist());
+                .andExpect(jsonPath("$[0].totalTons").doesNotExist())
+                .andExpect(jsonPath("$[0].confidenceLevel").value("LOW"))
+                .andExpect(jsonPath("$[0].pendingPlots").value(1));
         mvc.perform(get(INTAKES + "/" + current))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.preliminaryThresholdPercent").value(50.0))
@@ -138,7 +141,23 @@ class IntakeRenewalExitIntegrationTest {
                 .andExpect(jsonPath("$.sectors[0].plots").value(1))
                 .andExpect(jsonPath("$.sectors[0].greenTons").doesNotExist())
                 .andExpect(jsonPath("$.sectors[0].blackTons").doesNotExist())
-                .andExpect(jsonPath("$.sectors[1].sectorStatus").value("NONE"));
+                .andExpect(jsonPath("$.sectors[1].sectorStatus").value("NONE"))
+                .andExpect(jsonPath("$.confidenceLevel").value("LOW"))
+                .andExpect(jsonPath("$.pendingHectares").isNumber())
+                .andExpect(jsonPath("$.caliberBreakdown.length()").value(0))
+                .andExpect(jsonPath("$.unsizedTons").doesNotExist());
+
+        // Once the plant sets its ranges the projection splits by them, even before any plot can be estimated
+        mvc.perform(put("/api/v1/caliber-ranges").contentType(MediaType.APPLICATION_JSON).content(
+                        "{\"ranges\":[{\"minFruitsPerKg\":140,\"maxFruitsPerKg\":180},"
+                                + "{\"minFruitsPerKg\":181,\"maxFruitsPerKg\":220}]}"))
+                .andExpect(status().isOk());
+        mvc.perform(get(INTAKES + "/" + current))
+                .andExpect(jsonPath("$.caliberBreakdown.length()").value(2))
+                .andExpect(jsonPath("$.caliberBreakdown[0].minFruitsPerKg").value(140))
+                .andExpect(jsonPath("$.caliberBreakdown[0].tons").value(0.0))
+                .andExpect(jsonPath("$.unsizedTons").value(0.0))
+                .andExpect(jsonPath("$.outOfRangeTons").value(0.0));
         mvc.perform(get(INTAKES + "/" + (current + 1))).andExpect(status().isNotFound());
         mvc.perform(get(INTAKES + "/1999")).andExpect(status().isBadRequest());
 

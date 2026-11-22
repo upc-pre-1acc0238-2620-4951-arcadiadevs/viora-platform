@@ -20,10 +20,20 @@ import java.util.List;
  * @param coveragePercent             the share of plots sampled or settled
  * @param preliminaryThresholdPercent the coverage from which a projection stops being preliminary
  * @param sectors                     the intake by sector
+ * @param confidenceLevel             {@code LOW}, {@code MEDIUM} or {@code HIGH} for a projection, by the lower of the
+ *                                    plot and hectare coverage; null once settled
+ * @param pendingPlots                plots left to sample for the next confidence level; null once settled
+ * @param pendingHectares             hectares left to sample for the next confidence level; null once settled
+ * @param caliberBreakdown            the projection by the plant's caliber ranges; empty when the plant set none or
+ *                                    once settled
+ * @param unsizedTons                 tons of plots whose producer weighed no fruits; null without ranges
+ * @param outOfRangeTons              tons of plots whose caliber falls outside every range; null without ranges
  * @param evaluatedAt                 when it was computed
  */
 public record IntakeForecastView(int campaignYear, String kind, String status, Double totalTons, double greenTons,
                                  double blackTons, double unclassifiedTons, int plots, int sampledPlots,
                                  int estimablePlots, double coveragePercent, double preliminaryThresholdPercent,
-                                 List<SectorIntakeView> sectors, Instant evaluatedAt) {
+                                 List<SectorIntakeView> sectors, String confidenceLevel, Integer pendingPlots,
+                                 Double pendingHectares, List<CaliberIntakeView> caliberBreakdown,
+                                 Double unsizedTons, Double outOfRangeTons, Instant evaluatedAt) {
 }
