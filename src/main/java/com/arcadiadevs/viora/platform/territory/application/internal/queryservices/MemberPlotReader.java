@@ -7,6 +7,7 @@ import com.arcadiadevs.viora.platform.territory.application.internal.outboundser
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalTelemetryService;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ExternalThinningService;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.PlotFacts;
+import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.SponsoredMember;
 import com.arcadiadevs.viora.platform.territory.application.internal.outboundservices.acl.ThinningFacts;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.MemberPlotDetailView;
 import com.arcadiadevs.viora.platform.territory.application.queryservices.MemberPlotView;
@@ -114,16 +115,16 @@ public class MemberPlotReader {
     /**
      * Reads the active plots of a member who shares.
      *
-     * @param read       the read context
-     * @param producerId the member
-     * @param origin     where the manager stands; null without GPS
+     * @param read   the read context
+     * @param member the member
+     * @param origin where the manager stands; null without GPS
      * @return the plots with their sector and color
      */
-    public List<MemberPlotView> plotsOf(LicenseRead read, ProducerId producerId, GeoPoint origin) {
-        var ownerName = externalProfileService.findFullName(producerId).orElse(null);
-        return externalOrchardService.findActivePlots(producerId).stream()
+    public List<MemberPlotView> plotsOf(LicenseRead read, SponsoredMember member, GeoPoint origin) {
+        var ownerName = externalProfileService.findFullName(member.producerId()).orElse(null);
+        return externalOrchardService.findActivePlots(member.producerId()).stream()
                 .flatMap(plotId -> externalOrchardService.findPlotFacts(plotId).stream())
-                .map(facts -> toView(read, producerId, ownerName, facts, origin))
+                .map(facts -> toView(read, member, ownerName, facts, origin))
                 .toList();
     }
 
@@ -164,12 +165,13 @@ public class MemberPlotReader {
     /**
      * Reads one plot of a member who shares, with what the manager needs to coordinate a visit.
      *
-     * @param read       the read context
-     * @param producerId the member
-     * @param plotId     the plot
+     * @param read   the read context
+     * @param member the member
+     * @param plotId the plot
      * @return the plot, or empty if it is not an active plot of the member
      */
-    public Optional<MemberPlotDetailView> detailOf(LicenseRead read, ProducerId producerId, PlotId plotId) {
+    public Optional<MemberPlotDetailView> detailOf(LicenseRead read, SponsoredMember member, PlotId plotId) {
+        var producerId = member.producerId();
         if (externalOrchardService.findActivePlotOwner(plotId).filter(producerId::equals).isEmpty()) {
             return Optional.empty();
         }
@@ -179,7 +181,7 @@ public class MemberPlotReader {
             var sector = sectorOf(read, producerId, plotId);
             var bearing = externalPhenologyService.findBearingIndex(plotId);
             return new MemberPlotDetailView(plotId.plotId(), facts.name(), producerId.producerId(),
-                    externalProfileService.findFullName(producerId).orElse(null),
+                    externalProfileService.findFullName(producerId).orElse(null), member.maskedCode(),
                     externalProfileService.findPhone(producerId).orElse(null),
                     facts.variety(), facts.areaHa(), sector.zoneName(), sector.status(),
                     assessment.level().name(), reasonsOf(assessment), assessment.overloadPercent(),
@@ -198,8 +200,9 @@ public class MemberPlotReader {
         });
     }
 
-    private MemberPlotView toView(LicenseRead read, ProducerId producerId, String ownerName, PlotFacts facts,
+    private MemberPlotView toView(LicenseRead read, SponsoredMember member, String ownerName, PlotFacts facts,
                                   GeoPoint origin) {
+        var producerId = member.producerId();
         var plotId = facts.plotId();
         var thinning = externalThinningService.findCampaign(plotId, today(read).getYear());
         var assessment = assess(read, plotId, thinning);
@@ -208,7 +211,7 @@ public class MemberPlotReader {
         Double distance = origin == null || center == null ? null
                 : Math.round(origin.distanceKmTo(center) * 10.0) / 10.0;
         return new MemberPlotView(plotId.plotId(), facts.name(), producerId.producerId(), ownerName,
-                facts.variety(), facts.areaHa(), center == null ? null : center.latitude(),
+                member.maskedCode(), facts.variety(), facts.areaHa(), center == null ? null : center.latitude(),
                 center == null ? null : center.longitude(), facts.geoJson(), sector.zoneId(), sector.zoneName(),
                 sector.status(), sector.proposedName(), assessment.level().name(), reasonsOf(assessment),
                 assessment.overloadPercent(), thinning.map(each -> each.sampledTrees() > 0).orElse(false), distance,

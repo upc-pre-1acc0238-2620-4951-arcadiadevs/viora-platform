@@ -55,6 +55,23 @@ public final class SamplingCoverageEvaluator {
      * @param roundSnapshots the sampling round snapshots
      * @return unique count of trees evaluated
      */
+    /**
+     * The caliber of the latest round that weighed fruits: a later sample tells how the fruits grew.
+     *
+     * @param roundSnapshots the rounds of a campaign
+     * @return fruits per kilogram, or null when no round weighed fruits
+     */
+    public static Double latestFruitsPerKgFromSnapshots(List<SamplingRoundSnapshot> roundSnapshots) {
+        if (roundSnapshots == null) {
+            return null;
+        }
+        return roundSnapshots.stream()
+                .filter(round -> round.fruitSample() != null)
+                .max(Comparator.comparing(SamplingRoundSnapshot::createdAt))
+                .map(round -> round.fruitSample().fruitsPerKg())
+                .orElse(null);
+    }
+
     public static int countUniqueEvaluatedTreesFromSnapshots(List<SamplingRoundSnapshot> roundSnapshots) {
         if (roundSnapshots == null || roundSnapshots.isEmpty()) {
             return 0;

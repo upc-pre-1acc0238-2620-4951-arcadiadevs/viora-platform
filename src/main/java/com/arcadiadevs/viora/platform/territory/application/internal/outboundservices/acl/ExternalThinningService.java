@@ -48,7 +48,7 @@ public class ExternalThinningService {
     public Optional<YieldOutlookFacts> findYieldOutlook(PlotId plotId, int campaignYear) {
         return thinningContextFacade.findYieldOutlook(plotId.plotId(), campaignYear)
                 .map(outlook -> new YieldOutlookFacts(outlook.sampled(), outlook.kgPerHaWithLoad(), outlook.thinned(),
-                        outlook.kgPerHaAfterThinning()));
+                        outlook.kgPerHaAfterThinning(), outlook.fruitsPerKg()));
     }
 
     /**
@@ -58,9 +58,10 @@ public class ExternalThinningService {
      * @param kgPerHaWithLoad      the yield with the sampled load; null unless it can be estimated
      * @param thinned              whether the thinning was registered
      * @param kgPerHaAfterThinning the yield with the load the thinning left; null unless thinned and estimable
+     * @param fruitsPerKg          the caliber the producer last weighed; null when they weighed none
      */
     public record YieldOutlookFacts(boolean sampled, Double kgPerHaWithLoad, boolean thinned,
-                                    Double kgPerHaAfterThinning) {
+                                    Double kgPerHaAfterThinning, Double fruitsPerKg) {
 
         /**
          * The yield the intake adds: after the thinning only once it was registered, never assuming one that did not

@@ -8,9 +8,18 @@ package com.arcadiadevs.viora.platform.territory.domain.model.valueobjects;
  * @param sampled     whether any tree of it was sampled this campaign
  * @param projectedKg the harvest it is expected to give; null when it cannot be estimated
  * @param greenShare  the share of green olives in its settled history, from 0 to 1; null without history
+ * @param areaHa      its area in hectares; null if unknown
+ * @param fruitsPerKg the caliber its producer last weighed; null when they weighed none
  */
 public record PlotYield(PlotId plotId, SectorPlacement sector, boolean sampled, Double projectedKg,
-                        Double greenShare) {
+                        Double greenShare, Double areaHa, Double fruitsPerKg) {
+
+    /**
+     * A plot whose area and caliber are not known.
+     */
+    public PlotYield(PlotId plotId, SectorPlacement sector, boolean sampled, Double projectedKg, Double greenShare) {
+        this(plotId, sector, sampled, projectedKg, greenShare, null, null);
+    }
 
     /**
      * Validates the parts.

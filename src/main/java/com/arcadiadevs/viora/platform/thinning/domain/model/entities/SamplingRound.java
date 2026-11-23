@@ -2,6 +2,7 @@ package com.arcadiadevs.viora.platform.thinning.domain.model.entities;
 
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.SamplingRoundSnapshot;
 import com.arcadiadevs.viora.platform.thinning.domain.model.aggregates.TreeSamplingRecordSnapshot;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.FruitSample;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.RoundId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.SamplingBatchId;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.UserId;
@@ -22,6 +23,9 @@ public class SamplingRound {
     private final List<TreeSamplingRecord> samplingRecords;
     private final java.time.Instant createdAt;
 
+    /** The fruits weighed in the round to know their caliber; null when none were weighed. */
+    private final FruitSample fruitSample;
+
     /**
      * Constructs a SamplingRound entity.
      *
@@ -40,6 +44,19 @@ public class SamplingRound {
             List<TreeSamplingRecord> samplingRecords,
             java.time.Instant createdAt
     ) {
+        this(id, actorId, batchId, isRepresentative, samplingRecords, createdAt, null);
+    }
+
+    public SamplingRound(
+            RoundId id,
+            UserId actorId,
+            SamplingBatchId batchId,
+            boolean isRepresentative,
+            List<TreeSamplingRecord> samplingRecords,
+            java.time.Instant createdAt,
+            FruitSample fruitSample
+    ) {
+        this.fruitSample = fruitSample;
         this.id = id;
         this.actorId = actorId;
         this.batchId = batchId;
@@ -80,13 +97,23 @@ public class SamplingRound {
             SamplingBatchId batchId,
             List<TreeSamplingRecord> samplingRecords
     ) {
+        return create(actorId, batchId, samplingRecords, null);
+    }
+
+    public static SamplingRound create(
+            UserId actorId,
+            SamplingBatchId batchId,
+            List<TreeSamplingRecord> samplingRecords,
+            FruitSample fruitSample
+    ) {
         return new SamplingRound(
                 new RoundId(),
                 actorId,
                 batchId,
                 false,
                 samplingRecords,
-                java.time.Instant.now()
+                java.time.Instant.now(),
+                fruitSample
         );
     }
 
@@ -109,7 +136,8 @@ public class SamplingRound {
                 snapshot.batchId(),
                 Boolean.TRUE.equals(snapshot.isRepresentative()),
                 records,
-                snapshot.createdAt() != null ? snapshot.createdAt() : java.time.Instant.now()
+                snapshot.createdAt() != null ? snapshot.createdAt() : java.time.Instant.now(),
+                snapshot.fruitSample()
         );
     }
 
@@ -129,7 +157,8 @@ public class SamplingRound {
                 batchId,
                 isRepresentative,
                 recordSnapshots,
-                createdAt
+                createdAt,
+                fruitSample
         );
     }
 
@@ -139,6 +168,10 @@ public class SamplingRound {
 
     public RoundId id() {
         return id;
+    }
+
+    public FruitSample fruitSample() {
+        return fruitSample;
     }
 
     public UserId actorId() {

@@ -1,5 +1,9 @@
 package com.arcadiadevs.viora.platform.territory.domain;
 
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.CaliberRange;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.CaliberSplit;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ConfidenceLevel;
+import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.ConfidenceThresholds;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.IntakeStatus;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotId;
 import com.arcadiadevs.viora.platform.territory.domain.model.valueobjects.PlotSettlement;
@@ -102,6 +106,55 @@ class YieldAggregationDomainServiceTest {
 
         assertThat(intake.sectors()).extracting(sector -> sector.sector().status())
                 .containsExactly("PENDING", "NONE");
+    }
+
+    @Test
+    @DisplayName("Confidence goes by the lower of the plot and hectare coverage, and tells what is left to sample")
+    void confidenceByPlotsAndHectares() {
+        var thresholds = new ConfidenceThresholds(50, 80);
+        // Two of four plots sampled (50 %), but only 2 of 10 hectares (20 %): the hectares decide
+        var plots = List.of(sized(true, 1, null), sized(true, 1, null), sized(false, 4, null), sized(false, 4, null));
+
+        var low = YieldAggregationDomainService.confidence(plots, thresholds);
+        assertThat(low.level()).isEqualTo(ConfidenceLevel.LOW);
+        assertThat(low.coveragePercent()).isEqualTo(20.0);
+        assertThat(low.pendingPlots()).isZero();
+        assertThat(low.pendingHectares()).isEqualTo(3.0);
+
+        var medium = YieldAggregationDomainService.confidence(
+                List.of(sized(true, 4, null), sized(true, 4, null), sized(false, 1, null)), thresholds);
+        assertThat(medium.level()).isEqualTo(ConfidenceLevel.MEDIUM);
+        assertThat(medium.pendingPlots()).isEqualTo(1);
+
+        var high = YieldAggregationDomainService.confidence(List.of(sized(true, 4, null)), thresholds);
+        assertThat(high.level()).isEqualTo(ConfidenceLevel.HIGH);
+        assertThat(high.pendingPlots()).isZero();
+        assertThat(high.pendingHectares()).isZero();
+    }
+
+    @Test
+    @DisplayName("The projection splits by the plant's caliber ranges; unweighed and off-range plots stay apart")
+    void splitByCaliber() {
+        var ranges = List.of(new CaliberRange(140, 180), new CaliberRange(181, 220));
+        var plots = List.of(
+                new PlotYield(plot(), lowerYarada, true, 1_000.0, 0.6, 1.0, 160.0),
+                new PlotYield(plot(), lowerYarada, true, 2_000.0, null, 1.0, 200.0),
+                new PlotYield(plot(), lowerYarada, true, 500.0, 0.5, 1.0, null),
+                new PlotYield(plot(), lowerYarada, true, 300.0, 0.5, 1.0, 400.0),
+                new PlotYield(plot(), lowerYarada, false, null, 0.5, 1.0, 170.0));
+
+        var split = YieldAggregationDomainService.splitByCaliber(plots, ranges);
+
+        assertThat(split.ranges().getFirst().greenKg()).isCloseTo(600.0, within(0.001));
+        assertThat(split.ranges().getFirst().blackKg()).isCloseTo(400.0, within(0.001));
+        assertThat(split.ranges().get(1).unclassifiedKg()).isEqualTo(2_000.0);
+        assertThat(split.unsizedKg()).isEqualTo(500.0);
+        assertThat(split.outOfRangeKg()).isEqualTo(300.0);
+        assertThat(YieldAggregationDomainService.splitByCaliber(plots, List.of())).isEqualTo(CaliberSplit.NONE);
+    }
+
+    private static PlotYield sized(boolean sampled, double hectares, Double fruitsPerKg) {
+        return new PlotYield(plot(), SectorPlacement.NONE, sampled, null, null, hectares, fruitsPerKg);
     }
 
     private static PlotYield plotYield(SectorPlacement sector, boolean sampled, Double kilograms, Double greenShare) {

@@ -46,7 +46,8 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 ThinningRounding.load(meanFruits),
                 isRepresentative,
                 needed,
-                ThinningRounding.LOAD_UNIT
+                ThinningRounding.LOAD_UNIT,
+                SamplingCoverageEvaluator.latestFruitsPerKgFromSnapshots(snapshot.samplingRounds())
         );
     }
 
@@ -69,7 +70,8 @@ public final class SamplingSummaryResourceFromEntityAssembler {
                 ThinningRounding.load(summary.meanFruitsPerShoot()),
                 summary.isRepresentative(),
                 summary.treesNeeded(),
-                ThinningRounding.LOAD_UNIT
+                ThinningRounding.LOAD_UNIT,
+                summary.fruitsPerKg()
         );
     }
 

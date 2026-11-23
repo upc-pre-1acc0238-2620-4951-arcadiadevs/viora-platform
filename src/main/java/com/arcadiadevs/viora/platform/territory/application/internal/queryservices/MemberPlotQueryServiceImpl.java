@@ -85,7 +85,7 @@ public class MemberPlotQueryServiceImpl implements MemberPlotQueryService {
         var read = memberPlotReader.startRead(licenseId);
         return Result.success(externalSubscriptionService.findMembers(licenseId).stream()
                 .filter(member -> member.sharing() == DataSharingState.SHARING)
-                .flatMap(member -> memberPlotReader.plotsOf(read, member.producerId(), query.origin()).stream())
+                .flatMap(member -> memberPlotReader.plotsOf(read, member, query.origin()).stream())
                 .sorted(MemberPlotReader.VISIT_ORDER)
                 .toList());
     }
@@ -97,8 +97,8 @@ public class MemberPlotQueryServiceImpl implements MemberPlotQueryService {
             return Result.failure(scope.failure().orElseThrow());
         }
         var licenseId = scope.success().orElseThrow().licenseId();
-        return sharingOwnerOf(licenseId, query.plotId())
-                .flatMap(producerId -> memberPlotReader.detailOf(memberPlotReader.startRead(licenseId), producerId,
+        return sharingMemberOf(licenseId, query.plotId())
+                .flatMap(member -> memberPlotReader.detailOf(memberPlotReader.startRead(licenseId), member,
                         query.plotId()))
                 .<Result<MemberPlotDetailView, ApplicationError>>map(Result::success)
                 .orElseGet(() -> notFound(query.plotId()));
@@ -145,11 +145,15 @@ public class MemberPlotQueryServiceImpl implements MemberPlotQueryService {
      * member, or who does not share, answers the same as one that does not exist.
      */
     private Optional<ProducerId> sharingOwnerOf(LicenseId licenseId, PlotId plotId) {
+        return sharingMemberOf(licenseId, plotId).map(SponsoredMember::producerId);
+    }
+
+    /** The member who owns an active plot, while they share with the license, with their redeemed code. */
+    private Optional<SponsoredMember> sharingMemberOf(LicenseId licenseId, PlotId plotId) {
         return externalOrchardService.findActivePlotOwner(plotId)
                 .flatMap(producerId -> externalSubscriptionService.findMembers(licenseId).stream()
                         .filter(member -> member.producerId().equals(producerId))
                         .filter(member -> member.sharing() == DataSharingState.SHARING)
-                        .map(SponsoredMember::producerId)
                         .findFirst());
     }
 

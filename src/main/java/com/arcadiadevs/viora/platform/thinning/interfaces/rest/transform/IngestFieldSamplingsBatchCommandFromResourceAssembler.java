@@ -1,5 +1,6 @@
 package com.arcadiadevs.viora.platform.thinning.interfaces.rest.transform;
 
+import com.arcadiadevs.viora.platform.thinning.domain.model.commands.FruitSampleItem;
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.IngestFieldSamplingsBatchCommand;
 import com.arcadiadevs.viora.platform.thinning.domain.model.commands.TreeSampleItem;
 import com.arcadiadevs.viora.platform.thinning.interfaces.rest.resources.SubmitSamplingResource;
@@ -45,7 +46,9 @@ public final class IngestFieldSamplingsBatchCommandFromResourceAssembler {
                 actorId,
                 resource.campaignYear(),
                 resource.clientBatchId(),
-                sampleItems
+                sampleItems,
+                resource.fruitSample() == null ? null
+                        : new FruitSampleItem(resource.fruitSample().fruitCount(), resource.fruitSample().weightGrams())
         );
     }
 }

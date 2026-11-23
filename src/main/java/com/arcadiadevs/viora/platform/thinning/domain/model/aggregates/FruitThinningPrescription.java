@@ -6,6 +6,7 @@ import com.arcadiadevs.viora.platform.thinning.domain.model.entities.TreeSamplin
 import com.arcadiadevs.viora.platform.thinning.domain.model.events.SamplingRoundCompletedEvent;
 import com.arcadiadevs.viora.platform.thinning.domain.model.events.SustainableCropLoadDeterminedEvent;
 import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.*;
+import com.arcadiadevs.viora.platform.thinning.domain.model.valueobjects.FruitSample;
 import com.arcadiadevs.viora.platform.thinning.domain.services.CropLoadBalancingCalculatorService;
 import com.arcadiadevs.viora.platform.thinning.domain.services.FieldSamplingDeduplicator;
 import com.arcadiadevs.viora.platform.thinning.domain.services.SamplingCoverageEvaluator;
@@ -132,6 +133,24 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
             SamplingBatchId batchId,
             List<TreeSamplingRecord> treeRecords
     ) {
+        ingestSamplingsBatch(actorId, batchId, treeRecords, null);
+    }
+
+    /**
+     * Ingests a new field sampling round batch, with the fruits weighed in it to know their caliber.
+     *
+     * @param actorId     the identifier of the sampling user
+     * @param batchId     field sampling batch identifier
+     * @param treeRecords list of tree sampling records
+     * @param fruitSample the fruits weighed in the round; null when none were weighed
+     * @throws IllegalStateException if the prescription was already issued; a batch already ingested is still a no-op
+     */
+    public void ingestSamplingsBatch(
+            UserId actorId,
+            SamplingBatchId batchId,
+            List<TreeSamplingRecord> treeRecords,
+            FruitSample fruitSample
+    ) {
         List<TreeSamplingRecord> validatedRecords = FieldSamplingDeduplicator.validateNoDuplicates(treeRecords);
 
         for (SamplingRound existingRound : samplingRounds) {
@@ -146,7 +165,7 @@ public class FruitThinningPrescription extends AbstractDomainAggregateRoot<Fruit
 
         boolean wasRepresentativeBefore = SamplingCoverageEvaluator.isRepresentative(samplingRounds);
 
-        SamplingRound newRound = SamplingRound.create(actorId, batchId, validatedRecords);
+        SamplingRound newRound = SamplingRound.create(actorId, batchId, validatedRecords, fruitSample);
         samplingRounds.add(newRound);
 
         boolean isRepresentativeNow = SamplingCoverageEvaluator.isRepresentative(samplingRounds);
